@@ -33,6 +33,7 @@ EXPOSE 4000
 USER node
 
 # 9. On container start: apply any pending DB migrations, then run the API.
-#    Shell form (no JSON array) so "&&" works and there's no platform command
-#    parsing to get wrong. Migrate is a no-op when nothing is pending.
-CMD npm run migrate && npm start
+#    Exec-form "sh -c" so the "&&" is unambiguously handled by the shell and
+#    there's no platform command parsing to get wrong. Migrate is a no-op when
+#    nothing is pending.
+CMD ["sh", "-c", "npm run migrate && npm start"]
