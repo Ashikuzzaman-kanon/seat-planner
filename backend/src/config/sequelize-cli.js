@@ -10,6 +10,11 @@ function cfg(database) {
     host: process.env.DB_HOST || "localhost",
     port: parseInt(process.env.DB_PORT || "3306", 10),
     dialect: "mysql",
+    // Match the app's TLS behaviour so migrations work against managed DBs.
+    dialectOptions:
+      process.env.DB_SSL === "true"
+        ? { ssl: { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === "true" } }
+        : {},
     define: { underscored: true, timestamps: true },
     logging: false,
   };
