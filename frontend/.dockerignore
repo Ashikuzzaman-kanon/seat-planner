@@ -1,0 +1,15 @@
+# Keep the build context small and free of host-built artifacts/secrets.
+node_modules
+.next
+npm-debug.log
+
+# Env files are not needed in the image (NEXT_PUBLIC_* is baked via ENV in
+# the Dockerfile; runtime config comes from compose).
+.env
+.env.*
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+*.md

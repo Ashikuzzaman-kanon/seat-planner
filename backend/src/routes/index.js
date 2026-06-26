@@ -3,6 +3,8 @@ const router = express.Router();
 
 const authRoutes = require("./authRoutes");
 const userRoutes = require("./userRoutes");
+const referenceRoutes = require("./referenceRoutes");
+const seatPlanRoutes = require("./seatPlanRoutes");
 const { ALL_ROLES, ROLE_PERMISSIONS } = require("../constants/roles");
 
 router.get("/health", (_req, res) => res.json({ status: "ok", time: new Date().toISOString() }));
@@ -14,5 +16,7 @@ router.get("/meta/roles", (_req, res) =>
 
 router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
+router.use("/reference", referenceRoutes);
+router.use("/plans", seatPlanRoutes);
 
 module.exports = router;

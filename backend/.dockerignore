@@ -1,0 +1,17 @@
+# Files NOT to send into the image build (keeps it small & avoids leaking secrets).
+
+# Host node_modules are built for Windows; the image installs its own Linux
+# copy via "npm ci". Copying these in would break native modules (e.g. bcrypt).
+node_modules
+npm-debug.log
+
+# Never bake secrets into an image — env is provided at runtime instead.
+.env
+.env.*
+
+# Dev-only / irrelevant to the running app.
+.git
+.gitignore
+Dockerfile
+.dockerignore
+*.md

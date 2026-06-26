@@ -28,6 +28,7 @@ const PERMISSIONS = Object.freeze({
   PLAN_UPDATE: "plan:update",
   PLAN_DELETE: "plan:delete",
   PLAN_APPROVE: "plan:approve", // approve/reject pending plans
+  REFERENCE_MANAGE: "reference:manage", // manage train names / coach types / classes
   USER_VIEW: "user:view", // list/inspect users
   USER_MANAGE_ROLES: "user:manage_roles", // change a user's role
 });
@@ -48,6 +49,7 @@ const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.PLAN_UPDATE,
     PERMISSIONS.PLAN_DELETE,
     PERMISSIONS.PLAN_APPROVE,
+    PERMISSIONS.REFERENCE_MANAGE,
     PERMISSIONS.USER_VIEW,
   ],
 

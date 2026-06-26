@@ -29,6 +29,7 @@ export const PERMISSIONS = {
   PLAN_UPDATE: "plan:update",
   PLAN_DELETE: "plan:delete",
   PLAN_APPROVE: "plan:approve",
+  REFERENCE_MANAGE: "reference:manage",
   USER_VIEW: "user:view",
   USER_MANAGE_ROLES: "user:manage_roles",
 };

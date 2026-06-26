@@ -7,9 +7,8 @@ async function start() {
     await sequelize.authenticate();
     console.log("✅ Database connection established");
 
-    // Dev convenience: keep schema in sync. Use migrations in production.
-    await sequelize.sync({ alter: !env.isProduction });
-    console.log("✅ Models synchronized");
+    // Schema is managed by migrations (npm run migrate) — no sync() here, so
+    // the database shape is explicit, versioned, and identical across envs.
 
     app.listen(env.port, () => {
       console.log(`🚀 API listening on http://localhost:${env.port}/api (${env.nodeEnv})`);

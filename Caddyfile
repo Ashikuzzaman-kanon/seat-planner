@@ -1,0 +1,14 @@
+# Caddy routes one public address to two containers.
+# {$SITE_ADDRESS::80} = the SITE_ADDRESS env var, defaulting to ":80" (http).
+# Set SITE_ADDRESS=yourdomain.com in production and Caddy auto-provisions HTTPS.
+{$SITE_ADDRESS::80} {
+	# API calls go to the backend (path is preserved, so /api/* stays /api/*).
+	handle /api/* {
+		reverse_proxy backend:4000
+	}
+
+	# Everything else goes to the Next.js frontend.
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

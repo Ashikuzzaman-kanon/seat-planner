@@ -1,0 +1,9 @@
+const path = require("path");
+
+// Tells sequelize-cli where our config and migration files live, so we can
+// keep the standard project layout instead of its defaults.
+module.exports = {
+  config: path.resolve(__dirname, "src/config/sequelize-cli.js"),
+  "migrations-path": path.resolve(__dirname, "migrations"),
+  "seeders-path": path.resolve(__dirname, "seeders"),
+};

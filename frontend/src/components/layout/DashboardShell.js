@@ -20,6 +20,12 @@ const NAV = [
     permission: PERMISSIONS.PLAN_APPROVE,
   },
   {
+    href: "/dashboard/reference",
+    label: "Reference Data",
+    icon: "pi pi-database",
+    permission: PERMISSIONS.REFERENCE_MANAGE,
+  },
+  {
     href: "/dashboard/users",
     label: "Users & Roles",
     icon: "pi pi-users",

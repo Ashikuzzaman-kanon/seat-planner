@@ -1,0 +1,83 @@
+# One file describing the whole stack. Run it with `docker compose up`.
+# Compose puts all services on a private network where they reach each other
+# by service name (db, backend, frontend) — no host.docker.internal needed.
+name: seat-planner
+
+services:
+  # ---------- MySQL database ----------
+  db:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}        # a non-root app user (least privilege)
+      MYSQL_PASSWORD: ${DB_PASS}
+    volumes:
+      - db_data:/var/lib/mysql       # named volume = data survives restarts
+    healthcheck:                     # backend waits until this passes
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ---------- Express API ----------
+  backend:
+    build: ./backend                 # build the image from backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy   # don't start until MySQL is ready
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DB_HOST: db                    # the MySQL service name on the compose network
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      EMAIL_HOST: ${EMAIL_HOST:-}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_SECURE: ${EMAIL_SECURE:-false}
+      EMAIL_USER: ${EMAIL_USER:-}
+      EMAIL_PASS: ${EMAIL_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-Seat Planner <no-reply@seatplanner.local>}
+      SUPER_ADMIN_NAME: ${SUPER_ADMIN_NAME:-Super Admin}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD}
+    # Apply DB migrations, then start the API.
+    command: sh -c "npm run migrate && npm start"
+
+  # ---------- Next.js frontend ----------
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  # ---------- Caddy reverse proxy (single entry point) ----------
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    environment:
+      # ":80" locally (http). On the server set SITE_ADDRESS=yourdomain.com
+      # and Caddy fetches a TLS cert automatically.
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data             # persists issued TLS certificates
+      - caddy_config:/config
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:
