@@ -1,9 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Emit a minimal self-contained server (.next/standalone) for small,
-  // production-ready Docker images.
-  output: "standalone",
+  // Standalone output is only for our self-hosted Docker image. Vercel builds
+  // and serves Next.js its own way, so disable it there (it sets VERCEL=1).
+  output: process.env.VERCEL ? undefined : "standalone",
   // Proxy API calls to the backend so the browser only ever talks to one
   // origin (this frontend). Lets you share a single public URL (just port
   // 3000) without CORS or a second tunnel. Override the target with
