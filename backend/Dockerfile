@@ -32,7 +32,7 @@ EXPOSE 4000
 #    "node" user; running as it limits damage if the app is compromised.
 USER node
 
-# 9. The default command run when a CONTAINER starts from this image.
-#    (RUN = build time; CMD = run time.) This calls "npm start" ->
-#    "node src/server.js".
-CMD ["npm", "start"]
+# 9. On container start: apply any pending DB migrations, then run the API.
+#    Shell form (no JSON array) so "&&" works and there's no platform command
+#    parsing to get wrong. Migrate is a no-op when nothing is pending.
+CMD npm run migrate && npm start
