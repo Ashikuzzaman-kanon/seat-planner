@@ -10,6 +10,9 @@ defined as data.
 > The API runs on a free tier that sleeps after 15 minutes idle, so the first
 > request after a quiet spell can take ~50 seconds.
 
+**Guides:** [Features](docs/FEATURES.md) — every feature with a link to its code ·
+[Learning goals](docs/LEARNING-GOALS.md) — each learning-goal topic and where the project exercises it
+
 ---
 
 ## What it does
