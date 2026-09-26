@@ -37,6 +37,8 @@ const TicketScan = require("./TicketScan");
 const TicketReport = require("./TicketReport");
 const AccountHold = require("./AccountHold");
 const Job = require("./Job");
+const DemoRecord = require("./DemoRecord");
+const demoCapture = require("../utils/demoCapture");
 
 const models = {
   User,
@@ -77,6 +79,7 @@ const models = {
   TicketReport,
   AccountHold,
   Job,
+  DemoRecord,
 };
 
 // Wire up associations for any model that declares them.
@@ -85,5 +88,8 @@ Object.values(models).forEach((model) => {
     model.associate(models);
   }
 });
+
+// Notes every row the demo data creates, so it can be removed again exactly.
+demoCapture.install(sequelize, DemoRecord);
 
 module.exports = { sequelize, ...models };

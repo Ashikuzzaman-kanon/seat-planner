@@ -163,6 +163,13 @@ export const NAV_GROUPS = [
         permission: PERMISSIONS.JOB_VIEW,
         blurb: "Refunds and messages still running",
       },
+      {
+        href: "/dashboard/demo-data",
+        label: "Demo Data",
+        icon: "pi pi-box",
+        permission: PERMISSIONS.DEMO_MANAGE,
+        blurb: "Fill the system with sample data, or remove it",
+      },
     ],
   },
 ];

@@ -136,6 +136,12 @@ const EKOTA_ROUTE = [
   ["DNJ", "06:15", null, 1, 470],
 ];
 
+/** Which train each route belongs to, and the numbers it runs under. */
+const ROUTES = [
+  ["Madhumati Express", MADHUMATI_ROUTE, { code: "755/756", upCode: "755", downCode: "756" }],
+  ["Ekota Express", EKOTA_ROUTE, { code: "705/706", upCode: "705", downCode: "706" }],
+];
+
 /** Per-kilometre fallbacks, one per class. These catch every pair no table lists. */
 const DISTANCE_RATES = [
   ["Shovon", 1.1, 35],
@@ -145,6 +151,35 @@ const DISTANCE_RATES = [
   ["AC Chair", 2.6, 130],
   ["AC Cabin", 3.9, 200],
 ];
+
+/**
+ * A published price table for one train, to show an override beating the
+ * fallback on exactly the pairs it lists and nowhere else.
+ */
+const PUBLISHED_TABLE = {
+  name: "Madhumati — published Shovon Chair fares",
+  train: "Madhumati Express",
+  coachClass: "Shovon Chair",
+  pairs: [
+    ["RJS", "ISD", 120],
+    ["RJS", "KTC", 210],
+    ["RJS", "RJB", 300],
+    ["RJS", "FDP", 340],
+    ["RJS", "BNG", 380],
+    ["ISD", "BNG", 300],
+    ["KTC", "BNG", 240],
+  ],
+};
+
+/** Route rows as `trainService.setRoute` takes them. */
+const toStops = (route, stationIds) =>
+  route.map(([code, arrivalTime, departureTime, dayOffset, distanceKm]) => ({
+    stationId: stationIds.get(code),
+    arrivalTime,
+    departureTime,
+    dayOffset,
+    distanceKm,
+  }));
 
 async function run() {
   await sequelize.authenticate();
@@ -177,28 +212,14 @@ async function run() {
   console.log(`✅ Seat attributes: ${SEAT_ATTRIBUTES.length} total (${newAttributes} new)`);
 
   // ---- Routes ----
-  const toStops = (route) =>
-    route.map(([code, arrivalTime, departureTime, dayOffset, distanceKm]) => ({
-      stationId: stationIds.get(code),
-      arrivalTime,
-      departureTime,
-      dayOffset,
-      distanceKm,
-    }));
-
-  const routes = [
-    ["Madhumati Express", MADHUMATI_ROUTE, { code: "755/756", upCode: "755", downCode: "756" }],
-    ["Ekota Express", EKOTA_ROUTE, { code: "705/706", upCode: "705", downCode: "706" }],
-  ];
-
-  for (const [trainName, route, identity] of routes) {
+  for (const [trainName, route, identity] of ROUTES) {
     const train = await TrainName.findOne({ where: { name: trainName } });
     if (!train) {
       console.warn(`⚠️  ${trainName} not found — run seed:seatplans first. Skipping its route.`);
       continue;
     }
     await trainService.update(train.id, identity);
-    const saved = await trainService.setRoute(train.id, toStops(route));
+    const saved = await trainService.setRoute(train.id, toStops(route, stationIds));
     const hours = (saved.journeyMinutes / 60).toFixed(1);
     const overnight = saved.stops.some((s) => s.dayOffset > 0);
     console.log(
@@ -234,13 +255,12 @@ async function run() {
   }
   console.log(`✅ Fare rules: ${DISTANCE_RATES.length} per-kilometre fallbacks (${newRules} new)`);
 
-  // A published price table for one train, to show an override beating the
-  // fallback on exactly the pairs it lists and nowhere else.
-  const madhumati = await TrainName.findOne({ where: { name: "Madhumati Express" } });
-  const shovonChairId = classIds.get("Shovon Chair");
+  // The published price table.
+  const madhumati = await TrainName.findOne({ where: { name: PUBLISHED_TABLE.train } });
+  const shovonChairId = classIds.get(PUBLISHED_TABLE.coachClass);
 
   if (madhumati && shovonChairId) {
-    const name = "Madhumati — published Shovon Chair fares";
+    const { name } = PUBLISHED_TABLE;
     let rule = await FareRule.findOne({ where: { name } });
     if (!rule) {
       const created = await fareService.createRule({
@@ -259,16 +279,8 @@ async function run() {
       amount,
     });
 
-    await fareService.setTableEntries(rule.id, [
-      pair("RJS", "ISD", 120),
-      pair("RJS", "KTC", 210),
-      pair("RJS", "RJB", 300),
-      pair("RJS", "FDP", 340),
-      pair("RJS", "BNG", 380),
-      pair("ISD", "BNG", 300),
-      pair("KTC", "BNG", 240),
-    ]);
-    console.log("✅ Fare table: Madhumati Shovon Chair — 7 published pairs");
+    await fareService.setTableEntries(rule.id, PUBLISHED_TABLE.pairs.map((p) => pair(...p)));
+    console.log(`✅ Fare table: Madhumati Shovon Chair — ${PUBLISHED_TABLE.pairs.length} published pairs`);
   }
 
   console.log(
@@ -280,7 +292,13 @@ async function run() {
   process.exit(0);
 }
 
-run().catch((err) => {
-  console.error("❌ Network seeding failed:", err.message);
-  process.exit(1);
-});
+// Run only when invoked as a script. The data and helpers above are also used
+// by the super admin's "Populate demo data" button (services/demoService.js).
+if (require.main === module) {
+  run().catch((err) => {
+    console.error("❌ Network seeding failed:", err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { STATIONS, SEAT_ATTRIBUTES, ROUTES, DISTANCE_RATES, PUBLISHED_TABLE, toStops };

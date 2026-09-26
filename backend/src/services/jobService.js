@@ -9,6 +9,7 @@ const ApiError = require("../utils/ApiError");
 const { AUDIT_ACTIONS } = require("../constants/auditActions");
 const { backoffSeconds, isPermanent } = require("../utils/jobRetry");
 const { runWithContext } = require("../utils/requestContext");
+const demoCapture = require("../utils/demoCapture");
 
 /**
  * Durable jobs (Phase 8B).
@@ -221,7 +222,11 @@ async function run(job) {
     if (!definition) {
       throw Object.assign(new Error(`No handler for job type "${job.type}"`), { retryable: false });
     }
-    const result = await runWithContext(context, () => definition.handler(job.payload || {}, ctx));
+    // Outside any demo capture: a job kicked off by demo seeding runs on its
+    // own terms, and whatever it creates is not taken for demo data.
+    const result = await demoCapture.outside(() =>
+      runWithContext(context, () => definition.handler(job.payload || {}, ctx))
+    );
 
     await Job.update(
       {

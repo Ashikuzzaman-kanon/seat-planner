@@ -86,6 +86,9 @@ const PERMISSIONS = Object.freeze({
   // Background jobs
   JOB_VIEW: "job:view",
   JOB_MANAGE: "job:manage",
+
+  // Demo data
+  DEMO_MANAGE: "demo:manage",
 });
 
 /**
@@ -420,6 +423,16 @@ const PERMISSION_CATALOGUE = Object.freeze([
     description:
       "Send a job that ran out of attempts round again. Safe for the jobs this system runs: " +
       "each is written so that running it twice does the work once.",
+  },
+
+  {
+    key: PERMISSIONS.DEMO_MANAGE,
+    group: "Demo data",
+    label: "Populate and delete demo data",
+    description:
+      "Fill the system with demonstration accounts, trains, departures and bookings, and remove " +
+      "them again. Removing touches only what the demo created — but that includes every booking " +
+      "made on a demo departure, so it belongs with whoever runs the system.",
   },
 ]);
 

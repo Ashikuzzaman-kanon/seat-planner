@@ -11,6 +11,10 @@
  * than creating a second copy, and resets it to pending for re-review.
  *
  *   npm run seed:seatplans
+ *
+ * `PLANS` and `buildLayout` are exported for the in-app demo data, which
+ * imports the same layouts — approved rather than pending, since that is a
+ * demonstration and not a transcription awaiting review.
  */
 const crypto = require("crypto");
 const {
@@ -223,7 +227,13 @@ async function run() {
   process.exit(0);
 }
 
-run().catch(async (err) => {
-  console.error(`\n❌ Import failed: ${err.message}`);
-  process.exit(1);
-});
+// Run only when invoked as a script. The data and helpers above are also used
+// by the super admin's "Populate demo data" button (services/demoService.js).
+if (require.main === module) {
+  run().catch(async (err) => {
+    console.error(`\n❌ Import failed: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = { PLANS, buildLayout };

@@ -1,0 +1,337 @@
+/* Demo data. */
+
+.demo-page .card + .card {
+  margin-top: 1.25rem;
+}
+
+/* ---------------- Status ---------------- */
+
+.demo-status__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+}
+.demo-status__state {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+}
+.demo-status__state strong {
+  display: block;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+.demo-status__state small {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.demo-dot {
+  flex-shrink: 0;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--border-strong);
+  box-shadow: 0 0 0 4px var(--surface-2);
+}
+.demo-dot.is-on {
+  background: var(--ok);
+  box-shadow: 0 0 0 4px var(--ok-soft);
+}
+.demo-status__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+/* ---------------- Counts ---------------- */
+
+/* Nine counts: one row on a laptop, three by three on a phone. */
+.demo-counts {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+.demo-count {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-width: 0;
+}
+.demo-count b {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.demo-count span {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.demo-count span i {
+  font-size: 0.75rem;
+  color: var(--brand-600);
+}
+.demo-count.is-zero b,
+.demo-count.is-zero span i {
+  color: var(--faint);
+}
+@media (max-width: 1100px) {
+  .demo-counts {
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  }
+}
+
+/* ---------------- A run in progress ---------------- */
+
+.demo-job {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--brand-200);
+  border-radius: var(--radius);
+  background: var(--brand-50);
+}
+.demo-job__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.6rem;
+}
+.demo-job__line i {
+  color: var(--brand-600);
+}
+.demo-job__line span {
+  color: var(--ink-2);
+  font-size: 0.88rem;
+}
+.demo-job .p-progressbar {
+  height: 0.4rem;
+}
+.demo-job small {
+  color: var(--muted);
+}
+
+/* ---------------- What blocks a delete ---------------- */
+
+.demo-blockers {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #fcd9a8;
+  border-radius: var(--radius);
+  background: var(--warn-soft);
+  color: var(--ink-2);
+}
+.demo-blockers > i {
+  margin-top: 0.15rem;
+  color: var(--warn);
+}
+.demo-blockers strong {
+  color: var(--ink);
+}
+.demo-blocker p {
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.demo-blocker ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.86rem;
+}
+.demo-blocker code {
+  font-weight: 650;
+}
+
+/* ---------------- Sections ---------------- */
+
+.demo-section-head h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.demo-section-head h2 small {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.demo-section-head p {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-width: 72ch;
+}
+
+/* ---------------- Last run ---------------- */
+
+.demo-summary {
+  margin: 0.25rem 0 0;
+  color: var(--ink-2);
+}
+.demo-last.is-failed {
+  border-color: #fecaca;
+}
+.demo-error {
+  margin: 0.5rem 0 0;
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--bad-soft);
+  color: #991b1b;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.demo-notes__title {
+  margin: 1.1rem 0 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.demo-notes {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.demo-notes li {
+  display: flex;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.demo-notes li i {
+  margin-top: 0.22rem;
+  color: var(--info);
+}
+.demo-notes--warn li i {
+  color: var(--warn);
+}
+
+/* ---------------- Accounts ---------------- */
+
+.demo-accounts {
+  display: grid;
+  gap: 0.5rem;
+}
+.demo-account {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.demo-account.is-missing {
+  background: var(--surface-2);
+}
+.demo-account__who {
+  display: grid;
+  min-width: 0;
+}
+.demo-account__role {
+  font-size: 0.75rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.demo-account__email {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.demo-account__password {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.demo-account__password code {
+  white-space: nowrap;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.demo-account .demo-copy.p-button {
+  width: 1.9rem;
+  height: 1.9rem;
+  flex-shrink: 0;
+  margin-left: 0.15rem;
+}
+.demo-muted {
+  color: var(--faint);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+.demo-account__state {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+/* ---------------- Confirmation ---------------- */
+
+.demo-confirm-dialog {
+  width: min(34rem, calc(100vw - 1.5rem));
+}
+.demo-confirm p {
+  margin: 0 0 0.5rem;
+  line-height: 1.5;
+}
+.demo-confirm ul {
+  margin: 0 0 0.75rem;
+  padding-left: 1.1rem;
+  line-height: 1.5;
+}
+
+/* ---------------- Phones ---------------- */
+
+@media (max-width: 640px) {
+  .demo-counts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  /* A third of a phone is too narrow for an icon and "Departures" both. */
+  .demo-count span i {
+    display: none;
+  }
+  .demo-status__actions,
+  .demo-status__actions .p-button {
+    width: 100%;
+  }
+  .demo-account {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .demo-account__who {
+    grid-column: 1 / -1;
+  }
+  .demo-account__state {
+    justify-self: end;
+  }
+}

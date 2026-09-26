@@ -66,4 +66,6 @@ export const PERMISSIONS = {
 
   JOB_VIEW: "job:view",
   JOB_MANAGE: "job:manage",
+
+  DEMO_MANAGE: "demo:manage",
 };

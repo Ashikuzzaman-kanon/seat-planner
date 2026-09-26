@@ -24,6 +24,8 @@ export const JOB_TYPE_LABELS = {
   "refund.trip_cancellation": "Departure refunds",
   "refund.coach_cancellation": "Coach refunds",
   "notify.departure_cancelled": "Cancellation email",
+  "demo.populate": "Populate demo data",
+  "demo.clear": "Delete demo data",
 };
 
 export async function fetchJobs(params = {}) {

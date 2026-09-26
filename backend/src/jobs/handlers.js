@@ -138,4 +138,22 @@ jobs.define("notify.departure_cancelled", {
   },
 });
 
+/*
+ * Demo data (see services/demoService). Required here, not at the top: the
+ * demo service builds on nearly every other service, and nothing above needs it.
+ */
+const demo = require("../services/demoService");
+
+jobs.define(demo.JOB_TYPES.POPULATE, {
+  priority: 0,
+  describe: "Fill the system with demonstration accounts, trains, departures and bookings",
+  handler: (_payload, ctx) => demo.populate(ctx),
+});
+
+jobs.define(demo.JOB_TYPES.CLEAR, {
+  priority: 0,
+  describe: "Remove everything the demo data created",
+  handler: (_payload, ctx) => demo.clear(ctx),
+});
+
 module.exports = jobs;

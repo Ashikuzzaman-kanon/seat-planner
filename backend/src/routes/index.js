@@ -18,6 +18,7 @@ const waitlist = require("./waitlistRoutes");
 const verification = require("./verificationRoutes");
 const abuse = require("./abuseRoutes");
 const jobRoutes = require("./jobRoutes");
+const demoRoutes = require("./demoRoutes");
 const { PERMISSION_CATALOGUE } = require("../constants/permissions");
 const openapi = require("../docs/openapi");
 
@@ -92,6 +93,9 @@ router.use("/abuse", abuse);
 // Work carried on after the request that started it — a cancelled departure's
 // refunds and the messages telling its passengers (Phase 8B).
 router.use("/jobs", jobRoutes);
+
+// Demonstration data the super admin can populate and delete again.
+router.use("/demo-data", demoRoutes);
 
 // After the sale: returning a ticket, moving it to another passenger, and the
 // queue of decisions a person has to make about both.

@@ -116,7 +116,13 @@ async function run() {
   process.exit(0);
 }
 
-run().catch((err) => {
-  console.error("❌ Departure seeding failed:", err.message);
-  process.exit(1);
-});
+// Run only when invoked as a script. The data and helpers above are also used
+// by the super admin's "Populate demo data" button (services/demoService.js).
+if (require.main === module) {
+  run().catch((err) => {
+    console.error("❌ Departure seeding failed:", err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { TRAINS };

@@ -105,6 +105,10 @@ const AUDIT_ACTIONS = Object.freeze({
 
   JOB_FAILED: "job.failed",
   JOB_RETRY: "job.retry",
+
+  // Demonstration data, filled in and taken away by the super admin.
+  DEMO_POPULATE: "demo.populate",
+  DEMO_CLEAR: "demo.clear",
 });
 
 module.exports = { AUDIT_ACTIONS };

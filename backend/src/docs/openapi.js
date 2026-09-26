@@ -105,6 +105,7 @@ module.exports = {
     { name: "Waitlist", description: "Queueing for a stretch that is sold out, and the offers that queue converts into" },
     { name: "After the sale", description: "Returning a ticket, moving it to another passenger, and the decisions a person has to make" },
     { name: "Background jobs", description: "Work done after the request that asked for it — mass refunds and the messages about them" },
+    { name: "Demo data", description: "Filling the system with demonstration data, and removing exactly that again" },
     { name: "Meta", description: "Service metadata" },
   ],
 
@@ -470,12 +471,46 @@ module.exports = {
         startedAt: str(),
         finishedAt: str(),
         lastError: str(),
-        progress: obj({ total: int(), done: int() }),
+        progress: obj({ total: int(), done: int(), step: str("Demo jobs: the stage it is on") }),
         result: obj({}),
         payload: obj({}),
         createdById: int("Who queued it; they may read it without job:view"),
         createdAt: str(),
         updatedAt: str(),
+      }),
+
+      DemoBlocker: obj({
+        kind: { type: "string", enum: ["outside_tickets_on_demo_departures", "demo_tickets_on_other_departures"] },
+        tickets: int("Valid tickets in the way"),
+        bookings: arr(obj({ reference: str(), email: str(), tickets: int() })),
+        message: str("What is in the way, and what to do about it"),
+      }),
+
+      DemoStatus: obj({
+        populated: bool("Whether any demo data exists"),
+        counts: obj({
+          accounts: int(),
+          roles: int(),
+          seatPlans: int(),
+          stations: int(),
+          trains: int(),
+          fareRules: int(),
+          departures: int("Every departure of a demo train, including ones generated after populating"),
+          bookings: int("On demo departures, or by demo accounts — what a delete would remove"),
+          tickets: int(),
+        }),
+        accounts: arr(
+          obj({
+            role: str(),
+            name: str(),
+            email: str(),
+            password: str("The fixed demo password. Null for an account that existed before the demo — it kept its own"),
+            state: { type: "string", enum: ["demo", "existing", "missing"] },
+          })
+        ),
+        blockers: arr(ref("DemoBlocker")),
+        job: { ...ref("Job"), nullable: true, description: "A populate or delete still running" },
+        lastJob: { ...ref("Job"), nullable: true, description: "The last one that finished, with its result" },
       }),
 
       AccountHold: obj({
@@ -2345,6 +2380,66 @@ module.exports = {
           403: errors[403],
           404: errors[404],
           409: response("It is not failed", ref("Error")),
+        },
+      },
+    },
+
+    "/demo-data": {
+      get: {
+        tags: ["Demo data"],
+        summary: "What demo data exists",
+        description:
+          "Counts of what the demo created, the demo accounts with their passwords, anything that would " +
+          "stop a delete, and the populate or delete in progress.",
+        ...secured("demo:manage"),
+        responses: {
+          200: response("Status", ref("DemoStatus")),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/demo-data/populate": {
+      post: {
+        tags: ["Demo data"],
+        summary: "Fill the system with demonstration data",
+        description: [
+          "Queues a background job that creates demo accounts (passengers, planners, admins, checkers — never",
+          "a super admin), the transcribed seat plans (approved), stations, two trains with routes, fares and",
+          "departures, and sample bookings, returns, a transfer, a ticket check and a report.",
+          "",
+          "Anything that already exists under the same name is adopted and **not modified** — an existing",
+          "account keeps its password, an existing train its route. The job's result lists what was adopted.",
+          "Safe to run again: it fills in only what is missing.",
+        ].join("\n"),
+        ...secured("demo:manage"),
+        responses: {
+          202: response("Queued — follow it at /jobs/{id}", obj({ message: str(), job: ref("Job") })),
+          403: errors[403],
+          409: response("A demo delete is still running", ref("Error")),
+        },
+      },
+    },
+
+    "/demo-data/clear": {
+      post: {
+        tags: ["Demo data"],
+        summary: "Remove everything the demo data created",
+        description: [
+          "Queues a background job that deletes, in one transaction, every row the demo created plus what",
+          "happened on it since: departures generated for demo trains, bookings on demo departures, and",
+          "anything demo accounts did. Nothing the demo only adopted is touched.",
+          "",
+          "Refused with 409, before anything is queued, while someone outside the demo holds a valid ticket",
+          "on a demo departure or a demo account holds one on a real departure. `error.details.blockers`",
+          "says which bookings.",
+        ].join("\n"),
+        ...secured("demo:manage"),
+        responses: {
+          202: response("Queued — follow it at /jobs/{id}", obj({ message: str(), job: ref("Job") })),
+          400: response("There is no demo data", ref("Error")),
+          403: errors[403],
+          409: response("Valid tickets are in the way, or a populate is still running", ref("Error")),
         },
       },
     },

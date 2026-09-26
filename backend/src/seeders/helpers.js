@@ -45,10 +45,14 @@ async function setDefaultRole(role) {
 /**
  * Create the user if missing, otherwise refresh its password and verification
  * state, then grant the named roles. Existing role grants are replaced.
+ *
+ * `nid` and `dateOfBirth`, when given, fill in the travel profile a passenger
+ * needs before their first booking.
  */
-async function ensureUser({ fullName, email, password, roles = [] }) {
+async function ensureUser({ fullName, email, password, roles = [], nid, dateOfBirth }) {
   const normalizedEmail = email.toLowerCase().trim();
   const passwordHash = await bcrypt.hash(password, 10);
+  const profile = nid && dateOfBirth ? { nid, dateOfBirth } : {};
 
   let user = await User.findOne({ where: { email: normalizedEmail } });
   let created = false;
@@ -59,6 +63,7 @@ async function ensureUser({ fullName, email, password, roles = [] }) {
     user.isVerified = true;
     user.verificationCode = null;
     user.verificationCodeExpires = null;
+    Object.assign(user, profile);
     await user.save();
   } else {
     user = await User.create({
@@ -66,6 +71,7 @@ async function ensureUser({ fullName, email, password, roles = [] }) {
       email: normalizedEmail,
       passwordHash,
       isVerified: true,
+      ...profile,
     });
     created = true;
   }

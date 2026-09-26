@@ -48,7 +48,7 @@ defined as data.
 - Seat plans: a grid designer for coach layouts, with an approval workflow.
 
 **For administrators**
-- Roles and permissions are data: create roles, grant any of 48 permissions,
+- Roles and permissions are data: create roles, grant any of 49 permissions,
   assign several roles to a user. An escalation guard stops anyone granting
   what they do not hold.
 - A settings store for every tunable rule (timeouts, deductions, abuse weights,
@@ -57,6 +57,11 @@ defined as data.
 - **Background Jobs**: long-running work (a cancelled departure's mass refund,
   the email to each passenger) runs as durable jobs that survive a restart,
   retry with backoff, and wait here for a person if they give up.
+- **Demo Data** (super admin): one button fills an empty system with demo
+  accounts for every role, seat plans, a network, two trains with departures
+  and sample bookings; another removes exactly that again. Existing data is
+  adopted and never changed, and the delete refuses while anyone outside the
+  demo holds a valid ticket on a demo departure.
 
 ## Tech stack
 
@@ -156,11 +161,23 @@ npm run seed:departures         # compositions, weekly schedules, rolling horizo
 A departure generated before its plans were approved has no seats; use its
 *Rebuild* button on *Departures* once they are.
 
-If neither `BREVO_API_KEY` nor `EMAIL_HOST` is set, emails (verification codes,
-tickets) are printed to the API console instead of sent.
+If no email route is configured (`GMAIL_*`, `BREVO_API_KEY` or `EMAIL_HOST`),
+emails (verification codes, tickets) are printed to the API console instead of
+sent.
 
 Optional: `npm run seed:testusers` / `npm run seed:unittestusers` create
 accounts for trying each role.
+
+Or skip the seeding commands after `seed:superadmin`: sign in as the super
+admin and press **Populate demo data** on *Administration → Demo Data*. It
+builds the same data through the app itself — seat plans already approved,
+departures generated, sample bookings made — and **Delete demo data** removes
+it again. This is also how to put demo data on a deployed system.
+
+Demo accounts follow `<role><n>@example.com` / `<Role>123!` — for example
+`planner1@example.com` / `Planner123!`, `checker1@example.com` /
+`Checker123!`, `user1@example.com` / `User123!`. Anyone can read these
+passwords here, so the button never creates a super admin.
 
 ### 2. Frontend
 
@@ -198,7 +215,8 @@ Backend environment (`backend/.env`):
 | `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | no | Default 15m / 30d |
 | `TICKET_SIGNING_SECRET` | recommended | Signs ticket QR codes; falls back to `JWT_SECRET` |
 | `MONGO_URI` | no | Blank disables the audit log |
-| `BREVO_API_KEY` | no | Send through Brevo's HTTP API instead of SMTP — needed where outbound SMTP is blocked. `EMAIL_FROM` must be a verified Brevo sender |
+| `GMAIL_CLIENT_ID` `GMAIL_CLIENT_SECRET` `GMAIL_REFRESH_TOKEN` | no | Send through the Gmail API over HTTPS, as your own Gmail — works where outbound SMTP is blocked. See *Email in production* |
+| `BREVO_API_KEY` | no | Send through Brevo's HTTP API instead — also HTTPS. `EMAIL_FROM` must be a verified Brevo sender |
 | `EMAIL_HOST` `EMAIL_PORT` `EMAIL_SECURE` `EMAIL_USER` `EMAIL_PASS` `EMAIL_FROM` | no | SMTP; with neither this nor Brevo, mail is logged to the console |
 | `CORS_ORIGINS` | production | Comma-separated allowed origins |
 | `SUPER_ADMIN_NAME` `SUPER_ADMIN_EMAIL` `SUPER_ADMIN_PASSWORD` | for seeding | Used by `npm run seed:superadmin` |
@@ -226,10 +244,30 @@ The live deployment follows `master`:
 - **Render** builds `backend/Dockerfile`. The container runs
   `npm run migrate && npm start`, so pending migrations apply on every deploy.
 - **Aiven** hosts MySQL (TLS required).
-- **Brevo** sends email. Render's free web services block outbound SMTP
-  (ports 25, 465 and 587), so production sets `BREVO_API_KEY` and mail goes
-  out over HTTPS instead. Every send gives up after 15 seconds, so a mail
-  problem shows as "try again" rather than a request that never returns.
+- **Email** goes out over HTTPS, because Render's free web services block
+  outbound SMTP (ports 25, 465 and 587). Every send gives up after 15 seconds,
+  so a mail problem shows as "try again" rather than a request that never
+  returns.
+
+### Email in production (Gmail API)
+
+Free, about 500 emails a day, sent as your own Gmail. Once:
+
+1. [Google Cloud console](https://console.cloud.google.com) → create a project
+   (no billing needed) → *APIs & Services → Library* → enable **Gmail API**.
+2. *Google Auth Platform* (the OAuth consent screen): External; add the scope
+   `https://www.googleapis.com/auth/gmail.send`; under *Audience* **publish the
+   app** — in *Testing*, refresh tokens die after 7 days.
+3. *Clients* → create an OAuth client of type **Web application** with the
+   redirect URI `https://developers.google.com/oauthplayground`.
+4. In the [OAuth Playground](https://developers.google.com/oauthplayground):
+   ⚙ → *Use your own OAuth credentials* → paste the client ID and secret;
+   authorise the scope above with the Gmail account to send from (accept the
+   "unverified app" warning — it is your own app); *Exchange authorization code
+   for tokens*; copy the refresh token.
+5. On Render set `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`
+   and `EMAIL_FROM="Seat Planner <that-address@gmail.com>"`. The API logs
+   `[email] sending through the Gmail API` on start.
 
 Push to `master` and both redeploy. A database created by the first release is
 upgraded in place: migration `20260101000001` converts its old single `role`

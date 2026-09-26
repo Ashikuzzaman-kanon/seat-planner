@@ -27,6 +27,8 @@ const ACTION_SEVERITY = {
   "auth.password_reset_request": "warning",
   "auth.password_reset": "warning",
   "auth.password_reset_failed": "danger",
+  "demo.populate": "info",
+  "demo.clear": "warning",
 };
 
 export default function AuditPage() {
