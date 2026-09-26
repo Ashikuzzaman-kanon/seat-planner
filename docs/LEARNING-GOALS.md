@@ -37,9 +37,9 @@ here is planned on GitHub Actions.
 
 **Topic.** Foreign keys with the right delete rule (restrict, cascade, set null) and unique keys keep the data consistent whatever the code does.
 
-**In Seat Planner.** A booking can never lose its departure (RESTRICT); a departure's coaches and seats go with it (CASCADE); a train cannot run twice on one date, nor have two coaches in one position (UNIQUE).
+**In Seat Planner.** A booking can never lose its departure (RESTRICT); a departure's coaches and seats go with it (CASCADE); a train cannot run twice on one date, nor have two coaches in one position (UNIQUE). Above all, a seat can be sold only once per leg: the unique key on (seat, segment) is the last guard against double-selling, even when two purchases race.
 
-**Code.** [foreign-key helper](../backend/migrations/20260104000000-composition-and-trips.js#L21) · [one departure per train per date](../backend/migrations/20260104000000-composition-and-trips.js#L80) · [one coach per position](../backend/migrations/20260104000000-composition-and-trips.js#L39) · [booking tables](../backend/migrations/20260106000000-booking-and-payment.js)
+**Code.** [foreign-key helper](../backend/migrations/20260104000000-composition-and-trips.js#L21) · [one departure per train per date](../backend/migrations/20260104000000-composition-and-trips.js#L80) · [one coach per position](../backend/migrations/20260104000000-composition-and-trips.js#L39) · [one sale per seat per leg](../backend/migrations/20260105000000-segment-inventory.js#L51) · [booking tables](../backend/migrations/20260106000000-booking-and-payment.js)
 
 ### 3. ✅ Indexing
 
@@ -307,9 +307,9 @@ here is planned on GitHub Actions.
 
 **Topic.** Many people acting on the same seats and money at the same moment.
 
-**In Seat Planner.** Seat holds claim segments atomically, wallet rows are locked, background jobs use leases with heartbeats, and de-duplication keys stop two clicks queueing two mass refunds.
+**In Seat Planner.** Seat holds claim segments atomically — the unique key on (seat, segment) makes the loser of a race fail cleanly — wallet rows are locked, background jobs use leases with heartbeats, and de-duplication keys stop two clicks queueing two mass refunds.
 
-**Code.** [holdService.create](../backend/src/services/holdService.js#L60) · [job de-duplication](../backend/src/services/jobService.js#L102) · [lease heartbeat](../backend/src/services/jobService.js#L191)
+**Code.** [holdService.create](../backend/src/services/holdService.js#L60) · [seat-segment unique key](../backend/migrations/20260105000000-segment-inventory.js#L51) · [job de-duplication](../backend/src/services/jobService.js#L102) · [lease heartbeat](../backend/src/services/jobService.js#L191)
 
 ### 35. ✅ Authentication and authorization
 
