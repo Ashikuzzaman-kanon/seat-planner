@@ -43,6 +43,17 @@ const AUDIT_ACTIONS = Object.freeze({
 
   PROFILE_UPDATE: "profile.update",
 
+  // Signing in and out of accounts. Failures are recorded as well as
+  // successes: a run of failed sign-ins is the first thing to look for when
+  // an account is being guessed at.
+  AUTH_LOGIN: "auth.login",
+  AUTH_LOGIN_FAILED: "auth.login_failed",
+  AUTH_REGISTER: "auth.register",
+  AUTH_VERIFY_EMAIL: "auth.verify_email",
+  AUTH_PASSWORD_RESET_REQUEST: "auth.password_reset_request",
+  AUTH_PASSWORD_RESET: "auth.password_reset",
+  AUTH_PASSWORD_RESET_FAILED: "auth.password_reset_failed",
+
   WALLET_TOPUP: "wallet.topup",
   WALLET_ADJUST: "wallet.adjust",
   HOLD_CREATE: "hold.create",

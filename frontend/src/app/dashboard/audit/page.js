@@ -20,6 +20,13 @@ const ACTION_SEVERITY = {
   "role.delete": "danger",
   "user.roles.update": "warning",
   "setting.update": "info",
+  "auth.login": "success",
+  "auth.login_failed": "danger",
+  "auth.register": "info",
+  "auth.verify_email": "success",
+  "auth.password_reset_request": "warning",
+  "auth.password_reset": "warning",
+  "auth.password_reset_failed": "danger",
 };
 
 export default function AuditPage() {

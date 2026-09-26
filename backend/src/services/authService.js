@@ -19,6 +19,17 @@ const { AUDIT_ACTIONS } = require("../constants/auditActions");
 
 const SALT_ROUNDS = 10;
 
+/*
+ * Audit entries for the account flows.
+ *
+ * These requests carry nobody signed in, so the entry names the account
+ * itself as the actor — or, when no account matched, just the address that
+ * was typed. Passwords and codes are never written; only what happened, and
+ * (from the request context) the IP address and browser it came from.
+ */
+const who = (user, email) => ({ id: user?.id ?? null, email: user?.email ?? email ?? null });
+const account = (user, email) => ({ type: "user", id: user?.id ?? null, label: user?.email ?? email ?? null });
+
 /** Configurable at runtime, so code lifetimes can be tuned without a deploy. */
 function verificationTtlMinutes() {
   return settings.get("auth.verification_code_ttl_minutes");
@@ -80,6 +91,13 @@ async function register({ fullName, email, password }) {
         existing.verificationCode,
         verificationTtlMinutes()
       );
+      await audit.record({
+        action: AUDIT_ACTIONS.AUTH_REGISTER,
+        actor: who(existing),
+        entity: account(existing),
+        after: { fullName: existing.fullName, verified: false },
+        message: "registered again before verifying — a new code was sent",
+      });
       return existing.toPublicJSON();
     }
     throw ApiError.conflict("Email is already registered");
@@ -97,6 +115,13 @@ async function register({ fullName, email, password }) {
 
   await grantDefaultRole(user);
   await sendVerificationEmail(user.email, code, verificationTtlMinutes());
+  await audit.record({
+    action: AUDIT_ACTIONS.AUTH_REGISTER,
+    actor: who(user),
+    entity: account(user),
+    after: { fullName: user.fullName, verified: false },
+    message: "account created — waiting for email verification",
+  });
   return user.toPublicJSON();
 }
 
@@ -120,6 +145,14 @@ async function verifyEmail({ email, code }, context) {
   user.verificationCodeExpires = null;
   await user.save();
 
+  await audit.record({
+    action: AUDIT_ACTIONS.AUTH_VERIFY_EMAIL,
+    actor: who(user),
+    entity: account(user),
+    after: { verified: true },
+    message: "email verified — account active and signed in",
+  });
+
   return buildSession(user, context);
 }
 
@@ -137,17 +170,40 @@ async function resendVerification({ email }) {
 
 /** Authenticate with email + password, opening a session. */
 async function login({ email, password }, context) {
-  const user = await User.findOne({ where: { email: email.toLowerCase().trim() } });
-  if (!user) throw ApiError.unauthorized("Invalid credentials");
+  const typed = email.toLowerCase().trim();
+  const user = await User.findOne({ where: { email: typed } });
+
+  // The caller is told only "invalid credentials" either way; the log says
+  // which, because telling a typo from someone guessing is what it is for.
+  const refuse = async (reason, error) => {
+    await audit.record({
+      action: AUDIT_ACTIONS.AUTH_LOGIN_FAILED,
+      actor: who(user, typed),
+      entity: account(user, typed),
+      after: { reason },
+      outcome: "failure",
+      message: `sign-in refused: ${reason}`,
+    });
+    throw error;
+  };
+
+  if (!user) return refuse("no account with that email", ApiError.unauthorized("Invalid credentials"));
 
   const match = await user.verifyPassword(password);
-  if (!match) throw ApiError.unauthorized("Invalid credentials");
+  if (!match) return refuse("wrong password", ApiError.unauthorized("Invalid credentials"));
 
   if (!user.isVerified) {
-    throw ApiError.forbidden("Please verify your email before logging in");
+    return refuse("email not verified yet", ApiError.forbidden("Please verify your email before logging in"));
   }
 
-  return buildSession(user, context);
+  const session = await buildSession(user, context);
+  await audit.record({
+    action: AUDIT_ACTIONS.AUTH_LOGIN,
+    actor: { ...who(user), roles: session.roles.map((r) => r.name ?? r) },
+    entity: account(user),
+    message: "signed in",
+  });
+  return session;
 }
 
 /**
@@ -184,27 +240,59 @@ async function logout({ refreshToken }) {
 
 /** Begin password reset: email a reset OTP (silent if account is unknown). */
 async function forgotPassword({ email }) {
-  const user = await User.findOne({ where: { email: email.toLowerCase().trim() } });
-  if (!user) return; // Avoid account enumeration.
+  const typed = email.toLowerCase().trim();
+  const user = await User.findOne({ where: { email: typed } });
+  if (!user) {
+    // The caller is told nothing either way (no account enumeration); the log
+    // still notes the attempt.
+    await audit.record({
+      action: AUDIT_ACTIONS.AUTH_PASSWORD_RESET_REQUEST,
+      actor: who(null, typed),
+      entity: account(null, typed),
+      after: { codeSent: false },
+      outcome: "failure",
+      message: "password reset asked for an address with no account — nothing sent",
+    });
+    return;
+  }
 
   user.verificationCode = generateOtp();
   user.verificationCodeExpires = otpExpiry();
   await user.save();
   await sendPasswordResetEmail(user.email, user.verificationCode, verificationTtlMinutes());
+  await audit.record({
+    action: AUDIT_ACTIONS.AUTH_PASSWORD_RESET_REQUEST,
+    actor: who(user),
+    entity: account(user),
+    after: { codeSent: true },
+    message: "password reset requested — code emailed",
+  });
 }
 
 /** Complete password reset using the emailed OTP. */
 async function resetPassword({ email, code, newPassword }) {
-  const user = await User.findOne({ where: { email: email.toLowerCase().trim() } });
-  if (!user) throw ApiError.badRequest("Invalid reset request");
+  const typed = email.toLowerCase().trim();
+  const user = await User.findOne({ where: { email: typed } });
 
-  if (
-    !user.verificationCode ||
-    user.verificationCode !== code ||
-    !user.verificationCodeExpires ||
-    new Date() > user.verificationCodeExpires
-  ) {
-    throw ApiError.badRequest("Invalid or expired reset code");
+  const refuse = async (reason, error) => {
+    await audit.record({
+      action: AUDIT_ACTIONS.AUTH_PASSWORD_RESET_FAILED,
+      actor: who(user, typed),
+      entity: account(user, typed),
+      after: { reason },
+      outcome: "failure",
+      message: `password reset refused: ${reason}`,
+    });
+    throw error;
+  };
+
+  if (!user) return refuse("no account with that email", ApiError.badRequest("Invalid reset request"));
+
+  if (!user.verificationCode || user.verificationCode !== code) {
+    return refuse("wrong code", ApiError.badRequest("Invalid or expired reset code"));
+  }
+  if (!user.verificationCodeExpires || new Date() > user.verificationCodeExpires) {
+    return refuse("code expired", ApiError.badRequest("Invalid or expired reset code"));
   }
 
   user.passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
@@ -216,6 +304,14 @@ async function resetPassword({ email, code, newPassword }) {
 
   // Whoever knew the old password no longer has a way in.
   await revokeAllForUser(user.id);
+
+  await audit.record({
+    action: AUDIT_ACTIONS.AUTH_PASSWORD_RESET,
+    actor: who(user),
+    entity: account(user),
+    after: { sessionsSignedOut: true },
+    message: "password reset — every existing session signed out",
+  });
 }
 
 /**

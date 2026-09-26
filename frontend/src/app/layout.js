@@ -18,9 +18,19 @@ import { Inter } from "next/font/google";
  */
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
+/*
+ * The tab icon needs no entry here: Next picks up `icon.svg` (tabs),
+ * `favicon.ico` (browsers without SVG icons) and `apple-icon.png` (iOS home
+ * screen) from this folder and writes the <link> tags itself.
+ */
 export const metadata = {
   title: "Seat Planner — Railway Ticketing",
   description: "Book, check and run railway journeys",
+};
+
+// Tints the browser's address bar on phones to match the brand.
+export const viewport = {
+  themeColor: "#4f46e5",
 };
 
 export default function RootLayout({ children }) {

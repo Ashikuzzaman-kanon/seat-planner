@@ -10,21 +10,27 @@ const { getContext } = require("../utils/requestContext");
  * with a warning and the caller proceeds. That is the same graceful-degradation
  * stance the rest of the document features take.
  */
-async function record({ action, entity, before, after, outcome = "success", message }) {
+/**
+ * `actor` names who acted when the request carries nobody signed in — signing
+ * in, registering, resetting a password. Without it those entries would read
+ * as "system". A signed-in caller always wins over it.
+ */
+async function record({ action, entity, before, after, outcome = "success", message, actor }) {
   if (!isMongoConnected()) {
     console.warn(`[audit] skipped "${action}" — document store unavailable`);
     return null;
   }
 
   const ctx = getContext();
+  const who = ctx.actor || actor || null;
 
   try {
     return await AuditEvent.create({
       action,
       actor: {
-        id: ctx.actor?.id ?? null,
-        email: ctx.actor?.email ?? null,
-        roles: ctx.actor?.roles ?? [],
+        id: who?.id ?? null,
+        email: who?.email ?? null,
+        roles: who?.roles ?? [],
       },
       entity: {
         type: entity?.type ?? null,
