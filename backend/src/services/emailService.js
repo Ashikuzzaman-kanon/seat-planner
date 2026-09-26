@@ -1,15 +1,20 @@
 const nodemailer = require("nodemailer");
+const MailComposer = require("nodemailer/lib/mail-composer");
 const env = require("../config/env");
 const ApiError = require("../utils/ApiError");
 
 /*
  * How mail leaves the building, in order of preference:
  *
- * 1. Brevo's HTTP API, when BREVO_API_KEY is set. It goes out over HTTPS, so
- *    it works where outbound SMTP is blocked — Render's free web services
- *    have refused ports 25, 465 and 587 since September 2025.
- * 2. SMTP, when EMAIL_HOST is set — Gmail and the like, for local development.
- * 3. Neither: messages are written to the console, so every flow still runs.
+ * 1. The Gmail API, when GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and
+ *    GMAIL_REFRESH_TOKEN are all set.
+ * 2. Brevo's HTTP API, when BREVO_API_KEY is set.
+ * 3. SMTP, when EMAIL_HOST is set — Gmail and the like, for local development.
+ * 4. None of them: messages are written to the console, so every flow still runs.
+ *
+ * The first two go out over HTTPS, so they work where outbound SMTP is
+ * blocked — Render's free web services have refused ports 25, 465 and 587
+ * since September 2025.
  *
  * Every route is bounded in time. A mail server that never answers must not
  * hold a sign-up or a booking open while it fails to: unbounded, nodemailer
@@ -18,11 +23,15 @@ const ApiError = require("../utils/ApiError");
  */
 const SEND_TIMEOUT_MS = 15_000;
 
-const brevo = Boolean(env.email.brevoApiKey);
+const { gmail: gmailConfig } = env.email;
+const gmail = Boolean(gmailConfig.clientId && gmailConfig.clientSecret && gmailConfig.refreshToken);
+const brevo = !gmail && Boolean(env.email.brevoApiKey);
 
 let transporter = null;
 
-if (brevo) {
+if (gmail) {
+  console.info("[email] sending through the Gmail API");
+} else if (brevo) {
   console.info("[email] sending through Brevo's HTTP API");
 } else if (env.email.host) {
   transporter = nodemailer.createTransport({
@@ -40,7 +49,7 @@ if (brevo) {
 } else {
   // No SMTP configured: fall back to logging so the flow is testable in dev.
   console.warn(
-    "[email] Neither BREVO_API_KEY nor EMAIL_HOST is set — verification codes will be logged to the console instead of emailed."
+    "[email] No GMAIL_*, BREVO_API_KEY or EMAIL_HOST is set — verification codes will be logged to the console instead of emailed."
   );
 }
 
@@ -88,6 +97,79 @@ async function sendWithBrevo(message) {
   }
 }
 
+/*
+ * The Gmail API.
+ *
+ * A refresh token — granted once, by the account owner, for the gmail.send
+ * scope only — is traded for an access token lasting about an hour, which is
+ * kept and reused until shortly before it runs out. The message itself is an
+ * ordinary MIME message, built by nodemailer exactly as SMTP would send it,
+ * handed over base64url-encoded.
+ */
+let gmailToken = null; // { value, expiresAt }
+
+async function gmailAccessToken({ fresh = false } = {}) {
+  if (!fresh && gmailToken && gmailToken.expiresAt > Date.now() + 60_000) return gmailToken.value;
+
+  const res = await fetch(gmailConfig.tokenUrl, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: gmailConfig.clientId,
+      client_secret: gmailConfig.clientSecret,
+      refresh_token: gmailConfig.refreshToken,
+      grant_type: "refresh_token",
+    }),
+    signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.access_token) {
+    gmailToken = null;
+    // invalid_grant is the one people meet: the token was revoked, or it came
+    // from an OAuth app still in "Testing", whose tokens die after seven days.
+    const hint =
+      body.error === "invalid_grant"
+        ? " — the refresh token was revoked or has expired (an OAuth app left in Testing expires them after 7 days); get a new one"
+        : "";
+    throw new Error(`Google refused the refresh token (HTTP ${res.status} ${body.error || ""})${hint}`);
+  }
+  gmailToken = { value: body.access_token, expiresAt: Date.now() + (Number(body.expires_in) || 3600) * 1000 };
+  return gmailToken.value;
+}
+
+/** The message as Gmail's `messages.send` takes it: raw MIME, base64url. */
+async function gmailRaw({ from, to, subject, html, attachments }) {
+  const mime = await new MailComposer({
+    from,
+    to,
+    subject,
+    html,
+    ...(attachments?.length ? { attachments } : {}),
+  })
+    .compile()
+    .build();
+  return mime.toString("base64url");
+}
+
+async function sendWithGmail(message) {
+  const raw = await gmailRaw({ from: env.email.from, ...message });
+  const send = async (token) =>
+    fetch(gmailConfig.sendUrl, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ raw }),
+      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+    });
+
+  let res = await send(await gmailAccessToken());
+  // A token Google has stopped honouring before its time: get another, once.
+  if (res.status === 401) res = await send(await gmailAccessToken({ fresh: true }));
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 300);
+    throw new Error(`Gmail refused the message (HTTP ${res.status}) ${detail}`.trim());
+  }
+}
+
 /**
  * Domains RFC 2606 and RFC 6761 set aside so they can never receive mail.
  *
@@ -109,7 +191,8 @@ const UNROUTABLE = [
 const isUnroutable = (address) => UNROUTABLE.some((pattern) => pattern.test(String(address || "").trim()));
 
 async function sendMail({ to, subject, html, attachments }) {
-  if ((!brevo && !transporter) || isUnroutable(to)) {
+  const routed = gmail || brevo || Boolean(transporter);
+  if (!routed || isUnroutable(to)) {
     const files = attachments?.length
       ? `\n[email] Attachments: ${attachments
           .map((a) => `${a.filename} (${a.content?.length ?? 0} bytes)`)
@@ -118,7 +201,7 @@ async function sendMail({ to, subject, html, attachments }) {
     // Long bodies are truncated: the console is for confirming the mail went
     // out, not for reading a ticket in.
     const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    const why = brevo || transporter ? "unroutable address" : "no email route configured";
+    const why = routed ? "unroutable address" : "no email route configured";
     console.info(
       `\n[email:${why}] To: ${to}\n[email] Subject: ${subject}${files}\n[email] ${text.slice(0, 400)}${
         text.length > 400 ? "…" : ""
@@ -128,7 +211,9 @@ async function sendMail({ to, subject, html, attachments }) {
   }
 
   try {
-    if (brevo) {
+    if (gmail) {
+      await sendWithGmail({ to, subject, html, attachments });
+    } else if (brevo) {
       await sendWithBrevo({ to, subject, html, attachments });
     } else {
       await transporter.sendMail({
@@ -271,4 +356,5 @@ module.exports = {
   isUnroutable,
   parseAddress,
   brevoPayload,
+  gmailRaw,
 };

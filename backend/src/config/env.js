@@ -68,6 +68,15 @@ const env = {
     // hosts that block outbound SMTP, as Render's free tier does.
     brevoApiKey: process.env.BREVO_API_KEY || "",
     brevoUrl: process.env.BREVO_API_URL || "https://api.brevo.com/v3/smtp/email",
+    // The Gmail API, also over HTTPS: sends as the Gmail account that granted
+    // the refresh token. All three are needed for it to be used.
+    gmail: {
+      clientId: process.env.GMAIL_CLIENT_ID || "",
+      clientSecret: process.env.GMAIL_CLIENT_SECRET || "",
+      refreshToken: process.env.GMAIL_REFRESH_TOKEN || "",
+      tokenUrl: process.env.GMAIL_TOKEN_URL || "https://oauth2.googleapis.com/token",
+      sendUrl: process.env.GMAIL_SEND_URL || "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+    },
   },
 
   superAdmin: {
