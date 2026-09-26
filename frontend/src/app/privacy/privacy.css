@@ -1,0 +1,81 @@
+/* The privacy policy: a plain document, readable on any screen. */
+
+.legal {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 3rem 1rem 4rem;
+  background: var(--bg);
+}
+.legal__doc {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 2.5rem 2.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink-2);
+  line-height: 1.65;
+}
+.legal__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--brand-700);
+  text-decoration: none;
+}
+.legal__back:hover {
+  text-decoration: underline;
+}
+.legal h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+}
+.legal__updated {
+  margin: 0.25rem 0 1.5rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.legal__lead {
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius);
+  background: var(--brand-50);
+  color: var(--ink);
+}
+.legal h2 {
+  margin: 2rem 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.legal p {
+  margin: 0 0 0.75rem;
+}
+.legal ul {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+}
+.legal li {
+  margin-bottom: 0.4rem;
+}
+.legal strong {
+  color: var(--ink);
+}
+
+@media (max-width: 640px) {
+  .legal {
+    padding: 1rem 0.75rem 2rem;
+  }
+  .legal__doc {
+    padding: 1.5rem 1.25rem;
+  }
+  .legal h1 {
+    font-size: 1.6rem;
+  }
+}

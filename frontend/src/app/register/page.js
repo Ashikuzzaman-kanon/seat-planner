@@ -115,6 +115,10 @@ export default function RegisterPage() {
         <Link href="/login" className="auth-alt">
           <i className="pi pi-sign-in" aria-hidden="true" /> Sign in instead
         </Link>
+
+        <p className="auth-legal">
+          By creating an account you agree to how your data is handled — see <Link href="/privacy">Privacy</Link>.
+        </p>
       </form>
     </div>
   );

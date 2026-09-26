@@ -100,6 +100,10 @@ export default function LoginPage() {
         <Link href="/register" className="auth-alt">
           <i className="pi pi-user-plus" aria-hidden="true" /> Create an account
         </Link>
+
+        <p className="auth-legal">
+          <Link href="/privacy">Privacy</Link>
+        </p>
       </form>
     </div>
   );
