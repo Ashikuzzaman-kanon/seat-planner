@@ -342,7 +342,10 @@ async function create({ userId, holdReference: reference, passengers, method = "
   }
 
   const full = await get(booking.id, { userId });
-  await deliver(full, userId);
+  // Not awaited: the sale is complete and the tickets are on screen already.
+  // Rendering the PDF and handing it to a mail server is a courtesy, and the
+  // passenger should not wait on it — `deliver` logs its own failures.
+  deliver(full, userId);
   return full;
 }
 

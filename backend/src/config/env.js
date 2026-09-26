@@ -64,6 +64,10 @@ const env = {
     user: process.env.EMAIL_USER || "",
     pass: process.env.EMAIL_PASS || "",
     from: process.env.EMAIL_FROM || "Seat Planner <no-reply@seatplanner.local>",
+    // Brevo's HTTP API. When the key is set it is used instead of SMTP — for
+    // hosts that block outbound SMTP, as Render's free tier does.
+    brevoApiKey: process.env.BREVO_API_KEY || "",
+    brevoUrl: process.env.BREVO_API_URL || "https://api.brevo.com/v3/smtp/email",
   },
 
   superAdmin: {

@@ -1,9 +1,30 @@
 const nodemailer = require("nodemailer");
 const env = require("../config/env");
+const ApiError = require("../utils/ApiError");
+
+/*
+ * How mail leaves the building, in order of preference:
+ *
+ * 1. Brevo's HTTP API, when BREVO_API_KEY is set. It goes out over HTTPS, so
+ *    it works where outbound SMTP is blocked — Render's free web services
+ *    have refused ports 25, 465 and 587 since September 2025.
+ * 2. SMTP, when EMAIL_HOST is set — Gmail and the like, for local development.
+ * 3. Neither: messages are written to the console, so every flow still runs.
+ *
+ * Every route is bounded in time. A mail server that never answers must not
+ * hold a sign-up or a booking open while it fails to: unbounded, nodemailer
+ * waits two minutes for a connection, which is longer than the proxy in front
+ * of the API waits for the response.
+ */
+const SEND_TIMEOUT_MS = 15_000;
+
+const brevo = Boolean(env.email.brevoApiKey);
 
 let transporter = null;
 
-if (env.email.host) {
+if (brevo) {
+  console.info("[email] sending through Brevo's HTTP API");
+} else if (env.email.host) {
   transporter = nodemailer.createTransport({
     host: env.email.host,
     port: env.email.port,
@@ -11,12 +32,60 @@ if (env.email.host) {
     auth: env.email.user
       ? { user: env.email.user, pass: env.email.pass }
       : undefined,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: SEND_TIMEOUT_MS,
   });
+  console.info(`[email] sending through SMTP at ${env.email.host}:${env.email.port}`);
 } else {
   // No SMTP configured: fall back to logging so the flow is testable in dev.
   console.warn(
-    "[email] EMAIL_HOST is not set — verification codes will be logged to the console instead of emailed."
+    "[email] Neither BREVO_API_KEY nor EMAIL_HOST is set — verification codes will be logged to the console instead of emailed."
   );
+}
+
+/** "Seat Planner <no-reply@x.com>" -> { name: "Seat Planner", email: "no-reply@x.com" } */
+function parseAddress(value) {
+  const text = String(value || "").trim();
+  const match = /^"?([^"<]*?)"?\s*<([^>]+)>$/.exec(text);
+  if (!match) return { email: text };
+  const name = match[1].trim();
+  return name ? { name, email: match[2].trim() } : { email: match[2].trim() };
+}
+
+/** The request body Brevo's transactional email endpoint takes. */
+function brevoPayload({ from, to, subject, html, attachments }) {
+  return {
+    sender: parseAddress(from),
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+    ...(attachments?.length
+      ? {
+          attachment: attachments.map((a) => ({
+            name: a.filename,
+            content: Buffer.from(a.content).toString("base64"),
+          })),
+        }
+      : {}),
+  };
+}
+
+async function sendWithBrevo(message) {
+  const res = await fetch(env.email.brevoUrl, {
+    method: "POST",
+    headers: {
+      "api-key": env.email.brevoApiKey,
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify(brevoPayload({ from: env.email.from, ...message })),
+    signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+  });
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => "")).slice(0, 300);
+    throw new Error(`Brevo refused the message (HTTP ${res.status}) ${detail}`.trim());
+  }
 }
 
 /**
@@ -40,7 +109,7 @@ const UNROUTABLE = [
 const isUnroutable = (address) => UNROUTABLE.some((pattern) => pattern.test(String(address || "").trim()));
 
 async function sendMail({ to, subject, html, attachments }) {
-  if (!transporter || isUnroutable(to)) {
+  if ((!brevo && !transporter) || isUnroutable(to)) {
     const files = attachments?.length
       ? `\n[email] Attachments: ${attachments
           .map((a) => `${a.filename} (${a.content?.length ?? 0} bytes)`)
@@ -49,7 +118,7 @@ async function sendMail({ to, subject, html, attachments }) {
     // Long bodies are truncated: the console is for confirming the mail went
     // out, not for reading a ticket in.
     const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    const why = transporter ? "unroutable address" : "no SMTP configured";
+    const why = brevo || transporter ? "unroutable address" : "no email route configured";
     console.info(
       `\n[email:${why}] To: ${to}\n[email] Subject: ${subject}${files}\n[email] ${text.slice(0, 400)}${
         text.length > 400 ? "…" : ""
@@ -57,13 +126,27 @@ async function sendMail({ to, subject, html, attachments }) {
     );
     return;
   }
-  await transporter.sendMail({
-    from: env.email.from,
-    to,
-    subject,
-    html,
-    ...(attachments?.length ? { attachments } : {}),
-  });
+
+  try {
+    if (brevo) {
+      await sendWithBrevo({ to, subject, html, attachments });
+    } else {
+      await transporter.sendMail({
+        from: env.email.from,
+        to,
+        subject,
+        html,
+        ...(attachments?.length ? { attachments } : {}),
+      });
+    }
+  } catch (err) {
+    // The cause goes to the server log; the caller gets something a person
+    // can act on. 503, not 500: nothing is wrong with the request, and trying
+    // again later is the right response — a queued job retries on it too.
+    const why = err.name === "TimeoutError" ? `no answer within ${SEND_TIMEOUT_MS / 1000}s` : err.message;
+    console.error(`[email] could not send "${subject}" to ${to}: ${why}`);
+    throw new ApiError(503, "The email could not be sent just now. Please try again in a minute.");
+  }
 }
 
 function otpTemplate(title, intro, code, ttlMinutes) {
@@ -186,4 +269,6 @@ module.exports = {
   // Exported so the guard is tested as it is used, rather than through a copy
   // of the patterns that can quietly drift out of step with these.
   isUnroutable,
+  parseAddress,
+  brevoPayload,
 };

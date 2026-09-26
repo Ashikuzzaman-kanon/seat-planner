@@ -156,8 +156,8 @@ npm run seed:departures         # compositions, weekly schedules, rolling horizo
 A departure generated before its plans were approved has no seats; use its
 *Rebuild* button on *Departures* once they are.
 
-If `EMAIL_HOST` is blank, emails (verification codes, tickets) are printed to
-the API console instead of sent.
+If neither `BREVO_API_KEY` nor `EMAIL_HOST` is set, emails (verification codes,
+tickets) are printed to the API console instead of sent.
 
 Optional: `npm run seed:testusers` / `npm run seed:unittestusers` create
 accounts for trying each role.
@@ -198,7 +198,8 @@ Backend environment (`backend/.env`):
 | `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | no | Default 15m / 30d |
 | `TICKET_SIGNING_SECRET` | recommended | Signs ticket QR codes; falls back to `JWT_SECRET` |
 | `MONGO_URI` | no | Blank disables the audit log |
-| `EMAIL_HOST` `EMAIL_PORT` `EMAIL_SECURE` `EMAIL_USER` `EMAIL_PASS` `EMAIL_FROM` | no | SMTP; blank logs mail to the console |
+| `BREVO_API_KEY` | no | Send through Brevo's HTTP API instead of SMTP — needed where outbound SMTP is blocked. `EMAIL_FROM` must be a verified Brevo sender |
+| `EMAIL_HOST` `EMAIL_PORT` `EMAIL_SECURE` `EMAIL_USER` `EMAIL_PASS` `EMAIL_FROM` | no | SMTP; with neither this nor Brevo, mail is logged to the console |
 | `CORS_ORIGINS` | production | Comma-separated allowed origins |
 | `SUPER_ADMIN_NAME` `SUPER_ADMIN_EMAIL` `SUPER_ADMIN_PASSWORD` | for seeding | Used by `npm run seed:superadmin` |
 
@@ -225,6 +226,10 @@ The live deployment follows `master`:
 - **Render** builds `backend/Dockerfile`. The container runs
   `npm run migrate && npm start`, so pending migrations apply on every deploy.
 - **Aiven** hosts MySQL (TLS required).
+- **Brevo** sends email. Render's free web services block outbound SMTP
+  (ports 25, 465 and 587), so production sets `BREVO_API_KEY` and mail goes
+  out over HTTPS instead. Every send gives up after 15 seconds, so a mail
+  problem shows as "try again" rather than a request that never returns.
 
 Push to `master` and both redeploy. A database created by the first release is
 upgraded in place: migration `20260101000001` converts its old single `role`
