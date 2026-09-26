@@ -10,7 +10,7 @@ const {
   updatePlanRules,
   rejectRules,
 } = require("../validators/seatPlanValidators");
-const { PERMISSIONS } = require("../constants/roles");
+const { PERMISSIONS } = require("../constants/permissions");
 
 router.use(authenticate);
 

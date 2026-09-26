@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { DataTable } from "primereact/datatable";
+import DataTable from "@/components/ui/DataTable";
 import { Column } from "primereact/column";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
@@ -10,10 +10,11 @@ import { InputTextarea } from "primereact/inputtextarea";
 import { Toast } from "primereact/toast";
 import { confirmDialog, ConfirmDialog } from "primereact/confirmdialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { PERMISSIONS } from "@/constants/roles";
+import { PERMISSIONS } from "@/constants/permissions";
 import { listPlans, approvePlan, rejectPlan } from "@/lib/plans";
 import { PLAN_STATUS } from "@/constants/planStatus";
 
+import { TIP } from "@/components/ui/tip";
 export default function ApprovalsPage() {
   const { hasPermission } = useAuth();
   const router = useRouter();
@@ -88,9 +89,9 @@ export default function ApprovalsPage() {
 
   const actionBody = (row) => (
     <div style={{ display: "flex", gap: "0.25rem", justifyContent: "flex-end" }}>
-      <Button icon="pi pi-eye" rounded text tooltip="View" onClick={() => router.push(`/dashboard/plans/${row.id}`)} />
-      <Button icon="pi pi-check" rounded text severity="success" tooltip="Approve" onClick={() => onApprove(row)} />
-      <Button icon="pi pi-times" rounded text severity="danger" tooltip="Reject" onClick={() => { setRejectTarget(row); setReason(""); }} />
+      <Button aria-label="View" tooltipOptions={TIP} icon="pi pi-eye" rounded text tooltip="View" onClick={() => router.push(`/dashboard/plans/${row.id}`)} />
+      <Button aria-label="Approve" tooltipOptions={TIP} icon="pi pi-check" rounded text severity="success" tooltip="Approve" onClick={() => onApprove(row)} />
+      <Button aria-label="Reject" tooltipOptions={TIP} icon="pi pi-times" rounded text severity="danger" tooltip="Reject" onClick={() => { setRejectTarget(row); setReason(""); }} />
     </div>
   );
 

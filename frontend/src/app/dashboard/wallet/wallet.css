@@ -1,0 +1,135 @@
+/* The wallet screen. Single column on a phone, two on anything wider. */
+
+.wallet-loading {
+  display: flex;
+  justify-content: center;
+  padding: 4rem 0;
+}
+
+.wallet-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .wallet-grid {
+    grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+  }
+}
+
+.wallet-balance,
+.wallet-topup,
+.wallet-history {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.wallet-history {
+  margin-bottom: 1.5rem;
+}
+
+.wallet-balance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  background: linear-gradient(140deg, #1d4ed8, #1e3a8a);
+  border-color: #1e3a8a;
+  color: #fff;
+}
+
+.wallet-balance__label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #bfdbfe;
+}
+
+.wallet-balance__figure {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+  /* Long balances shrink rather than overflow the card on a narrow screen. */
+  overflow-wrap: anywhere;
+}
+
+.wallet-balance__verify.p-button.p-button-text {
+  color: #dbeafe;
+  padding-left: 0;
+  padding-right: 0;
+}
+.wallet-balance__verify.p-button.p-button-text:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.wallet-ledger {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #bfdbfe;
+}
+.wallet-ledger.is-bad {
+  color: #fecaca;
+  font-weight: 600;
+}
+
+.wallet-topup h2,
+.wallet-history h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.wallet-topup__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.wallet-topup__row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.wallet-topup__input {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.wallet-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.wallet-what {
+  display: flex;
+  flex-direction: column;
+}
+.wallet-what small {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.amount-in {
+  color: #047857;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.amount-out {
+  color: #b91c1c;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* A table of money should never force the page to scroll sideways. */
+.wallet-history .p-datatable-wrapper {
+  overflow-x: auto;
+}

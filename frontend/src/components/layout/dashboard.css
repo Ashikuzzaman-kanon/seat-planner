@@ -1,51 +1,233 @@
+/* ==========================================================================
+   The signed-in frame: sidebar, header, content
+   --------------------------------------------------------------------------
+   Card, page-title and button styling live in app/theme.css. This file used
+   to redefine `.card` and `.page-title` too, and because it loads after the
+   theme, its older values silently won everywhere — so they are gone from
+   here, and the theme is the single place a card is described.
+   ========================================================================== */
+
 .dash-layout {
   display: flex;
   min-height: 100vh;
+  background: var(--bg);
 }
 
+.dash-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+}
+
+/* ---------------- Sidebar ---------------- */
+
 .dash-sidebar {
-  width: 240px;
-  background: #0f172a;
-  color: #e2e8f0;
+  width: 264px;
+  flex-shrink: 0;
+  /* Stays put while the page scrolls, and scrolls itself if it is taller than
+     the window — the old one ran its last links off the bottom of a laptop. */
+  position: sticky;
+  top: 0;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 1.25rem 0.75rem;
-  flex-shrink: 0;
+  background:
+    radial-gradient(120% 60% at 0% 0%, rgba(79, 70, 229, 0.28) 0%, transparent 60%),
+    linear-gradient(180deg, #0b1224 0%, #0f172a 100%);
+  color: #cbd5e1;
+  border-right: 1px solid rgba(148, 163, 184, 0.08);
 }
 
 .dash-brand {
-  font-size: 1.15rem;
-  font-weight: 700;
-  padding: 0.5rem 0.75rem 1.25rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  padding: 1.15rem 1.1rem 1rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: #fff;
+  text-decoration: none !important;
+  min-width: 0;
+}
+.brand__mark {
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: var(--brand-grad);
+  color: #fff;
+  box-shadow: 0 6px 16px -4px rgba(79, 70, 229, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.brand__mark .pi {
+  font-size: 1.05rem;
+}
+.brand__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.brand__text strong {
+  font-size: 1.02rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+.brand__text small {
+  font-size: 0.72rem;
+  color: #8a9ab3;
+  font-weight: 500;
 }
 
 .dash-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0.25rem 0.75rem 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+}
+
+.nav-group + .nav-group {
+  margin-top: 1rem;
+}
+.nav-group__label {
+  padding: 0.4rem 0.7rem 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #64748b;
 }
 
 .dash-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.58rem 0.7rem;
+  margin: 1px 0;
+  border-radius: 10px;
+  color: #b6c2d4;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-decoration: none !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.dash-nav-item .pi {
+  width: 1.1rem;
+  font-size: 0.98rem;
+  text-align: center;
+  color: #7d8ca5;
+  transition: color 0.15s ease;
+}
+.dash-nav-item:hover {
+  background: rgba(148, 163, 184, 0.1);
+  color: #fff;
+}
+.dash-nav-item:hover .pi {
+  color: #dbe4f3;
+}
+
+/* Current page: a lit pill with an accent bar, rather than a solid slab of
+   blue that out-shouts the page it points to. */
+.dash-nav-item.active {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.22), rgba(99, 102, 241, 0.12));
+  color: #fff;
+  font-weight: 600;
+}
+.dash-nav-item.active .pi {
+  color: #93c5fd;
+}
+.dash-nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -0.75rem;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #60a5fa;
+}
+.dash-nav-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.6);
+}
+
+/* Who is signed in, at the foot of the sidebar. */
+.dash-me {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 8px;
-  color: #cbd5e1;
-  font-size: 0.92rem;
+  margin: 0.5rem 0.75rem 0.9rem;
+  padding: 0.65rem;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.1);
 }
-.dash-nav-item:hover {
-  background: #1e293b;
+.dash-me__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.25;
+}
+.dash-me__who strong {
   color: #fff;
-  text-decoration: none;
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.dash-nav-item.active {
-  background: #2563eb;
+.dash-me__who span {
+  color: #8a9ab3;
+  font-size: 0.74rem;
+}
+.dash-me__out {
+  width: 2.1rem;
+  height: 2.1rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #8a9ab3;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.dash-me__out:hover {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+}
+
+/* ---------------- Avatars ---------------- */
+
+.avatar {
+  width: 2.1rem;
+  height: 2.1rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   color: #fff;
+  background: var(--brand-grad);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
+.avatar--lg {
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 0.95rem;
+}
+
+/* ---------------- Main column and header ---------------- */
 
 .dash-main {
   flex: 1;
@@ -55,61 +237,204 @@
 }
 
 .dash-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.5rem;
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
+  gap: 1rem;
+  height: 64px;
+  padding: 0 1.75rem;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border);
 }
 
-.dash-user {
+.dash-crumbs {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.45rem;
+  min-width: 0;
+  font-size: 0.9rem;
 }
-.dash-user-name {
+.dash-crumbs__group {
+  color: var(--muted);
+  font-weight: 500;
+}
+.dash-crumbs .pi {
+  font-size: 0.72rem;
+  color: var(--faint);
+}
+.dash-crumbs__page {
+  color: var(--ink);
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The brand in the header only appears on a phone. */
+.brand--compact {
+  display: none;
+  color: var(--ink);
+}
+.brand--compact .brand__mark {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9px;
+  box-shadow: 0 4px 10px -3px rgba(79, 70, 229, 0.55);
+}
+.brand--compact .brand__mark .pi {
+  font-size: 0.9rem;
+}
+.brand--compact strong {
+  font-size: 0.98rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.dash-header__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.dash-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 2.4rem;
+  padding: 0 0.95rem;
+  border-radius: 10px;
+  background: var(--brand-600);
+  color: #fff !important;
+  font-size: 0.88rem;
   font-weight: 600;
+  text-decoration: none !important;
+  box-shadow: 0 1px 2px rgba(29, 78, 216, 0.3), 0 6px 14px -6px rgba(37, 99, 235, 0.6);
+  transition: background-color 0.15s ease, transform 0.08s ease;
 }
-.dash-user-email {
+.dash-cta:hover {
+  background: var(--brand-700);
+}
+.dash-cta:active {
+  transform: translateY(1px);
+}
+.dash-cta .pi {
   font-size: 0.8rem;
-  color: #6b7280;
 }
+
+.dash-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.6rem;
+  padding: 0 0.55rem 0 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.dash-account:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-xs);
+}
+.dash-account:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.dash-account .avatar {
+  width: 2rem;
+  height: 2rem;
+}
+.dash-account .pi {
+  font-size: 0.7rem;
+  color: var(--faint);
+}
+
+/* ---------------- Account menu ---------------- */
+
+.acct-menu.p-menu {
+  width: 17.5rem;
+  padding: 0.4rem;
+  border-radius: 14px;
+}
+.acct-card {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.6rem 0.6rem 0.7rem;
+}
+.acct-card__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+.acct-card__who strong {
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+.acct-card__who > span {
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.acct-card__roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+.acct-card__roles em {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: var(--brand-50);
+  color: var(--brand-700);
+}
+.acct-menu .p-menuitem-link {
+  border-radius: 9px;
+  padding: 0.6rem 0.7rem;
+}
+.acct-menu .acct-signout .p-menuitem-text,
+.acct-menu .acct-signout .p-menuitem-icon {
+  color: var(--bad) !important;
+}
+
+/* ---------------- Content ---------------- */
 
 .dash-content {
-  padding: 1.5rem;
   flex: 1;
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 1.9rem 1.75rem 3rem;
 }
 
-.page-title {
-  margin: 0 0 0.25rem;
-  font-size: 1.4rem;
-}
-.page-subtitle {
-  margin: 0 0 1.5rem;
-  color: #6b7280;
-}
-
-.card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 1.25rem;
-}
+/* ---------------- Stat tiles ---------------- */
 
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: 1rem;
 }
 .stat-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
   padding: 1.25rem;
 }
 .stat-card .stat-label {
-  color: #6b7280;
+  color: var(--muted);
   font-size: 0.85rem;
 }
 .stat-card .stat-value {
@@ -118,12 +443,144 @@
   margin-top: 0.25rem;
 }
 
-@media (max-width: 768px) {
-  .dash-sidebar {
-    width: 64px;
+/* ---------------- Seat plan list toolbar ---------------- */
+
+.plans-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+.plans-result-count {
+  margin: -0.35rem 0 0.9rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .plans-toolbar {
+    flex-wrap: wrap;
   }
-  .dash-brand span,
-  .dash-nav-item span {
+}
+
+/* ==========================================================================
+   Small screens: the sidebar becomes a drawer
+   --------------------------------------------------------------------------
+   An icon rail was tried first and was the worst of both worlds: a fifth of a
+   400px screen gone, and icons with their labels removed. A drawer gives the
+   page its full width and the navigation its words.
+   ========================================================================== */
+
+.dash-burger,
+.dash-close,
+.dash-scrim {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .dash-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1200;
+    width: min(18rem, 84vw);
+    height: auto;
+    transform: translateX(-100%);
+    transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+    box-shadow: 0 0 60px rgba(2, 6, 23, 0.45);
+  }
+  .menu-open .dash-sidebar {
+    transform: none;
+  }
+
+  .dash-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.24s ease;
+  }
+  .menu-open .dash-scrim {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .dash-close,
+  .dash-burger {
+    display: inline-grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border: 0;
+    border-radius: 11px;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .dash-close {
+    background: rgba(148, 163, 184, 0.1);
+    color: #cbd5e1;
+  }
+  .dash-burger {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--ink);
+  }
+  .dash-burger .pi {
+    font-size: 1.05rem;
+  }
+
+  .dash-header {
+    padding: 0 1rem;
+    gap: 0.7rem;
+    height: 60px;
+  }
+  .dash-content {
+    padding: 1.4rem 1.1rem 2.5rem;
+  }
+}
+
+@media (max-width: 640px) {
+  /* No room for a breadcrumb and a brand; the page title says where you are. */
+  .dash-crumbs {
     display: none;
+  }
+  .brand--compact {
+    display: inline-flex;
+  }
+  /* The account button shrinks to its avatar; the name is in its menu. */
+  .dash-account__name,
+  .dash-account .pi {
+    display: none;
+  }
+  .dash-account {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    height: auto;
+  }
+  .dash-cta span {
+    display: none;
+  }
+  .dash-cta {
+    width: 2.4rem;
+    padding: 0;
+    justify-content: center;
+  }
+  .dash-content {
+    padding: 1.1rem 0.9rem 2.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-sidebar,
+  .dash-scrim,
+  .dash-nav-item {
+    transition: none;
   }
 }

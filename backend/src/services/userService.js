@@ -1,10 +1,16 @@
 const { Op } = require("sequelize");
-const { User } = require("../models");
+const { User, Role, Permission, UserRole } = require("../models");
 const ApiError = require("../utils/ApiError");
-const { ALL_ROLES, ROLES } = require("../constants/roles");
+const { RESERVED_ROLES } = require("../constants/roles");
+const { AUDIT_ACTIONS } = require("../constants/auditActions");
+const { assertCanAssignRole } = require("./roleService");
+const { invalidateUser } = require("./permissionService");
+const audit = require("./auditService");
 
-/** Paginated, searchable user list for admins / super admins. */
-async function listUsers({ page = 1, limit = 20, search = "", role } = {}) {
+const USER_INCLUDE = [{ model: Role, as: "roles", through: { attributes: [] } }];
+
+/** Paginated, searchable user list. Optionally filtered to holders of one role. */
+async function listUsers({ page = 1, limit = 20, search = "", roleId } = {}) {
   const where = {};
   if (search) {
     where[Op.or] = [
@@ -12,60 +18,124 @@ async function listUsers({ page = 1, limit = 20, search = "", role } = {}) {
       { email: { [Op.like]: `%${search}%` } },
     ];
   }
-  if (role) where.role = role;
 
   const offset = (page - 1) * limit;
   const { rows, count } = await User.findAndCountAll({
     where,
+    include: [
+      {
+        ...USER_INCLUDE[0],
+        // Filtering by role must not drop the user's other roles from the
+        // response, so the filter is applied as a separate required join.
+        ...(roleId ? { where: { id: roleId }, required: true } : {}),
+      },
+    ],
     limit,
     offset,
     order: [["created_at", "DESC"]],
+    distinct: true,
   });
 
+  // Re-read role lists unfiltered when a role filter narrowed the join.
+  const users = roleId
+    ? await User.findAll({ where: { id: rows.map((r) => r.id) }, include: USER_INCLUDE })
+    : rows;
+
   return {
-    users: rows.map((u) => u.toPublicJSON()),
+    users: users.map((u) => u.toPublicJSON()),
     pagination: { page, limit, total: count, pages: Math.ceil(count / limit) },
   };
 }
 
-async function getUser(id) {
-  const user = await User.findByPk(id);
+async function findUserOr404(id) {
+  const user = await User.findByPk(id, { include: USER_INCLUDE });
   if (!user) throw ApiError.notFound("User not found");
+  return user;
+}
+
+async function getUser(id) {
+  const user = await findUserOr404(id);
   return user.toPublicJSON();
 }
 
 /**
- * Change a user's role. Only callable by a super admin (enforced at the route).
- * Guards against a super admin changing their own role (avoids self-lockout)
- * and against demoting the last remaining super admin.
+ * Replace the set of roles a user holds.
+ *
+ * Guards, in order:
+ *   1. Nobody edits their own roles — removes the easiest self-lockout.
+ *   2. The escalation guard applies to every role being added *and* removed, so
+ *      an administrator cannot hand out, or strip, access beyond their own.
+ *   3. The last super admin cannot be demoted, or the install loses its way in.
  */
-async function changeRole({ actingUser, targetUserId, newRole }) {
-  if (!ALL_ROLES.includes(newRole)) {
-    throw ApiError.badRequest(`Invalid role. Must be one of: ${ALL_ROLES.join(", ")}`);
-  }
-
-  const target = await User.findByPk(targetUserId);
-  if (!target) throw ApiError.notFound("User not found");
+async function setUserRoles({ actingUser, actingAccess, targetUserId, roleIds }) {
+  const target = await findUserOr404(targetUserId);
 
   if (target.id === actingUser.id) {
-    throw ApiError.badRequest("You cannot change your own role");
+    throw ApiError.badRequest("You cannot change your own roles");
   }
 
-  if (target.role === newRole) {
-    return target.toPublicJSON(); // No-op.
+  const requestedIds = [...new Set(roleIds.map(Number))];
+  const roles = await Role.findAll({
+    where: { id: requestedIds },
+    include: [{ model: Permission, as: "permissions", through: { attributes: [] } }],
+  });
+
+  if (roles.length !== requestedIds.length) {
+    const found = new Set(roles.map((r) => r.id));
+    const missing = requestedIds.filter((id) => !found.has(id));
+    throw ApiError.badRequest(`Unknown role id(s): ${missing.join(", ")}`);
   }
 
-  // Don't allow removing the last super admin.
-  if (target.role === ROLES.SUPER_ADMIN && newRole !== ROLES.SUPER_ADMIN) {
-    const superAdmins = await User.count({ where: { role: ROLES.SUPER_ADMIN } });
-    if (superAdmins <= 1) {
-      throw ApiError.badRequest("Cannot demote the last super admin");
+  const currentIds = target.roles.map((r) => r.id);
+  const added = roles.filter((r) => !currentIds.includes(r.id));
+  const removedIds = currentIds.filter((id) => !requestedIds.includes(id));
+  const removed = await Role.findAll({
+    where: { id: removedIds },
+    include: [{ model: Permission, as: "permissions", through: { attributes: [] } }],
+  });
+
+  for (const role of [...added, ...removed]) {
+    assertCanAssignRole(actingAccess, role);
+  }
+
+  const superAdminRole = await Role.findOne({
+    where: { name: RESERVED_ROLES.SUPER_ADMIN },
+  });
+  if (superAdminRole && removedIds.includes(superAdminRole.id)) {
+    const remaining = await UserRole.count({ where: { roleId: superAdminRole.id } });
+    if (remaining <= 1) {
+      throw ApiError.badRequest("Cannot remove the last super admin");
     }
   }
 
-  target.role = newRole;
-  await target.save();
-  return target.toPublicJSON();
+  await UserRole.destroy({ where: { userId: target.id } });
+  await UserRole.bulkCreate(
+    requestedIds.map((roleId) => ({
+      userId: target.id,
+      roleId,
+      grantedById: actingUser.id,
+    }))
+  );
+
+  // The next request this user makes resolves their access afresh — which is
+  // what makes revocation effective within seconds rather than at token expiry.
+  invalidateUser(target.id);
+
+  await audit.record({
+    action: AUDIT_ACTIONS.USER_ROLES_UPDATE,
+    entity: { type: "user", id: target.id, label: target.email },
+    before: { roles: target.roles.map((r) => r.name) },
+    after: { roles: roles.map((r) => r.name) },
+    message:
+      [
+        added.length ? `granted: ${added.map((r) => r.name).join(", ")}` : null,
+        removed.length ? `revoked: ${removed.map((r) => r.name).join(", ")}` : null,
+      ]
+        .filter(Boolean)
+        .join("; ") || "no change",
+  });
+
+  return getUser(target.id);
 }
 
-module.exports = { listUsers, getUser, changeRole };
+module.exports = { listUsers, getUser, setUserRoles };

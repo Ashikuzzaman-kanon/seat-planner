@@ -1,11 +1,11 @@
 const { body, param } = require("express-validator");
-const { ALL_ROLES } = require("../constants/roles");
 
-const changeRoleRules = [
+const setRolesRules = [
   param("id").isInt().withMessage("User id must be an integer"),
-  body("role")
-    .isIn(ALL_ROLES)
-    .withMessage(`Role must be one of: ${ALL_ROLES.join(", ")}`),
+  body("roleIds")
+    .isArray()
+    .withMessage("roleIds must be an array of role ids"),
+  body("roleIds.*").isInt().withMessage("Each role id must be an integer"),
 ];
 
-module.exports = { changeRoleRules };
+module.exports = { setRolesRules };

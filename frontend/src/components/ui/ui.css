@@ -1,0 +1,444 @@
+/* ==========================================================================
+   Selects and search boxes
+   --------------------------------------------------------------------------
+   One place for how a control looks, so thirty of them cannot drift apart
+   again.
+
+   The choices worth naming:
+
+   - **44px minimum height.** That is the smallest target a thumb hits reliably,
+     and §16.4 says this has to work on a phone and later inside a mobile app.
+     The library's default is shorter, tuned for a mouse.
+   - **A focus ring, not a focus glow.** PrimeReact's default is a soft spread
+     shadow that washes out on a light background. A two-pixel ring with an
+     offset is visible without being loud, and is the same on every control so
+     keyboard users learn it once.
+   - **The panel is a surface, not a box.** A real shadow, a rounded edge and a
+     hairline border read as something above the page; the default flat border
+     reads as part of it.
+   - **Nothing animates position.** Only colour and shadow transition. A panel
+     that slides costs a frame before you can read it, on every open.
+   ========================================================================== */
+
+:root {
+  --ui-radius: 10px;
+  --ui-height: 44px;
+  --ui-border: #d5dae2;
+  --ui-border-strong: #b9c1cd;
+  --ui-ring: #2563eb;
+  --ui-ring-soft: rgba(37, 99, 235, 0.16);
+  --ui-surface: #ffffff;
+  --ui-muted: #6b7280;
+  --ui-text: #111827;
+  --ui-danger: #dc2626;
+}
+
+/* ---------------- Fields ---------------- */
+
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.ui-field__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #374151;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.ui-field__required {
+  color: var(--ui-danger);
+  font-weight: 700;
+}
+
+.ui-field__hint {
+  font-size: 0.76rem;
+  color: var(--ui-muted);
+  line-height: 1.4;
+}
+
+.ui-field__error {
+  font-size: 0.76rem;
+  color: var(--ui-danger);
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+/* ---------------- Select ---------------- */
+
+.ui-select.p-dropdown {
+  width: 100%;
+  min-height: var(--ui-height);
+  align-items: center;
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.ui-select.p-dropdown:not(.p-disabled):hover {
+  border-color: var(--ui-border-strong);
+}
+
+/* One ring, every control, so it is learned once. */
+.ui-select.p-dropdown:not(.p-disabled).p-focus,
+.ui-select.p-dropdown:not(.p-disabled):focus-within {
+  border-color: var(--ui-ring);
+  box-shadow: 0 0 0 3px var(--ui-ring-soft);
+  outline: none;
+}
+
+/*
+ * The chosen value. It truncates with an ellipsis, and when the select can be
+ * cleared it stops short of the × — before this, a long station name ran
+ * underneath the × and the two were drawn on top of each other.
+ */
+.ui-select.p-dropdown .p-dropdown-label {
+  display: block;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--ui-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ui-select.p-dropdown.p-dropdown-clearable .p-dropdown-label {
+  padding-right: 2rem;
+}
+/* The label is a `.p-inputtext` too, so it picked up the inputs' soft shadow,
+   whose edge showed as a stray line just left of the chevron. The shadow
+   belongs to the whole control, which already has one. */
+.ui-select.p-dropdown .p-dropdown-label {
+  box-shadow: none;
+}
+
+.ui-select.p-dropdown .p-dropdown-label.p-placeholder {
+  color: #9aa3b2;
+}
+
+.ui-select.p-dropdown .p-dropdown-trigger {
+  width: 2.5rem;
+  color: var(--ui-muted);
+}
+
+.ui-select.p-dropdown .p-dropdown-clear-icon {
+  right: 2.55rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-top: -0.4rem;
+  color: var(--ui-muted);
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+.ui-select.p-dropdown .p-dropdown-clear-icon:hover {
+  color: var(--ui-text);
+}
+/* With a mouse, the × appears when the select is hovered or focused, so a
+   row of filters is not a row of crosses. A touch screen has no hover, so
+   there it always shows. */
+@media (hover: hover) {
+  .ui-select.p-dropdown .p-dropdown-clear-icon {
+    opacity: 0;
+  }
+  .ui-select.p-dropdown:hover .p-dropdown-clear-icon,
+  .ui-select.p-dropdown.p-focus .p-dropdown-clear-icon,
+  .ui-select.p-dropdown:focus-within .p-dropdown-clear-icon {
+    opacity: 1;
+  }
+}
+
+.ui-select.p-dropdown.p-invalid {
+  border-color: var(--ui-danger);
+}
+.ui-select.p-dropdown.p-invalid:not(.p-disabled).p-focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.ui-select.p-dropdown.p-disabled {
+  background: #f6f7f9;
+  opacity: 1;
+  color: #9aa3b2;
+}
+
+/* ---------------- The panel ---------------- */
+
+.ui-select__panel.p-dropdown-panel {
+  border-radius: 12px;
+  border: 1px solid var(--ui-border);
+  box-shadow:
+    0 12px 28px -8px rgba(16, 24, 40, 0.18),
+    0 4px 10px -4px rgba(16, 24, 40, 0.08);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+/* The filter box reads as a search, because that is what it is. */
+.ui-select__panel .p-dropdown-header {
+  padding: 0.6rem;
+  background: #fbfcfd;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.ui-select__panel .p-dropdown-filter-container {
+  width: 100%;
+}
+
+.ui-select__panel .p-dropdown-filter {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--ui-border);
+  padding-left: 2.1rem;
+  font-size: 0.88rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ui-select__panel .p-dropdown-filter:focus {
+  border-color: var(--ui-ring);
+  box-shadow: 0 0 0 3px var(--ui-ring-soft);
+  outline: none;
+}
+.ui-select__panel .p-dropdown-filter-icon {
+  left: 0.75rem;
+  color: #9aa3b2;
+}
+
+.ui-select__panel .p-dropdown-items {
+  padding: 0.35rem;
+}
+
+.ui-select__panel .p-dropdown-item {
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.9rem;
+  color: var(--ui-text);
+  /* Colour only — a list that shifts as you arrow through it is hard to read. */
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.ui-select__panel .p-dropdown-item:not(.p-highlight):not(.p-disabled):hover {
+  background: #f2f5fa;
+}
+
+.ui-select__panel .p-dropdown-item.p-highlight {
+  background: #e8efff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+/* The tick against the chosen option, at the right where the eye ends. */
+.ui-select__panel .p-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.ui-select__panel .p-dropdown-item > span:not(.p-ink) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ui-select__panel .p-dropdown-check-icon,
+.ui-select__panel .p-dropdown-blank-icon {
+  order: 2;
+  flex: 0 0 auto;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin: 0;
+  color: var(--ui-ring);
+}
+
+/* Keyboard focus has to be distinguishable from the current selection. */
+.ui-select__panel .p-dropdown-item.p-focus:not(.p-highlight) {
+  background: #eef2f7;
+  box-shadow: inset 0 0 0 2px var(--ui-ring-soft);
+}
+
+.ui-select__panel .p-dropdown-empty-message {
+  padding: 0.85rem 0.9rem;
+  font-size: 0.86rem;
+  color: var(--ui-muted);
+}
+
+/* ---------------- Search box ---------------- */
+
+.ui-search {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+/* Owns the positioning, so IconField only ever sees the two children it
+   expects — see the note in SearchBox.js. */
+.ui-search__wrap {
+  position: relative;
+  width: 100%;
+}
+
+.ui-search__wrap .p-icon-field {
+  width: 100%;
+  display: block;
+}
+
+.ui-search__input.p-inputtext {
+  width: 100%;
+  min-height: var(--ui-height);
+  border-radius: var(--ui-radius);
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  font-size: 0.92rem;
+  /* Room for the icon on the left and the clear button on the right. */
+  padding: 0.6rem 2.6rem 0.6rem 2.5rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ui-search__input.p-inputtext::placeholder {
+  color: #9aa3b2;
+}
+
+.ui-search__input.p-inputtext:enabled:hover {
+  border-color: var(--ui-border-strong);
+}
+
+.ui-search__input.p-inputtext:enabled:focus {
+  border-color: var(--ui-ring);
+  box-shadow: 0 0 0 3px var(--ui-ring-soft);
+  outline: none;
+}
+
+.ui-search__wrap .p-icon-field > .p-input-icon,
+.ui-search__wrap .p-icon-field > .pi {
+  left: 0.85rem;
+  color: #9aa3b2;
+  transition: color 0.15s ease;
+}
+
+.ui-search__wrap:focus-within .p-icon-field > .pi-search {
+  color: var(--ui-ring);
+}
+
+.ui-search__clear {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ui-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.ui-search__clear:hover {
+  background: #eef1f5;
+  color: var(--ui-text);
+}
+
+.ui-search__clear:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ui-ring-soft);
+  color: var(--ui-text);
+}
+
+.ui-search__clear .pi {
+  font-size: 0.78rem;
+}
+
+.ui-search__count {
+  font-size: 0.76rem;
+  color: var(--ui-muted);
+  padding-left: 0.15rem;
+}
+
+/* ---------------- Phones ---------------- */
+
+@media (max-width: 640px) {
+  :root {
+    /* A shade taller where the pointer is a thumb. */
+    --ui-height: 46px;
+  }
+
+  .ui-search {
+    flex: 1 1 100%;
+  }
+
+  /* 16px keeps iOS from zooming the page when the field takes focus. */
+  .ui-search__input.p-inputtext,
+  .ui-select.p-dropdown .p-dropdown-label,
+  .ui-select__panel .p-dropdown-filter {
+    font-size: 16px;
+  }
+
+  .ui-select__panel .p-dropdown-item {
+    padding: 0.75rem 0.7rem;
+  }
+}
+
+/* Respect a system preference for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .ui-select.p-dropdown,
+  .ui-search__input.p-inputtext,
+  .ui-search__clear,
+  .ui-select__panel .p-dropdown-item {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   Toolbars
+   --------------------------------------------------------------------------
+   The row of filters above a table. A select in a form fills its field; in a
+   toolbar it takes a sensible width and leaves room for its neighbours, and
+   the row wraps rather than pushing the last button off the card.
+   ========================================================================== */
+
+.ui-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.ui-toolbar__spacer {
+  flex: 1 1 0;
+}
+.ui-toolbar__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  color: var(--ink-2, #334155);
+}
+
+:is(.ui-toolbar, .net-toolbar, .plans-toolbar, .bookings-toolbar, .reports__toolbar, .occ-toolbar, .seatgrid-toolbar, .seat-toolbar)
+  > .ui-select.p-dropdown {
+  width: auto;
+  flex: 0 1 18rem;
+}
+:is(.ui-toolbar, .net-toolbar, .plans-toolbar, .bookings-toolbar, .reports__toolbar, .occ-toolbar, .seatgrid-toolbar, .seat-toolbar)
+  > .p-button {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  :is(.ui-toolbar, .net-toolbar, .plans-toolbar, .bookings-toolbar, .reports__toolbar, .occ-toolbar, .seatgrid-toolbar, .seat-toolbar)
+    > .ui-select.p-dropdown {
+    flex: 1 1 100%;
+    min-width: 0 !important;
+  }
+  .ui-toolbar__spacer {
+    display: none;
+  }
+}

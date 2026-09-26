@@ -1,0 +1,299 @@
+/* ==========================================================================
+   Data tables
+   --------------------------------------------------------------------------
+   The base look (header, borders, paginator) is in theme.css, inside the
+   PrimeReact layer. This file holds what the shared DataTable wrapper adds:
+   calmer sort icons, an empty state that looks intended, cells that do not
+   crush their tags — and, below 640px, rows drawn as cards.
+   ========================================================================== */
+
+.ui-table.p-datatable {
+  font-size: 0.92rem;
+}
+
+/* Rounded header ends, so the header band sits inside the card's curve. */
+.ui-table .p-datatable-thead > tr > th:first-child {
+  border-top-left-radius: 12px;
+}
+.ui-table .p-datatable-thead > tr > th:last-child {
+  border-top-right-radius: 12px;
+}
+.ui-table .p-datatable-thead > tr > th {
+  white-space: nowrap;
+}
+
+/* The sort arrows were the loudest thing in the header. */
+.ui-table .p-sortable-column .p-sortable-column-icon {
+  width: 0.72rem;
+  height: 0.72rem;
+  margin-left: 0.4rem;
+  color: #a3adbd;
+}
+.ui-table .p-sortable-column.p-highlight {
+  color: var(--brand-700, #1d4ed8);
+  background: var(--brand-50, #eff6ff);
+}
+.ui-table .p-sortable-column.p-highlight .p-sortable-column-icon {
+  color: var(--brand-600, #2563eb);
+}
+
+/* Stripes, barely there: enough to follow a row, not enough to band the page. */
+.ui-table.p-datatable-striped .p-datatable-tbody > tr.p-row-odd {
+  background: #fafbfd;
+}
+.ui-table.p-datatable-hoverable-rows .p-datatable-tbody > tr:not(.p-highlight):hover {
+  background: #f3f7ff;
+  color: inherit;
+}
+.ui-table .p-datatable-tbody > tr > td {
+  vertical-align: middle;
+}
+
+/* A tag says one thing; wrapping it inside itself turns a pill into a blob. */
+.ui-table .p-tag {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* An empty table should look like a decision, not a failure to load. */
+.ui-table .p-datatable-emptymessage > td {
+  padding: 2.75rem 1rem !important;
+  text-align: center;
+  color: var(--muted, #64748b);
+  font-size: 0.92rem;
+}
+.ui-table .p-datatable-emptymessage > td::before {
+  content: "\e961"; /* pi-inbox */
+  font-family: "primeicons";
+  display: block;
+  margin: 0 auto 0.6rem;
+  width: 3rem;
+  height: 3rem;
+  line-height: 3rem;
+  border-radius: 14px;
+  font-size: 1.3rem;
+  color: var(--faint, #94a3b8);
+  background: var(--surface-2, #f8fafc);
+}
+
+.ui-table .p-paginator {
+  padding-top: 0.9rem;
+}
+
+/* ==========================================================================
+   Phones: every row is a card
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  /*
+   * The stacking itself. PrimeReact is meant to inject these rules when
+   * `responsiveLayout="stack"` is set, but in 10.x it only does so when the
+   * `breakpoint` prop *changes* after mount (an update-only effect), so on a
+   * fresh page they never appear. It does render each cell's column title,
+   * so only the layout has to be supplied here.
+   */
+  .ui-table.p-datatable-responsive-stack .p-datatable-thead > tr > th,
+  .ui-table.p-datatable-responsive-stack .p-datatable-tfoot > tr > td {
+    display: none;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td {
+    display: flex;
+    flex-wrap: wrap;
+    /* Columns carry inline widths for the desktop table; a card row is the
+       card's width, whatever the column asked for. */
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    align-items: center;
+    justify-content: space-between;
+  }
+  /* Whatever sits to the right of the label keeps to the right, and moves
+     under the label rather than squeezing when the two do not fit. */
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td > .p-column-title + * {
+    margin-left: auto;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td .p-button {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td > .p-column-title {
+    display: block;
+  }
+
+  /* The phone rules in mobile.css make tables keep their width and scroll;
+     a stacked table has nothing to scroll. */
+  .ui-table.p-datatable-responsive-stack .p-datatable-wrapper {
+    overflow: visible;
+    border-radius: 0;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-table {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr {
+    display: flex;
+    flex-direction: column;
+    padding: 0.3rem 1rem;
+    border: 1px solid var(--border, #e6eaf1);
+    border-radius: 14px;
+    background: var(--surface, #fff) !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr:hover {
+    background: var(--surface, #fff) !important;
+  }
+
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td {
+    gap: 1rem;
+    min-height: 2.6rem;
+    padding: 0.55rem 0 !important;
+    text-align: right;
+    white-space: normal;
+    font-size: 0.9rem;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td + td {
+    border-top: 1px solid #f1f4f8;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td > .p-column-title {
+    flex: 0 0 auto;
+    max-width: 45%;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 650;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted, #64748b);
+  }
+  /* The value half of a cell: right-aligned, and allowed to wrap. */
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td > :not(.p-column-title) {
+    min-width: 0;
+  }
+
+  /* Columns with no header are action buttons: they go at the foot of the
+     card, right-aligned, without an empty label pushing them about. */
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td > .p-column-title:empty {
+    display: none;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td:has(> .p-column-title:empty) {
+    justify-content: flex-end;
+  }
+
+  /* Prose (a description) reads badly right-aligned beside its label: give
+     it the full width under the label instead. Opt in per column with
+     `bodyClassName="ui-cell--text"`. */
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td.ui-cell--text {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+    text-align: left;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td.ui-cell--text > .p-column-title + * {
+    margin-left: 0;
+  }
+
+  /* The first cell is what the row is about: say it louder. */
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td:first-child:not(:has(> .p-row-toggler)) {
+    font-weight: 650;
+    color: var(--ink, #0f172a);
+  }
+
+  /* The expand arrow goes to the card's foot as a labelled control, not alone
+     on the first line where it reads as a stray glyph. */
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td:has(> .p-row-toggler) {
+    order: 99;
+    justify-content: flex-end;
+    border-top: 1px solid #f1f4f8;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td:has(> .p-row-toggler)::before {
+    content: "Details";
+    margin-right: auto;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--brand-600, #2563eb);
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td:has(> .p-row-toggler) + td {
+    border-top: 0;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr > td:has(> .p-row-toggler) > .p-column-title {
+    display: none;
+  }
+
+  /* Expansion rows belong to the card above them. */
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr.p-datatable-row-expansion {
+    margin-top: -0.85rem;
+    border-top: 0;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    background: var(--surface-2, #f8fafc) !important;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr.p-datatable-row-expansion > td {
+    display: block;
+    text-align: left;
+  }
+
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr.p-datatable-emptymessage {
+    border-style: dashed;
+    box-shadow: none;
+  }
+  .ui-table.p-datatable-responsive-stack .p-datatable-tbody > tr.p-datatable-emptymessage > td {
+    display: block;
+    text-align: center;
+  }
+
+  .ui-table .p-paginator {
+    justify-content: center;
+  }
+}
+
+/* ---------------- Timestamps (When.js) ---------------- */
+
+.ui-when {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.3;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ui-when > span {
+  color: var(--ink, #0f172a);
+}
+.ui-when > small {
+  font-size: 0.78rem;
+  color: var(--muted, #64748b);
+}
+.ui-when__extra {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem !important;
+  color: var(--faint, #94a3b8) !important;
+}
+.ui-when--none {
+  color: var(--faint, #94a3b8);
+}
+@media (max-width: 640px) {
+  .ui-table.p-datatable-responsive-stack td .ui-when {
+    align-items: flex-end;
+  }
+}
+
+/* A short table that should stay a table on a phone (see ReferenceManager):
+   let text wrap so the row fits the screen, rather than scrolling its action
+   buttons out of sight. */
+@media (max-width: 640px) {
+  .ui-table--fit .p-datatable-table {
+    min-width: 0 !important;
+    width: 100%;
+  }
+  .ui-table--fit .p-datatable-tbody > tr > td,
+  .ui-table--fit .p-datatable-thead > tr > th {
+    white-space: normal;
+  }
+}

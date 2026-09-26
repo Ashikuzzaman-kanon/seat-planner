@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DataTable } from "primereact/datatable";
+import DataTable from "@/components/ui/DataTable";
 import { Column } from "primereact/column";
 import { InputText } from "primereact/inputtext";
 import { Button } from "primereact/button";
 import { Toast } from "primereact/toast";
 import { confirmDialog } from "primereact/confirmdialog";
 
+import { tip } from "@/components/ui/tip";
 /**
  * Generic add / rename / delete manager for one reference list.
  * `apiClient` is one of the objects from lib/reference.js.
@@ -112,13 +113,13 @@ export default function ReferenceManager({ title, singular, apiClient }) {
     <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
       {editingId === row.id ? (
         <>
-          <Button icon="pi pi-check" rounded text severity="success" onClick={() => saveEdit(row)} />
-          <Button icon="pi pi-times" rounded text severity="secondary" onClick={() => setEditingId(null)} />
+          <Button {...tip("Save name")} icon="pi pi-check" rounded text severity="success" onClick={() => saveEdit(row)} />
+          <Button {...tip("Cancel")} icon="pi pi-times" rounded text severity="secondary" onClick={() => setEditingId(null)} />
         </>
       ) : (
         <>
-          <Button icon="pi pi-pencil" rounded text onClick={() => startEdit(row)} />
-          <Button icon="pi pi-trash" rounded text severity="danger" onClick={() => remove(row)} />
+          <Button {...tip("Rename")} icon="pi pi-pencil" rounded text onClick={() => startEdit(row)} />
+          <Button {...tip("Delete")} icon="pi pi-trash" rounded text severity="danger" onClick={() => remove(row)} />
         </>
       )}
     </div>
@@ -138,7 +139,19 @@ export default function ReferenceManager({ title, singular, apiClient }) {
         <Button label="Add" icon="pi pi-plus" loading={saving} onClick={add} disabled={!newName.trim()} />
       </div>
 
-      <DataTable value={items} loading={loading} dataKey="id" emptyMessage={`No ${title.toLowerCase()} yet`} stripedRows paginator rows={10}>
+      <DataTable
+        value={items}
+        loading={loading}
+        dataKey="id"
+        emptyMessage={`No ${title.toLowerCase()} yet`}
+        stripedRows
+        paginator
+        rows={10}
+        // One column of names: a card per name would only add a label that
+        // says "Name". The plain rows already fit a phone.
+        responsiveLayout="scroll"
+        className="ui-table--fit"
+      >
         <Column field="name" header="Name" body={nameBody} sortable />
         <Column header="" body={actionBody} style={{ width: "8rem" }} />
       </DataTable>

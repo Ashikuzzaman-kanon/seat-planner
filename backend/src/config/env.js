@@ -30,11 +30,31 @@ const env = {
 
   jwt: {
     secret: required("JWT_SECRET"),
-    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+    // Access tokens are deliberately short-lived: they carry identity only, and
+    // permissions are re-read per request, so revoking a role takes effect
+    // almost immediately instead of lingering until the token expires.
+    accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
+    // Refresh tokens are long-lived but revocable server-side.
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
   },
 
   verification: {
     ttlMinutes: parseInt(process.env.VERIFICATION_CODE_TTL_MIN || "15", 10),
+  },
+
+  ticket: {
+    // Signs the payload inside a ticket QR, so a checker can verify a ticket
+    // without reaching the database. Separate from JWT_SECRET on purpose: these
+    // signatures end up printed on paper in passengers' hands and live as long
+    // as the journey, so rotating one must not invalidate everyone's session.
+    signingSecret: process.env.TICKET_SIGNING_SECRET || required("JWT_SECRET"),
+    // What a scanner opens when the QR is read by a plain camera app.
+    verifyUrl: process.env.TICKET_VERIFY_URL || "",
+  },
+
+  // MongoDB (document store). Blank = document features disabled.
+  mongo: {
+    uri: process.env.MONGO_URI || "",
   },
 
   email: {

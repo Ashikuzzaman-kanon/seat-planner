@@ -27,6 +27,10 @@ const loginRules = [email(), body("password").notEmpty().withMessage("Password i
 const forgotPasswordRules = [email()];
 const resetPasswordRules = [email(), code(), password("newPassword")];
 
+const refreshRules = [
+  body("refreshToken").isString().notEmpty().withMessage("A refresh token is required"),
+];
+
 module.exports = {
   registerRules,
   verifyEmailRules,
@@ -34,4 +38,5 @@ module.exports = {
   loginRules,
   forgotPasswordRules,
   resetPasswordRules,
+  refreshRules,
 };

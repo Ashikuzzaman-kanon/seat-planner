@@ -21,6 +21,19 @@ services:
       timeout: 5s
       retries: 20
 
+  # ---------- MongoDB (document store: audit log, history, notifications) ----------
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db          # named volume = documents survive restarts
+    ports:
+      # Inside compose the backend reaches this by service name, so this mapping
+      # is only for running the API natively on the host during development.
+      # Bound to loopback on purpose: an unauthenticated Mongo must not be
+      # reachable from the rest of the network.
+      - "127.0.0.1:27017:27017"
+
   # ---------- Express API ----------
   backend:
     build: ./backend                 # build the image from backend/Dockerfile
@@ -28,6 +41,8 @@ services:
     depends_on:
       db:
         condition: service_healthy   # don't start until MySQL is ready
+      mongo:
+        condition: service_started
     environment:
       NODE_ENV: production
       PORT: 4000
@@ -36,6 +51,7 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
+      MONGO_URI: mongodb://mongo:27017/seat_planner   # reaches the mongo service by name
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
@@ -79,5 +95,6 @@ services:
 
 volumes:
   db_data:
+  mongo_data:
   caddy_data:
   caddy_config:

@@ -1,0 +1,258 @@
+/* Cancelling, and watching the refunds that follow (Phase 8B). */
+
+/* ---------------- Cancel with a reason ---------------- */
+
+.cancel-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.cancel-reason__intro {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--ink-2, #334155);
+}
+.cancel-reason__label {
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--ink, #0f172a);
+}
+.cancel-reason__label span {
+  font-weight: 500;
+  color: var(--muted, #64748b);
+}
+.cancel-reason__hint {
+  font-size: 0.76rem;
+  color: var(--muted, #64748b);
+  text-align: right;
+}
+.cancel-reason__hint.is-short {
+  color: #b45309;
+  text-align: left;
+}
+.cancel-reason__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ---------------- Refunds still running ---------------- */
+
+.refund-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid #fde68a;
+  background: linear-gradient(180deg, #fffbeb, #fff);
+}
+.refund-banner.is-done {
+  border-color: #bbf7d0;
+  background: linear-gradient(180deg, #f0fdf4, #fff);
+}
+.refund-banner.is-failed {
+  border-color: #fecaca;
+  background: linear-gradient(180deg, #fef2f2, #fff);
+}
+.refund-banner__icon {
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+  font-size: 1.15rem;
+  color: #b45309;
+}
+.refund-banner.is-done .refund-banner__icon {
+  color: #16a34a;
+}
+.refund-banner.is-failed .refund-banner__icon {
+  color: #dc2626;
+}
+.refund-banner__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.refund-banner__text small {
+  font-size: 0.84rem;
+  color: var(--ink-2, #334155);
+}
+.refund-banner__bar.p-progressbar {
+  height: 6px;
+  margin-top: 0.4rem;
+  border-radius: 999px;
+}
+.refund-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+.refund-banner__link {
+  font-size: 0.85rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.refund-banner__close {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted, #64748b);
+  cursor: pointer;
+}
+.refund-banner__close:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+/* ---------------- One departure's coaches ---------------- */
+
+.coach-ops__centre {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+.coach-ops__note {
+  margin-bottom: 0.9rem;
+}
+.coach-ops__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.coach-ops__row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border, #e6eaf1);
+  border-radius: 12px;
+  background: #fff;
+}
+.coach-ops__row.is-cancelled {
+  background: var(--surface-2, #f8fafc);
+}
+.coach-ops__pos {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  font-size: 0.82rem;
+  font-weight: 750;
+  color: var(--brand-700, #1d4ed8);
+  background: var(--brand-50, #eff5ff);
+}
+.coach-ops__row.is-cancelled .coach-ops__pos {
+  color: var(--muted, #64748b);
+  background: #eef1f5;
+}
+.coach-ops__main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.coach-ops__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.coach-ops__title strong {
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+.coach-ops__main small {
+  font-size: 0.8rem;
+  color: var(--muted, #64748b);
+}
+.coach-ops__reason {
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+.coach-ops__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+}
+
+.coach-ops__add {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #e6eaf1);
+}
+.coach-ops__add h4 {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+}
+.coach-ops__add p {
+  margin: 0 0 0.75rem;
+  font-size: 0.84rem;
+  color: var(--muted, #64748b);
+}
+.coach-ops__add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+.coach-ops__add-row .coach-ops__plan.p-dropdown {
+  flex: 1 1 16rem;
+  width: auto;
+  min-width: 0;
+}
+.coach-ops__code.p-inputtext {
+  flex: 0 1 9rem;
+  min-width: 0;
+  text-transform: uppercase;
+}
+/* The value is a code and reads in capitals; the hint is a sentence. */
+.coach-ops__code.p-inputtext::placeholder {
+  text-transform: none;
+}
+.coach-ops__position.p-inputtext {
+  flex: 0 1 8rem;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  /* One button per line, the decisive one on top, both full width. */
+  .cancel-reason__actions {
+    flex-direction: column-reverse;
+  }
+  .cancel-reason__actions .p-button {
+    width: 100%;
+    justify-content: center;
+  }
+  .coach-ops__row {
+    flex-wrap: wrap;
+  }
+  .coach-ops__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .coach-ops__add-row > * {
+    flex: 1 1 100% !important;
+  }
+  .refund-banner {
+    flex-wrap: wrap;
+  }
+  .refund-banner__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

@@ -8,6 +8,8 @@ import { Password } from "primereact/password";
 import { Button } from "primereact/button";
 import { Toast } from "primereact/toast";
 import api from "@/lib/api";
+import AuthBrand from "@/components/layout/AuthBrand";
+import AuthField, { PasswordStrength } from "@/components/layout/AuthField";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -44,57 +46,75 @@ export default function RegisterPage() {
 
   return (
     <div className="auth-shell">
+      <AuthBrand />
       <Toast ref={toast} />
       <form className="auth-card" onSubmit={submit}>
-        <h1>Create your account</h1>
-        <p className="subtitle">Register with your email to get started</p>
+        <p className="auth-card__eyebrow">Create account</p>
+        <h1>Start travelling</h1>
+        <p className="subtitle">One account for booking, your wallet and your tickets.</p>
 
-        <div className="field-block">
-          <label htmlFor="fullName">Full name</label>
+        <AuthField id="fullName" label="Full name" icon="pi-user">
           <InputText
             id="fullName"
             value={form.fullName}
             onChange={update("fullName")}
             placeholder="Jane Doe"
+            autoComplete="name"
             required
           />
-        </div>
+        </AuthField>
 
-        <div className="field-block">
-          <label htmlFor="email">Email</label>
+        <AuthField id="email" label="Email" icon="pi-envelope">
           <InputText
             id="email"
             type="email"
             value={form.email}
             onChange={update("email")}
             placeholder="you@example.com"
+            autoComplete="email"
             required
           />
-        </div>
+        </AuthField>
 
-        <div className="field-block">
-          <label htmlFor="password">Password</label>
+        <AuthField
+          id="password"
+          label="Password"
+          icon="pi-lock"
+          footer={<PasswordStrength value={form.password} />}
+        >
           <Password
-            id="password"
+            inputId="password"
             value={form.password}
             onChange={update("password")}
+            feedback={false}
             toggleMask
             inputStyle={{ width: "100%" }}
             placeholder="At least 8 characters"
+            autoComplete="new-password"
             required
           />
-        </div>
+        </AuthField>
 
         <Button
           type="submit"
           label="Create account"
-          className="w-full"
+          icon="pi pi-arrow-right"
+          iconPos="right"
+          className="w-full auth-submit"
           loading={loading}
         />
 
-        <div className="auth-footer">
-          Already registered? <Link href="/login">Sign in</Link>
+        <p className="auth-fine">
+          We will email you a 6-digit code to confirm the address before you can sign in.
+        </p>
+
+        <div className="auth-divider">
+          <span>Already registered?</span>
         </div>
+
+        <Link href="/login" className="auth-alt">
+          <i className="pi pi-sign-in" aria-hidden="true" /> Sign in instead
+        </Link>
       </form>
     </div>
   );

@@ -1,0 +1,55 @@
+/* Seat inventory. The matrix itself is the shared PairMatrix (components/ui). */
+
+/* The departure at a glance, above its matrix. */
+.inv-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0 0 1.1rem;
+}
+.inv-stats > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 6.5rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: 12px;
+  background: var(--surface-2, #f8fafc);
+  border: 1px solid var(--border, #e6eaf1);
+}
+.inv-stats dt {
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted, #64748b);
+}
+.inv-stats dd {
+  margin: 0.1rem 0 0;
+  font-size: 1.2rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink, #0f172a);
+}
+.inv-stats > .is-warn {
+  background: var(--warn-soft, #fffbeb);
+  border-color: #fde68a;
+}
+.inv-stats > .is-warn dt {
+  color: #92400e;
+}
+
+/* Tags above the pair dialog's seat list. */
+.inv-summary {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .inv-stats > div {
+    flex: 1 1 calc(50% - 0.3rem);
+    min-width: 0;
+  }
+}

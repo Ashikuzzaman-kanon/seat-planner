@@ -7,14 +7,16 @@ import { InputText } from "primereact/inputtext";
 import { InputOtp } from "primereact/inputotp";
 import { Button } from "primereact/button";
 import { Toast } from "primereact/toast";
-import api, { setToken } from "@/lib/api";
+import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import AuthBrand from "@/components/layout/AuthBrand";
+import AuthField from "@/components/layout/AuthField";
 
 function VerifyEmailInner() {
   const router = useRouter();
   const params = useSearchParams();
   const toast = useRef(null);
-  const { refresh } = useAuth();
+  const { adoptSession } = useAuth();
 
   const [email, setEmail] = useState(params.get("email") || "");
   const [code, setCode] = useState("");
@@ -26,8 +28,8 @@ function VerifyEmailInner() {
     setLoading(true);
     try {
       const { data } = await api.post("/auth/verify-email", { email, code });
-      setToken(data.token);
-      await refresh();
+      // Verification returns a full session, so there is no second sign-in step.
+      adoptSession(data);
       toast.current?.show({ severity: "success", summary: "Verified!" });
       setTimeout(() => router.replace("/dashboard"), 600);
     } catch (err) {
@@ -59,47 +61,62 @@ function VerifyEmailInner() {
 
   return (
     <div className="auth-shell">
+      <AuthBrand />
       <Toast ref={toast} />
       <form className="auth-card" onSubmit={submit}>
-        <h1>Verify your email</h1>
-        <p className="subtitle">Enter the 6-digit code we emailed you</p>
+        <span className="auth-card__badge" aria-hidden="true">
+          <i className="pi pi-envelope" />
+        </span>
+        <h1>Check your inbox</h1>
+        <p className="subtitle">Enter the 6-digit code we emailed you to finish creating your account.</p>
 
-        <div className="field-block">
-          <label htmlFor="email">Email</label>
+        <AuthField id="email" label="Email" icon="pi-envelope">
           <InputText
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
             required
           />
-        </div>
+        </AuthField>
 
-        <div className="field-block">
-          <label>Verification code</label>
-          <InputOtp value={code} onChange={(e) => setCode(String(e.value))} length={6} integerOnly />
-        </div>
+        <AuthField label="Verification code">
+          <InputOtp
+            value={code}
+            onChange={(e) => setCode(String(e.value ?? ""))}
+            length={6}
+            integerOnly
+            className="auth-otp"
+          />
+        </AuthField>
 
         <Button
           type="submit"
-          label="Verify"
-          className="w-full"
+          label="Verify and continue"
+          icon="pi pi-arrow-right"
+          iconPos="right"
+          className="w-full auth-submit"
           loading={loading}
           disabled={code.length !== 6}
         />
 
-        <div className="auth-footer">
+        <p className="auth-resend">
+          Didn&apos;t get it?{" "}
           <Button
             type="button"
             link
-            label="Resend code"
+            label="Send a new code"
             onClick={resend}
             loading={resending}
+            disabled={!email}
           />
-          <div style={{ marginTop: 8 }}>
-            <Link href="/login">Back to sign in</Link>
-          </div>
-        </div>
+        </p>
+
+        <Link href="/login" className="auth-back">
+          <i className="pi pi-arrow-left" aria-hidden="true" /> Back to sign in
+        </Link>
       </form>
     </div>
   );

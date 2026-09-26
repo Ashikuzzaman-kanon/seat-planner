@@ -1,35 +1,33 @@
-// Mirrors the backend role/permission model (backend/src/constants/roles.js).
-export const ROLES = {
-  USER: "user",
-  PLANNER: "planner",
-  ADMIN: "admin",
-  SUPER_ADMIN: "super_admin",
-};
+/**
+ * Role display helpers.
+ *
+ * Roles are created at runtime, so there is no fixed list to enumerate here —
+ * only presentation. `super_admin` is the one name the system itself reserves.
+ */
 
-export const ALL_ROLES = Object.values(ROLES);
+export const SUPER_ADMIN_ROLE = "super_admin";
 
-export const ROLE_LABELS = {
-  [ROLES.USER]: "User",
-  [ROLES.PLANNER]: "Planner",
-  [ROLES.ADMIN]: "Admin",
-  [ROLES.SUPER_ADMIN]: "Super Admin",
-};
+/** "super_admin" -> "Super Admin" */
+export function roleLabel(name) {
+  if (!name) return "";
+  return name
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
-// Severity colors for PrimeReact <Tag>.
-export const ROLE_SEVERITY = {
-  [ROLES.USER]: "secondary",
-  [ROLES.PLANNER]: "info",
-  [ROLES.ADMIN]: "warning",
-  [ROLES.SUPER_ADMIN]: "danger",
-};
+const PALETTE = ["info", "success", "warning", "secondary", "contrast"];
 
-export const PERMISSIONS = {
-  PLAN_VIEW: "plan:view",
-  PLAN_CREATE: "plan:create",
-  PLAN_UPDATE: "plan:update",
-  PLAN_DELETE: "plan:delete",
-  PLAN_APPROVE: "plan:approve",
-  REFERENCE_MANAGE: "reference:manage",
-  USER_VIEW: "user:view",
-  USER_MANAGE_ROLES: "user:manage_roles",
-};
+/**
+ * A stable colour per role name. Roles are user-created, so colours are derived
+ * rather than configured — the same role always looks the same without anyone
+ * having to pick.
+ */
+export function roleSeverity(name) {
+  if (!name) return "secondary";
+  if (name === SUPER_ADMIN_ROLE) return "danger";
+
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return PALETTE[hash % PALETTE.length];
+}

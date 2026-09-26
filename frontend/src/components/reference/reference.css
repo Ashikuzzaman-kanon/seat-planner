@@ -1,0 +1,18 @@
+/* Coach classes, which carry standing capacity as well as a name. */
+
+.class-hint {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.class-nostanding {
+  color: #9ca3af;
+  font-size: 0.85rem;
+}
+
+.class-field-hint {
+  color: #6b7280;
+  font-size: 0.78rem;
+  margin-top: 0.3rem;
+  display: block;
+}

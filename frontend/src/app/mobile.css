@@ -1,0 +1,325 @@
+/* ==========================================================================
+   Making the whole application usable on a phone
+   --------------------------------------------------------------------------
+   §16.4 says this has to work on a phone and later inside a mobile app. Most
+   of it did not: twelve screens use a DataTable with no responsive
+   configuration, so a table wider than the screen dragged the whole page
+   sideways, and dialogs sized for a laptop ran off the edge.
+
+   This is loaded last, on purpose. Fixing the handful of patterns that repeat
+   across every screen reaches all of them at once; rewriting twelve pages to
+   say the same thing twelve times would not be better, only longer.
+
+   The rules are deliberately narrow — each one names a real failure:
+     · a table must scroll inside itself, never move the page
+     · a dialog must not be wider than the screen
+     · a control a thumb presses must be at least 44px
+     · nothing may cause horizontal scrolling of the body
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  /* ---------------- Nothing drags the page sideways ---------------- */
+
+  /*
+   * `clip`, not `hidden`. `hidden` makes the body a scroll container, and a
+   * sticky element inside a scroll container sticks to that container — so
+   * the header silently stopped sticking on phones. `clip` stops the sideways
+   * drag without creating one.
+   */
+  html,
+  body {
+    overflow-x: clip;
+  }
+
+  /* ---------------- Tables scroll inside themselves ---------------- */
+
+  /*
+   * The wrapper scrolls; the table keeps its natural width. Letting the table
+   * shrink instead turns every column into two characters and a hyphen, which
+   * is not a table anybody can read — sideways scrolling is the honest answer
+   * for a grid that genuinely has eight columns.
+   */
+  .p-datatable-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .p-datatable-table {
+    min-width: max-content;
+  }
+
+  .p-datatable .p-datatable-tbody > tr > td,
+  .p-datatable .p-datatable-thead > tr > th {
+    padding: 0.6rem 0.65rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  /* A cell holding buttons must not be squeezed to nothing. */
+  .p-datatable .p-datatable-tbody > tr > td .p-button {
+    min-width: 2.25rem;
+  }
+
+  /* Paginator controls wrap rather than overflowing. */
+  .p-paginator {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.5rem 0.25rem;
+  }
+  .p-paginator .p-paginator-pages {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  /* ---------------- Dialogs fit the screen ---------------- */
+
+  .p-dialog {
+    /* Overrides the inline width most dialogs set for a laptop. */
+    width: calc(100vw - 1.5rem) !important;
+    max-width: calc(100vw - 1.5rem) !important;
+    max-height: calc(100dvh - 2rem);
+    margin: 0;
+  }
+  .p-dialog .p-dialog-content {
+    padding: 1rem;
+  }
+  .p-dialog .p-dialog-header {
+    padding: 0.9rem 1rem;
+    font-size: 1rem;
+  }
+  /* A dialog's buttons go full width rather than crowding one line. */
+  .p-dialog .p-dialog-footer .p-button {
+    flex: 1;
+  }
+  .p-dialog .p-dialog-footer {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+
+  /* ---------------- Targets a thumb can hit ---------------- */
+
+  .p-button {
+    min-height: 44px;
+  }
+  .p-button.p-button-sm {
+    min-height: 40px;
+  }
+  /* An icon-only round button is already a square; keep it square. */
+  .p-button.p-button-icon-only {
+    min-width: 44px;
+  }
+
+  .p-inputtext,
+  .p-dropdown,
+  .p-multiselect,
+  .p-calendar .p-inputtext {
+    min-height: 44px;
+    /* 16px stops iOS zooming the page when a field takes focus. */
+    font-size: 16px;
+  }
+
+  /* A bigger tap area without a bigger box. PrimeReact lays an invisible
+     input over the drawn box and that input takes the tap, so the input is
+     what grows. (Padding the wrapper instead squeezed the box itself into an
+     11px-wide sliver.) */
+  .p-checkbox .p-checkbox-input,
+  .p-radiobutton .p-radiobutton-input {
+    top: -0.6rem;
+    left: -0.6rem;
+    width: calc(100% + 1.2rem);
+    height: calc(100% + 1.2rem);
+  }
+
+  /* ---------------- Toolbars and groups wrap ---------------- */
+
+  .p-toolbar,
+  .p-selectbutton,
+  .p-buttonset {
+    flex-wrap: wrap;
+  }
+  .p-selectbutton .p-button {
+    flex: 1 1 auto;
+  }
+
+  /* ---------------- Page furniture ---------------- */
+
+  .card {
+    padding: 0.9rem;
+    border-radius: 12px;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+  }
+  .page-subtitle {
+    font-size: 0.86rem;
+  }
+
+  /* Anything laid out in fixed columns collapses to one. */
+  .grid-2,
+  .grid-3,
+  .two-column,
+  .three-column {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* A long reference or email must wrap rather than widen the page. */
+  code,
+  .p-tag,
+  dd {
+    overflow-wrap: anywhere;
+  }
+}
+
+/* ---------------- The checker, on a phone ----------------
+   The one screen designed to be used standing up, so it gets more than the
+   shared rules: the verdict comes first and fills the view, and the controls
+   under it are sized for one thumb. */
+
+@media (max-width: 768px) {
+  .checker__verdict {
+    min-height: 14rem;
+  }
+  .checker__headline {
+    font-size: 1.45rem;
+  }
+  .checker__headline .pi {
+    font-size: 1.45rem;
+  }
+  .checker__message {
+    font-size: 0.95rem;
+  }
+
+  /* Two columns of label/value is one column of unreadable columns. */
+  .checker__ticket {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .checker__buttons {
+    /* Check and Admit are different decisions; keep them apart under a thumb. */
+    gap: 0.6rem;
+  }
+  .checker__buttons .p-button {
+    min-height: 50px;
+  }
+
+  .checker__number {
+    min-height: 52px;
+    font-size: 1.1rem;
+  }
+
+  .scanner__frame {
+    /* Taller than 4:3 — a phone held upright has height to spare, and a bigger
+       frame is an easier target for somebody else's ticket. */
+    aspect-ratio: 3 / 4;
+  }
+
+  .checker__history small {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .checker__ticket {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   Things that are genuinely wider than a phone
+   --------------------------------------------------------------------------
+   A seat plan is a drawing of a carriage and a matrix is a grid of stations.
+   Neither becomes readable by being squeezed; both become readable by being
+   scrolled. The rule is the same as for tables: scroll inside yourself, never
+   move the page.
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  /* A coach plan keeps its shape and scrolls. */
+  .seatgrid,
+  .seat-grid,
+  .plan-grid {
+    min-width: 0;
+  }
+
+  .seatgrid-wrap,
+  .plan-editor__canvas,
+  .matrix-scroll,
+  .availability-matrix {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /*
+   * A long reference, email or station list must wrap rather than widen the
+   * page. `nowrap` is right for a table cell inside a scrolling wrapper and
+   * wrong for prose, so this only targets the prose.
+   */
+  p,
+  li,
+  dd,
+  .page-subtitle,
+  .card > span,
+  .card > small {
+    overflow-wrap: anywhere;
+  }
+
+  /* Anything using a laptop-width flex row wraps instead of overflowing. */
+  .card > div[style*="display: flex"],
+  .toolbar,
+  .actions,
+  .filters {
+    flex-wrap: wrap;
+  }
+}
+
+/*
+ * A safety net, not a fix.
+ *
+ * `overflow-x: hidden` on the body stops a stray wide element dragging the
+ * whole page sideways, which is the symptom people notice. It does not make
+ * that element readable — the rules above are what do that — so anything new
+ * that overflows still needs its own scrolling container rather than relying
+ * on this to hide the problem.
+ */
+
+/* ---------------- Tabs on a phone ----------------
+   An underlined tab strip is wider than a phone once it has more than two
+   tabs, and PrimeReact scrolls it silently — Network showed "Stations" and
+   "Trains & Routes" with no hint that "Fares" and "Seat Attributes" existed.
+   As wrapping pills, every tab is on screen. */
+@media (max-width: 640px) {
+  .p-tabview .p-tabview-nav-content {
+    overflow: visible;
+  }
+  .p-tabview .p-tabview-nav {
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    border: 0;
+    padding-bottom: 0.25rem;
+  }
+  .p-tabview .p-tabview-nav li .p-tabview-nav-link {
+    margin: 0;
+    padding: 0.55rem 0.9rem;
+    border: 1px solid var(--border-strong, #d5dbe5);
+    border-radius: 999px;
+    background: var(--surface, #fff);
+    color: var(--ink-2, #334155);
+    font-size: 0.88rem;
+  }
+  .p-tabview .p-tabview-nav li.p-tabview-selected .p-tabview-nav-link,
+  .p-tabview .p-tabview-nav li.p-highlight .p-tabview-nav-link {
+    background: var(--brand-50, #eff5ff);
+    border-color: var(--brand-200, #bfd5fe);
+    color: var(--brand-700, #1d4ed8);
+  }
+  .p-tabview .p-tabview-ink-bar,
+  .p-tabview .p-tabview-nav-btn {
+    display: none;
+  }
+  .p-tabview .p-tabview-panels {
+    padding: 1rem 0 0;
+  }
+}

@@ -8,7 +8,7 @@ const listUsers = asyncHandler(async (req, res) => {
     page,
     limit,
     search: req.query.search || "",
-    role: req.query.role,
+    roleId: req.query.roleId ? parseInt(req.query.roleId, 10) : undefined,
   });
   res.json(result);
 });
@@ -18,13 +18,14 @@ const getUser = asyncHandler(async (req, res) => {
   res.json({ user });
 });
 
-const changeRole = asyncHandler(async (req, res) => {
-  const user = await userService.changeRole({
+const setRoles = asyncHandler(async (req, res) => {
+  const user = await userService.setUserRoles({
     actingUser: req.user,
+    actingAccess: req.access,
     targetUserId: req.params.id,
-    newRole: req.body.role,
+    roleIds: req.body.roleIds,
   });
-  res.json({ message: "Role updated", user });
+  res.json({ message: "Roles updated", user });
 });
 
-module.exports = { listUsers, getUser, changeRole };
+module.exports = { listUsers, getUser, setRoles };

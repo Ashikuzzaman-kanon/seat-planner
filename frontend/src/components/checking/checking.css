@@ -1,0 +1,533 @@
+/* ==========================================================================
+   The checker's screen
+   --------------------------------------------------------------------------
+   Read at arm's length, in a moving carriage, by somebody holding a phone in
+   one hand. So the verdict is the largest thing on the page and its colour
+   carries the answer before any word is read — with the word there anyway,
+   because colour alone is not an answer for everyone.
+   ========================================================================== */
+
+.checker {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.checker__where {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.checker__tripnum {
+  flex: 0 1 12rem;
+  min-height: 44px;
+  border-radius: 10px;
+}
+.checker__station {
+  flex: 1 1 16rem;
+}
+
+.checker__note {
+  width: 100%;
+}
+
+.checker__work {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .checker__work {
+    /* The verdict first on a phone: it is what is being looked at. */
+    grid-template-columns: 1fr;
+  }
+  .checker__verdict {
+    order: -1;
+  }
+  /* Until there is an answer, the verdict is one line, not a third of the
+     screen pushing the camera down. */
+  .checker__verdict.is-empty {
+    min-height: 0;
+    padding: 0.85rem 1rem;
+  }
+  .checker__verdict.is-empty .checker__empty {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0;
+  }
+  .checker__verdict.is-empty .checker__empty .pi {
+    font-size: 1.3rem;
+    margin: 0;
+  }
+  .checker__verdict.is-empty .checker__empty p {
+    margin: 0;
+  }
+}
+
+.checker__input h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+.checker__or {
+  margin-top: 1.25rem !important;
+}
+
+.checker__typed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.checker__number {
+  min-height: 48px;
+  border-radius: 10px;
+  font-size: 1.05rem;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+.checker__buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+.checker__buttons .p-button {
+  flex: 1;
+  min-height: 46px;
+}
+
+/* ---------------- The verdict ---------------- */
+
+.checker__verdict {
+  min-height: 18rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-width: 2px;
+  border-style: solid;
+  border-color: #e5e7eb;
+}
+
+.checker__verdict.is-ok {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+.checker__verdict.is-warn {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+.checker__verdict.is-bad {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.checker__empty {
+  margin: auto;
+  text-align: center;
+  color: #9ca3af;
+}
+.checker__empty .pi {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.checker__headline {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.6rem;
+  line-height: 1.15;
+}
+.checker__headline .pi {
+  font-size: 1.6rem;
+}
+.is-ok .checker__headline {
+  color: #15803d;
+}
+.is-warn .checker__headline {
+  color: #b45309;
+}
+.is-bad .checker__headline {
+  color: #b91c1c;
+}
+
+/* The sentence said out loud to the passenger. */
+.checker__message {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.checker__ticket {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0.25rem 0 0;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 10px;
+}
+.checker__ticket dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+.checker__ticket dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #111827;
+  overflow-wrap: anywhere;
+}
+
+.checker__proof {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.checker__admit {
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+/* ---------------- The camera ---------------- */
+
+.scanner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.scanner__frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  background: #0f172a;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scanner__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Where frames are read from when the browser has no native reader. Never
+   shown — it exists only to hold pixels. */
+.scanner__canvas {
+  display: none;
+}
+
+.scanner__idle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+.scanner__idle .pi {
+  font-size: 2rem;
+}
+
+/* Something to aim with. Purely a guide — the reader looks at the whole frame. */
+.scanner__reticle {
+  position: absolute;
+  width: 58%;
+  aspect-ratio: 1;
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  border-radius: 14px;
+  box-shadow: 0 0 0 100vmax rgba(15, 23, 42, 0.35);
+}
+
+.scanner__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.scanner__hint {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+.scanner-note {
+  width: 100%;
+}
+.scanner-note code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0 0.25rem;
+  border-radius: 4px;
+}
+
+/* ---------------- This shift ---------------- */
+
+.checker__history h2 {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+.checker__history ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.checker__history li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+  border-top: 1px solid #f1f3f6;
+  font-size: 0.85rem;
+}
+.checker__history li:first-child {
+  border-top: 0;
+}
+.checker__history strong {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.checker__history em {
+  font-style: normal;
+  color: #4b5563;
+}
+.checker__history small {
+  margin-left: auto;
+  color: #9ca3af;
+}
+
+.checker__dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.checker__dot.is-ok {
+  background: #16a34a;
+}
+.checker__dot.is-warn {
+  background: #d97706;
+}
+.checker__dot.is-bad {
+  background: #dc2626;
+}
+
+/* ---------------- Reporting ---------------- */
+
+.checker__report-lead {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: #4b5563;
+  line-height: 1.5;
+}
+.checker__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+}
+.checker__field > span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+}
+.checker__field small {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+.checker__report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* ---------------- Optional context ----------------
+   A disclosure rather than a form: these are optional, and an earlier version
+   that put them in a card above the scanner made them read as a required first
+   step. Collapsed by default, and the summary shows what is set. */
+
+.checker__where {
+  background: #fff;
+  border: 1px solid #e8edf3;
+  border-radius: 12px;
+  padding: 0.25rem 0.9rem;
+}
+
+.checker__where > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #374151;
+  list-style: revert;
+}
+.checker__where > summary span {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.checker__where > summary em {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 0.76rem;
+  color: #6b7280;
+}
+.checker__where > summary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  border-radius: 8px;
+}
+
+.checker__where-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  gap: 0.9rem;
+  padding: 0.5rem 0 0.9rem;
+  border-top: 1px solid #f1f3f6;
+}
+.checker__where-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.checker__where-fields label > span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+}
+.checker__where-fields small {
+  font-size: 0.74rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+/* ---------------- What a scan does ----------------
+   Off by default, and the card changes colour when it is not — because the
+   difference between "reading tickets" and "spending tickets" should be
+   visible without reading the label. */
+
+.checker__mode {
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.checker__mode.is-armed {
+  background: #fff7ed;
+  border-color: #fdba74;
+}
+.checker__mode label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+.checker__mode span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.checker__mode strong {
+  font-size: 0.9rem;
+  color: #111827;
+}
+.checker__mode em {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+.checker__mode.is-armed em {
+  color: #9a3412;
+}
+.checker__armed-note {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+/* ---------------- The answer arriving ----------------
+   A checker scanning a queue sees two valid tickets in a row and cannot tell
+   whether the second one registered. The panel is keyed on an answer counter,
+   so this replays even when the verdict is identical — movement is the signal,
+   not the content. */
+
+@keyframes verdict-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes verdict-flash {
+  0% {
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  100% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+
+.checker__verdict.is-new {
+  animation: verdict-in 0.22s ease-out;
+}
+
+/* The ring is drawn in the verdict's own colour, so green and red read
+   differently from across a carriage. */
+.checker__verdict.is-new::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: verdict-flash 0.55s ease-out;
+}
+.checker__verdict {
+  position: relative;
+}
+.checker__verdict.is-ok::after {
+  color: rgba(22, 163, 74, 0.45);
+}
+.checker__verdict.is-warn::after {
+  color: rgba(217, 119, 6, 0.45);
+}
+.checker__verdict.is-bad::after {
+  color: rgba(220, 38, 38, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checker__verdict.is-new,
+  .checker__verdict.is-new::after {
+    animation: none;
+  }
+}

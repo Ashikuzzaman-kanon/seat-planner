@@ -1,84 +1,231 @@
-# Train Seat Planner
+# Seat Planner — Railway Ticketing
 
-A role-based application for managing train coach seat plans.
+A complete railway ticketing system: design coach seat plans, run departures,
+sell seats **stretch by stretch**, check tickets on the train (even without
+signal), handle returns and disruptions, and administer all of it with roles
+defined as data.
 
-This repository currently implements the **authentication and role-permission**
-foundation. The seat-plan builder/viewer and approval workflow are scaffolded
-and ready to be wired up once the plan UI details are finalized.
+**Live:** https://seat-planner-sable.vercel.app · API https://seat-planner-api.onrender.com/api/v1/health
 
-## Roles & permissions
+> The API runs on a free tier that sleeps after 15 minutes idle, so the first
+> request after a quiet spell can take ~50 seconds.
 
-Hierarchy: `user` < `planner` < `admin` < `super_admin`
+---
 
-| Capability                | user | planner | admin | super_admin |
-| ------------------------- | :--: | :-----: | :---: | :---------: |
-| View approved plans       |  ✅  |   ✅    |  ✅   |     ✅      |
-| Create / update / delete plans |    |   ✅    |  ✅   |     ✅      |
-| Approve plans             |      |         |  ✅   |     ✅      |
-| View users                |      |         |  ✅   |     ✅      |
-| Change user roles         |      |         |       |     ✅      |
+## What it does
 
-- A **planner's** new/edited plan goes to *pending* and must be approved by an
-  admin or super admin before users can see it.
-- Plans created by an **admin / super_admin** are auto-approved (enforced when
-  the plan module lands).
-- The role/permission matrix is defined once in
-  [`backend/src/constants/roles.js`](backend/src/constants/roles.js) and mirrored
-  on the frontend in [`frontend/src/constants/roles.js`](frontend/src/constants/roles.js).
+**For passengers**
+- Search trains between any two stations; a seat is sold only for the stretch
+  you travel, so a train "full end to end" often still has room on yours — and
+  a *Where is there room?* view shows exactly where.
+- Choose seats on a drawn coach map or let the system pick (window, charging
+  port, fan, seated together), hold them for a timed checkout, pay by wallet,
+  simulated card/mobile banking, or a split of both.
+- Signed QR tickets, PDF, and a confirmation email. Resume an unfinished
+  checkout from any device.
+- Return a ticket under two policies (*convenient*: refunded now less a
+  time-based deduction; *demand*: refunded segment by segment as the seat
+  resells), transfer it to another passenger (approved by staff), or extend the
+  journey with a connecting standing ticket.
+- Join a waitlist for a sold-out stretch; a freed seat is offered in one click.
 
-## Layout
+**For staff on the train**
+- *Check Tickets*: scan a QR with the phone camera or type the number; eight
+  distinct verdicts; scanning can admit the passenger or only read the ticket.
+- An offline manifest for checking with no network, synced idempotently later.
+- Report a suspicious ticket; reports feed a review queue and an account score.
+
+**For operators**
+- Network: stations, trains, routes with day offsets, fare rule chains, seat
+  attributes.
+- Departures: weekly schedules generate a rolling horizon of departures; per
+  departure, add / remove / cancel / reinstate coaches, switch return policies
+  and standing sales, and cancel a whole departure — everyone aboard is refunded
+  in full and told why.
+- Seat Inventory: a station-pair availability matrix and a per-seat occupancy map
+  showing who holds each seat and for which stretch; quota holds for specific
+  pairs.
+- Seat plans: a grid designer for coach layouts, with an approval workflow.
+
+**For administrators**
+- Roles and permissions are data: create roles, grant any of 48 permissions,
+  assign several roles to a user. An escalation guard stops anyone granting
+  what they do not hold.
+- A settings store for every tunable rule (timeouts, deductions, abuse weights,
+  job retries) — changes take effect without a restart.
+- An audit log of every privileged action.
+- **Background Jobs**: long-running work (a cancelled departure's mass refund,
+  the email to each passenger) runs as durable jobs that survive a restart,
+  retry with backoff, and wait here for a person if they give up.
+
+## Tech stack
+
+| Layer | |
+|---|---|
+| Frontend | Next.js 15 (App Router), React 18, PrimeReact 10, jsQR, jsPDF |
+| Backend | Node.js 20, Express 4, Sequelize 6, express-validator, PDFKit, qrcode, Nodemailer |
+| Data | MySQL 8 (everything transactional) · MongoDB (audit log; optional) |
+| Auth | Short-lived JWT access tokens + rotating, revocable refresh tokens; per-request permission resolution |
+| Deploy | Vercel (frontend) · Render, Docker (API) · Aiven MySQL · Docker Compose + Caddy for self-hosting |
+
+## How it fits together
+
+```
+ Browser ──▶ Next.js (Vercel)  ── /api/* rewrite ──▶  Express API (Render)
+                                                        │
+                                   MySQL (Aiven) ◀──────┤  transactions, jobs table
+                                   MongoDB (optional) ◀─┘  audit log
+                                                        │
+                                   in-process workers:  recurring sweeps (horizon,
+                                                        expired holds, waitlist offers)
+                                                        + durable job worker
+```
+
+The browser only ever talks to the frontend's origin; Next.js proxies `/api/*`
+to the API, so there is no CORS in production.
+
+Some design points worth knowing:
+
+- **Segment inventory.** A seat is booked per segment between consecutive stops.
+  Availability for A→D means every segment in between is free on the same seat.
+- **Money is integers** (poisha) end to end, with an append-only wallet ledger
+  that can be re-added and verified against the balance.
+- **Durable jobs.** A cancellation marks the departure cancelled and queues its
+  refund job in one transaction; a worker claims jobs under a renewable lease
+  (no database locks held during the work), processes refunds in resumable
+  batches, and each passenger's email is itself a job written with their refund.
+- **Permissions in code, roles in data.** Every endpoint declares the permission
+  it needs; the catalogue is synced to the database on boot.
+
+The full specification, decision log and per-phase build notes are in
+[REQUIREMENTS.md](REQUIREMENTS.md). The API contract is served at
+`/api/v1/openapi.json`.
+
+## Repository layout
 
 ```
 seat-planner/
-├── backend/    Express + Sequelize (MySQL) REST API
-└── frontend/   Next.js (App Router) + PrimeReact
+├── backend/            Express API
+│   ├── migrations/     Sequelize migrations (run automatically on container start)
+│   ├── src/
+│   │   ├── constants/  permission catalogue, settings catalogue, audit actions
+│   │   ├── docs/       OpenAPI document
+│   │   ├── jobs/       recurring sweeps + durable job handlers
+│   │   ├── models/     Sequelize models (+ mongo/ for the audit log)
+│   │   ├── routes/ controllers/ services/ validators/ middleware/
+│   │   ├── seeders/    super admin, test users, network, seat plans, departures
+│   │   └── utils/      pure logic: availability, auto-select, refund policy, money…
+│   └── tests/          unit tests (node:test)
+├── frontend/           Next.js app
+│   └── src/
+│       ├── app/        routes: auth pages, /dashboard/*
+│       ├── components/ booking, checking, departures, inventory, network, ui…
+│       └── lib/        API clients per area
+├── tools/lan-https.js  HTTPS proxy for testing the camera scanner from a phone
+├── docker-compose.yml  MySQL + MongoDB + API + frontend + Caddy
+├── REQUIREMENTS.md     specification and build log
+└── PRESENTATION.md     walkthrough of the project for presenting it
 ```
 
-## Quick start
+## Running it locally
 
-### 1. Backend
+**Prerequisites:** Node.js 20, MySQL 8. MongoDB is optional (the audit log is
+skipped without it) — `docker compose up -d mongo` starts one.
+
+### 1. API
 
 ```bash
 cd backend
-cp .env.example .env          # then edit DB + JWT + SMTP values
+cp .env.example .env            # set DB_*, JWT_SECRET, SUPER_ADMIN_*; SMTP optional
 npm install
-npm run seed:superadmin       # creates the first super admin from .env
-npm run dev                   # http://localhost:4000/api
+npm run migrate                 # creates the schema
+npm run seed:superadmin         # system roles + your super admin account
+npm run seed:seatplans          # coach layouts (imported as pending review)
+npm run seed:network            # stations, trains, routes, fares
+npm run dev                     # http://localhost:4000/api/v1
 ```
 
-Requires a MySQL database matching `DB_NAME` (default `seat_planner`).
-If `EMAIL_HOST` is left blank, verification/reset codes are printed to the
-backend console instead of emailed — convenient for local testing.
+Departures only get seats from **approved** seat plans, and imported plans
+arrive pending. So before generating departures, start the frontend (below),
+sign in as the super admin and approve the plans under *Approvals*. Then:
+
+```bash
+npm run seed:departures         # compositions, weekly schedules, rolling horizon
+```
+
+A departure generated before its plans were approved has no seats; use its
+*Rebuild* button on *Departures* once they are.
+
+If `EMAIL_HOST` is blank, emails (verification codes, tickets) are printed to
+the API console instead of sent.
+
+Optional: `npm run seed:testusers` / `npm run seed:unittestusers` create
+accounts for trying each role.
 
 ### 2. Frontend
 
 ```bash
 cd frontend
-cp .env.example .env.local    # NEXT_PUBLIC_API_BASE_URL defaults to localhost:4000/api
+echo "NEXT_PUBLIC_API_BASE_URL=/api" > .env.local
 npm install
-npm run dev                   # http://localhost:3000
+npm run dev                     # http://localhost:3000
 ```
 
-## API summary
+### Scanning tickets from a phone on the same network
 
-| Method | Path                          | Access            |
-| ------ | ----------------------------- | ----------------- |
-| POST   | `/api/auth/register`          | public            |
-| POST   | `/api/auth/verify-email`      | public            |
-| POST   | `/api/auth/resend-verification` | public          |
-| POST   | `/api/auth/login`             | public            |
-| POST   | `/api/auth/forgot-password`   | public            |
-| POST   | `/api/auth/reset-password`    | public            |
-| GET    | `/api/auth/me`                | authenticated     |
-| GET    | `/api/users`                  | `user:view`       |
-| GET    | `/api/users/:id`              | `user:view`       |
-| PATCH  | `/api/users/:id/role`         | `user:manage_roles` |
-| GET    | `/api/meta/roles`             | public            |
+Browsers only allow the camera on a secure origin. Run
+`node tools/lan-https.js` and open the printed `https://<your-LAN-IP>:3443`
+address on the phone (accept the self-signed certificate once).
 
-## Frontend pages
+### Everything in Docker
 
-- `/register`, `/verify-email`, `/login`, `/forgot-password`, `/reset-password`
-- `/dashboard` — role-aware home
-- `/dashboard/users` — **super admin** role management
-- `/dashboard/approvals` — **admin/super admin** approval queue (scaffold)
-- `/dashboard/plans` — seat plans (scaffold)
+```bash
+cp backend/.env.example .env    # compose reads DB_*, JWT_SECRET, SUPER_ADMIN_* from it …
+echo "MYSQL_ROOT_PASSWORD=change-me" >> .env   # … plus this, for the MySQL container
+docker compose up --build       # http://localhost
+docker compose exec backend npm run seed:superadmin
+```
+
+## Configuration
+
+Backend environment (`backend/.env`):
+
+| Variable | Required | Notes |
+|---|---|---|
+| `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASS` | yes | MySQL connection |
+| `DB_SSL`, `DB_POOL_MAX` | managed DBs | `DB_SSL=true` for Aiven; small pools on free tiers |
+| `JWT_SECRET` | yes | Signs access tokens |
+| `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN` | no | Default 15m / 30d |
+| `TICKET_SIGNING_SECRET` | recommended | Signs ticket QR codes; falls back to `JWT_SECRET` |
+| `MONGO_URI` | no | Blank disables the audit log |
+| `EMAIL_HOST` `EMAIL_PORT` `EMAIL_SECURE` `EMAIL_USER` `EMAIL_PASS` `EMAIL_FROM` | no | SMTP; blank logs mail to the console |
+| `CORS_ORIGINS` | production | Comma-separated allowed origins |
+| `SUPER_ADMIN_NAME` `SUPER_ADMIN_EMAIL` `SUPER_ADMIN_PASSWORD` | for seeding | Used by `npm run seed:superadmin` |
+
+Frontend: `NEXT_PUBLIC_API_BASE_URL` (use `/api`) and, in production,
+`BACKEND_ORIGIN` — where the `/api` rewrite points.
+
+Business rules (hold timeouts, refund slabs, waitlist windows, abuse weights,
+job retries…) live in the settings store and are edited on the *Settings*
+screen, not in environment variables.
+
+## Tests
+
+```bash
+cd backend
+node --test tests/              # unit tests: availability, auto-select, refunds, money, tokens, job retries…
+```
+
+## Deployment
+
+The live deployment follows `master`:
+
+- **Vercel** builds `frontend/` (framework preset Next.js) with
+  `NEXT_PUBLIC_API_BASE_URL=/api` and `BACKEND_ORIGIN` set to the API URL.
+- **Render** builds `backend/Dockerfile`. The container runs
+  `npm run migrate && npm start`, so pending migrations apply on every deploy.
+- **Aiven** hosts MySQL (TLS required).
+
+Push to `master` and both redeploy. A database created by the first release is
+upgraded in place: migration `20260101000001` converts its old single `role`
+column into roles-as-data, keeping every account's permissions.

@@ -7,6 +7,8 @@ import { InputText } from "primereact/inputtext";
 import { Button } from "primereact/button";
 import { Toast } from "primereact/toast";
 import api from "@/lib/api";
+import AuthBrand from "@/components/layout/AuthBrand";
+import AuthField from "@/components/layout/AuthField";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -37,27 +39,32 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="auth-shell">
+      <AuthBrand />
       <Toast ref={toast} />
       <form className="auth-card" onSubmit={submit}>
-        <h1>Forgot password</h1>
-        <p className="subtitle">We'll email you a code to reset it</p>
+        <span className="auth-card__badge" aria-hidden="true">
+          <i className="pi pi-key" />
+        </span>
+        <h1>Forgot your password?</h1>
+        <p className="subtitle">Enter your email and we will send a 6-digit code to reset it.</p>
 
-        <div className="field-block">
-          <label htmlFor="email">Email</label>
+        <AuthField id="email" label="Email" icon="pi-envelope">
           <InputText
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
             required
           />
-        </div>
+        </AuthField>
 
-        <Button type="submit" label="Send reset code" className="w-full" loading={loading} />
+        <Button type="submit" label="Send reset code" icon="pi pi-send" iconPos="right" className="w-full auth-submit" loading={loading} />
 
-        <div className="auth-footer">
-          <Link href="/login">Back to sign in</Link>
-        </div>
+        <Link href="/login" className="auth-back">
+          <i className="pi pi-arrow-left" aria-hidden="true" /> Back to sign in
+        </Link>
       </form>
     </div>
   );

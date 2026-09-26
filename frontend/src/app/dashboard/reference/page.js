@@ -1,10 +1,14 @@
-"use client";
+﻿"use client";
 
 import { TabView, TabPanel } from "primereact/tabview";
 import { useAuth } from "@/contexts/AuthContext";
-import { PERMISSIONS } from "@/constants/roles";
+import { PERMISSIONS } from "@/constants/permissions";
+import { Message } from "primereact/message";
+import Link from "next/link";
 import ReferenceManager from "@/components/reference/ReferenceManager";
-import { trainNamesApi, coachTypesApi, coachClassesApi } from "@/lib/reference";
+import CoachClassManager from "@/components/reference/CoachClassManager";
+import { coachTypesApi } from "@/lib/reference";
+import "@/components/reference/reference.css";
 
 export default function ReferencePage() {
   const { hasPermission } = useAuth();
@@ -24,19 +28,37 @@ export default function ReferencePage() {
     <div>
       <h1 className="page-title">Reference Data</h1>
       <p className="page-subtitle">
-        Manage the train names, coach types, and classes that planners choose from.
+        The coach types and classes that planners choose from when building a layout.
       </p>
+
+      <Message
+        severity="info"
+        style={{ width: "100%", marginBottom: "1rem" }}
+        content={
+          <span>
+            Looking for trains? They moved to{" "}
+            <Link href="/dashboard/network" style={{ fontWeight: 600 }}>
+              Network &rarr; Trains
+            </Link>
+            , where a train also carries its codes, route, coaches and schedule. These were always
+            the same records &mdash; this screen only ever showed the name.
+          </span>
+        }
+      />
 
       <div className="card">
         <TabView>
-          <TabPanel header="Train Names" leftIcon="pi pi-bookmark mr-2">
-            <ReferenceManager title="Train Names" singular="Train name" apiClient={trainNamesApi} />
-          </TabPanel>
+          {/* Trains outgrew this screen — they carry codes, routes, composition
+              and schedules now, and all of that lives under Network → Trains. */}
           <TabPanel header="Coach Types" leftIcon="pi pi-box mr-2">
             <ReferenceManager title="Coach Types" singular="Coach type" apiClient={coachTypesApi} />
           </TabPanel>
+          {/*
+            Coach classes have their own manager: they carry standing capacity
+            as well as a name, and the generic one only knows about names.
+          */}
           <TabPanel header="Coach Classes" leftIcon="pi pi-star mr-2">
-            <ReferenceManager title="Coach Classes" singular="Coach class" apiClient={coachClassesApi} />
+            <CoachClassManager />
           </TabPanel>
         </TabView>
       </div>

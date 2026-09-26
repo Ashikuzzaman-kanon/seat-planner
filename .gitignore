@@ -23,3 +23,7 @@ yarn-error.log*
 Thumbs.db
 .idea/
 .vscode/
+
+# Self-signed certificates for serving the app over HTTPS on a local network
+# (tools/lan-https.js). Machine-specific and regenerated on demand.
+tools/certs/

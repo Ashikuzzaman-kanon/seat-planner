@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Dropdown } from "primereact/dropdown";
+import Select from "@/components/ui/Select";
 import { InputText } from "primereact/inputtext";
 import { InputTextarea } from "primereact/inputtextarea";
 import { Checkbox } from "primereact/checkbox";
@@ -151,12 +151,12 @@ export default function PlanEditor({ planId }) {
   );
 
   return (
-    <div>
+    <div className="plan-page">
       <Toast ref={toast} />
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
+      <div className="page-head">
         <h1 className="page-title">{isEdit ? "Edit Seat Plan" : "New Seat Plan"}</h1>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <Button label="Save draft" icon="pi pi-save" outlined loading={saving} onClick={() => save(false)} />
           <Button label="Save & submit" icon="pi pi-send" loading={saving} onClick={() => save(true)} />
         </div>
@@ -166,15 +166,15 @@ export default function PlanEditor({ planId }) {
       <div className="card">
         <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
           {field("Train name", (
-            <Dropdown value={meta.trainNameId} options={refOptions(refs.trainNames)} filter
+            <Select value={meta.trainNameId} options={refOptions(refs.trainNames)} filter
               onChange={(e) => setMeta((m) => ({ ...m, trainNameId: e.value }))} placeholder="Select train" />
           ))}
           {field("Coach type", (
-            <Dropdown value={meta.coachTypeId} options={refOptions(refs.coachTypes)} filter
+            <Select value={meta.coachTypeId} options={refOptions(refs.coachTypes)} filter
               onChange={(e) => setMeta((m) => ({ ...m, coachTypeId: e.value }))} placeholder="Select type" />
           ))}
           {field("Coach class", (
-            <Dropdown value={meta.coachClassId} options={refOptions(refs.coachClasses)} filter
+            <Select value={meta.coachClassId} options={refOptions(refs.coachClasses)} filter
               onChange={(e) => setMeta((m) => ({ ...m, coachClassId: e.value }))} placeholder="Select class" />
           ))}
           {field("Coach no", (
@@ -187,7 +187,7 @@ export default function PlanEditor({ planId }) {
             <InputText value={layout.toStation} onChange={(e) => setLayout((l) => ({ ...l, toStation: e.target.value }))} placeholder="To" />
           ))}
           {!isEdit && field("Start from template", (
-            <Dropdown value={templateId} options={[{ label: "— None —", value: null }, ...templates.map((t) => ({ label: `${t.trainName?.name || "?"} · ${t.coachNo}`, value: t.id }))]}
+            <Select value={templateId} options={[{ label: "— None —", value: null }, ...templates.map((t) => ({ label: `${t.trainName?.name || "?"} · ${t.coachNo}`, value: t.id }))]}
               onChange={(e) => applyTemplate(e.value)} placeholder="Optional" />
           ))}
         </div>
@@ -234,7 +234,7 @@ export default function PlanEditor({ planId }) {
                 <label htmlFor="win">Window seat</label>
               </div>
               {selectedSeat.isWindow && field("Window type", (
-                <Dropdown value={selectedSeat.windowType || "full"} options={[{ label: "Full", value: "full" }, { label: "Half", value: "half" }]}
+                <Select value={selectedSeat.windowType || "full"} options={[{ label: "Full", value: "full" }, { label: "Half", value: "half" }]}
                   onChange={(e) => patchSeat({ windowType: e.value })} />
               ))}
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>

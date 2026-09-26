@@ -1,0 +1,433 @@
+/* ==========================================================================
+   The review queue
+   --------------------------------------------------------------------------
+   Read by somebody deciding whether to move a person closer to being locked
+   out. The arithmetic is laid out rather than summarised, because a bare score
+   cannot be argued with and so gets agreed with.
+   ========================================================================== */
+
+.reports {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.reports__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.reports__count {
+  font-size: 0.82rem;
+  color: #6b7280;
+  margin-left: auto;
+}
+
+.reports__empty,
+.reports__none {
+  width: 100%;
+}
+
+.reports__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.report {
+  border-left: 4px solid #d5dae2;
+}
+.report.is-open {
+  border-left-color: #d97706;
+}
+.report.is-upheld {
+  border-left-color: #dc2626;
+}
+.report.is-dismissed {
+  border-left-color: #9ca3af;
+  opacity: 0.85;
+}
+
+.report header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+.report header > div {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.report header code {
+  font-size: 0.76rem;
+  color: #9ca3af;
+}
+
+/* The checker's own words, quoted rather than paraphrased. */
+.report__detail {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #374151;
+  font-style: italic;
+}
+
+.report__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+.report__facts dt {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+.report__facts dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #111827;
+  overflow-wrap: anywhere;
+}
+
+.report__review {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.7rem;
+  background: #eef2f7;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.report footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.report__decide {
+  display: flex;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+/* ---------------- Accounts on hold ---------------- */
+
+.reports__held {
+  border-left: 4px solid #dc2626;
+}
+.reports__held h2 {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #b91c1c;
+}
+.reports__held ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.reports__held li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0;
+  border-top: 1px solid #f1f3f6;
+}
+.reports__held li:first-child {
+  border-top: 0;
+}
+.reports__held li > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.reports__held span {
+  font-size: 0.85rem;
+  color: #4b5563;
+  overflow-wrap: anywhere;
+}
+.reports__held small {
+  font-size: 0.76rem;
+  color: #9ca3af;
+}
+.reports__held-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+/* ---------------- Dialogs ---------------- */
+
+.reports__lead {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: #4b5563;
+}
+.reports__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.9rem;
+}
+.reports__field > span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+}
+.reports__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* ---------------- Standing ---------------- */
+
+.standing__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.4rem;
+}
+.standing__total {
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #111827;
+}
+.standing__head small {
+  display: block;
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin-top: 0.2rem;
+}
+.standing__window {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.standing__parts {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  margin-bottom: 1rem;
+}
+.standing__parts th {
+  text-align: left;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  padding: 0 0.5rem 0.4rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+.standing__parts td {
+  padding: 0.55rem 0.5rem 0.55rem 0;
+  border-bottom: 1px solid #f1f3f6;
+  vertical-align: top;
+  color: #4b5563;
+}
+.standing__parts td:first-child {
+  color: #111827;
+  font-weight: 600;
+}
+.standing__parts td small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.74rem;
+  color: #6b7280;
+  margin-top: 0.15rem;
+  line-height: 1.4;
+}
+/* A signal actually contributing is worth seeing at a glance. */
+.standing__parts tr.is-counting td {
+  background: #fff7ed;
+}
+
+.standing__heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+.standing__holds {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.standing__holds li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.5rem 0.7rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 0.84rem;
+}
+.standing__holds small {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.standing__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 560px) {
+  .report__decide {
+    width: 100%;
+  }
+  .report__decide .p-button {
+    flex: 1;
+  }
+}
+
+/* ---------------- Travel, beside the score ----------------
+   Context for a decision, kept visually separate from the arithmetic so it is
+   never mistaken for part of it. Weighting misconduct by loyalty is how you
+   end up policing infrequent travellers hardest. */
+
+.standing__travel {
+  margin: 0 0 1.25rem;
+  padding: 0.85rem;
+  background: #f8fafc;
+  border: 1px solid #eef1f5;
+  border-radius: 10px;
+}
+.standing__context {
+  margin: 0 0 0.75rem;
+  font-size: 0.76rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.standing__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(6.5rem, 100%), 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.standing__stats > div {
+  background: #fff;
+  border: 1px solid #e8edf3;
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.standing__stats strong {
+  font-size: 1.15rem;
+  line-height: 1.1;
+  color: #111827;
+}
+.standing__stats span {
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+.standing__stats .is-good strong {
+  color: #15803d;
+}
+/* Not an accusation — a number worth a second look. */
+.standing__stats .is-watch {
+  border-color: #fdba74;
+  background: #fffbeb;
+}
+.standing__stats .is-watch strong {
+  color: #b45309;
+}
+
+.standing__money {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(7rem, 100%), 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid #eef1f5;
+}
+.standing__money dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+.standing__money dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.standing__reports {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.standing__reports li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.45rem 0.6rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+.standing__reports span {
+  flex: 1 1 12rem;
+  color: #4b5563;
+  overflow-wrap: anywhere;
+}
+.standing__reports small {
+  color: #9ca3af;
+}
+
+/* The score table keeps its columns and scrolls, rather than being squeezed. */
+.standing__scroll {
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+/* The status filter stays one row on a phone: four equal segments. */
+@media (max-width: 640px) {
+  .reports__toolbar .p-selectbutton {
+    display: flex;
+    width: 100%;
+  }
+  .reports__toolbar .p-selectbutton .p-button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 0.4rem;
+    font-size: 0.85rem;
+    justify-content: center;
+  }
+}

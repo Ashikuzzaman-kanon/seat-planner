@@ -9,7 +9,7 @@ const {
 const ApiError = require("../utils/ApiError");
 const { normalizeLayout } = require("../utils/normalizeLayout");
 const { PLAN_STATUS } = require("../constants/planStatus");
-const { PERMISSIONS, roleHasPermission } = require("../constants/roles");
+const { PERMISSIONS } = require("../constants/permissions");
 
 // Eager-load reference names and authors for full plan responses.
 const INCLUDES = [
@@ -20,13 +20,15 @@ const INCLUDES = [
   { model: User, as: "approvedBy" },
 ];
 
-function canSeeAll(user) {
-  // Anyone who can create plans (planner+) can see non-approved plans.
-  return roleHasPermission(user.role, PERMISSIONS.PLAN_CREATE);
+// Visibility follows permissions, not role names — `permissions` is the Set
+// resolved per request by the auth middleware.
+function canSeeAll(permissions) {
+  // Anyone who can create plans can also see ones that aren't approved yet.
+  return permissions.has(PERMISSIONS.PLAN_CREATE);
 }
 
-function canApprove(user) {
-  return roleHasPermission(user.role, PERMISSIONS.PLAN_APPROVE);
+function canApprove(permissions) {
+  return permissions.has(PERMISSIONS.PLAN_APPROVE);
 }
 
 /** Confirms the chosen train/type/class actually exist before saving. */
@@ -47,11 +49,11 @@ async function findPlanOr404(id) {
   return plan;
 }
 
-/** List plans with role-based visibility and optional filters. */
-async function listPlans({ user, status, search = "", mine, templates, trainNameId }) {
+/** List plans with permission-based visibility and optional filters. */
+async function listPlans({ user, permissions, status, search = "", mine, templates, trainNameId }) {
   const where = {};
 
-  if (!canSeeAll(user)) {
+  if (!canSeeAll(permissions)) {
     // Regular users only ever see approved plans.
     where.status = PLAN_STATUS.APPROVED;
   } else if (templates) {
@@ -79,15 +81,15 @@ async function listPlans({ user, status, search = "", mine, templates, trainName
   });
 }
 
-async function getPlan({ user, id }) {
+async function getPlan({ user, permissions, id }) {
   const plan = await findPlanOr404(id);
-  if (!canSeeAll(user) && plan.status !== PLAN_STATUS.APPROVED) {
+  if (!canSeeAll(permissions) && plan.status !== PLAN_STATUS.APPROVED) {
     throw ApiError.notFound("Plan not found");
   }
   return plan.toPublicJSON();
 }
 
-async function createPlan({ user, data }) {
+async function createPlan({ user, permissions, data }) {
   await assertRefsExist(data);
   const plan = await SeatPlan.create({
     coachNo: data.coachNo.trim(),
@@ -98,10 +100,10 @@ async function createPlan({ user, data }) {
     status: PLAN_STATUS.DRAFT,
     createdById: user.id,
   });
-  return getPlan({ user, id: plan.id });
+  return getPlan({ user, permissions, id: plan.id });
 }
 
-async function updatePlan({ user, id, data }) {
+async function updatePlan({ user, permissions, id, data }) {
   const plan = await findPlanOr404(id);
 
   if (data.trainNameId || data.coachTypeId || data.coachClassId) {
@@ -126,18 +128,18 @@ async function updatePlan({ user, id, data }) {
   }
 
   await plan.save();
-  return getPlan({ user, id: plan.id });
+  return getPlan({ user, permissions, id: plan.id });
 }
 
 /** Planner submits a draft/rejected plan for approval (admins auto-approve). */
-async function submitPlan({ user, id }) {
+async function submitPlan({ user, permissions, id }) {
   const plan = await findPlanOr404(id);
   if (![PLAN_STATUS.DRAFT, PLAN_STATUS.REJECTED].includes(plan.status)) {
     throw ApiError.badRequest("Only draft or rejected plans can be submitted");
   }
 
   plan.rejectionReason = null;
-  if (canApprove(user)) {
+  if (canApprove(permissions)) {
     plan.status = PLAN_STATUS.APPROVED;
     plan.approvedById = user.id;
     plan.approvedAt = new Date();
@@ -146,10 +148,10 @@ async function submitPlan({ user, id }) {
   }
 
   await plan.save();
-  return getPlan({ user, id: plan.id });
+  return getPlan({ user, permissions, id: plan.id });
 }
 
-async function approvePlan({ user, id }) {
+async function approvePlan({ user, permissions, id }) {
   const plan = await findPlanOr404(id);
   if (plan.status !== PLAN_STATUS.PENDING) {
     throw ApiError.badRequest("Only pending plans can be approved");
@@ -159,10 +161,10 @@ async function approvePlan({ user, id }) {
   plan.approvedAt = new Date();
   plan.rejectionReason = null;
   await plan.save();
-  return getPlan({ user, id: plan.id });
+  return getPlan({ user, permissions, id: plan.id });
 }
 
-async function rejectPlan({ user, id, reason }) {
+async function rejectPlan({ user, permissions, id, reason }) {
   const plan = await findPlanOr404(id);
   if (plan.status !== PLAN_STATUS.PENDING) {
     throw ApiError.badRequest("Only pending plans can be rejected");
@@ -172,7 +174,7 @@ async function rejectPlan({ user, id, reason }) {
   plan.approvedById = null;
   plan.approvedAt = null;
   await plan.save();
-  return getPlan({ user, id: plan.id });
+  return getPlan({ user, permissions, id: plan.id });
 }
 
 async function deletePlan({ id }) {

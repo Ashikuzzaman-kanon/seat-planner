@@ -9,7 +9,6 @@ body {
   min-height: 100vh;
   background: #f4f6fb;
   color: #1f2937;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 a {
@@ -20,33 +19,7 @@ a:hover {
   text-decoration: underline;
 }
 
-.auth-shell {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-}
-
-.auth-card {
-  width: 100%;
-  max-width: 420px;
-  background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-  padding: 2rem;
-}
-
-.auth-card h1 {
-  margin: 0 0 0.25rem;
-  font-size: 1.5rem;
-}
-
-.auth-card .subtitle {
-  margin: 0 0 1.5rem;
-  color: #6b7280;
-  font-size: 0.9rem;
-}
+/* The sign-in pages style themselves: components/layout/auth.css. */
 
 .field-block {
   margin-bottom: 1rem;
@@ -61,11 +34,4 @@ a:hover {
 .field-block .p-password,
 .field-block .p-password-input {
   width: 100%;
-}
-
-.auth-footer {
-  margin-top: 1.25rem;
-  text-align: center;
-  font-size: 0.85rem;
-  color: #6b7280;
 }

@@ -1,0 +1,513 @@
+/* ==========================================================================
+   Design system
+   --------------------------------------------------------------------------
+   One set of tokens, and PrimeReact's components restyled to use them.
+
+   Before this, the look was whatever each component's default happened to
+   be: saturated solid tags that made every page shout, a stepper with white
+   boxes breaking its own line, and three different blues. The direction now:
+
+   - Calm surfaces, strong type. Colour is for meaning — the one primary
+     action, a status — not decoration. A page with ten solid red and cyan
+     pills has no way left to say that one thing matters.
+   - Tinted, not solid. Tags and soft buttons use a pale fill with a strong
+     label, which reads clearly without competing with the content.
+   - Depth from shadow, not borders. Cards sit on the page with a soft shadow
+     and a hairline, rather than a heavy outline.
+
+   Loaded after the PrimeReact theme and before page stylesheets, so pages
+   that need something specific still win.
+   ========================================================================== */
+
+:root {
+  /* Brand — the blue the custom stylesheets already use, now named. */
+  --brand-50: #eff5ff;
+  --brand-100: #dbe7fe;
+  --brand-200: #bfd5fe;
+  --brand-500: #3b82f6;
+  --brand-600: #2563eb;
+  --brand-700: #1d4ed8;
+  --brand-800: #1e40af;
+  --brand-grad: linear-gradient(135deg, #2563eb 0%, #4f46e5 55%, #7c3aed 100%);
+
+  /* Surfaces and ink */
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --border: #e6eaf1;
+  --border-strong: #d5dbe5;
+  --ink: #0f172a;
+  --ink-2: #334155;
+  --muted: #64748b;
+  --faint: #94a3b8;
+
+  /* Meaning */
+  --ok: #16a34a;
+  --ok-soft: #ecfdf3;
+  --warn: #d97706;
+  --warn-soft: #fffbeb;
+  --bad: #dc2626;
+  --bad-soft: #fef2f2;
+  --info: #0284c7;
+  --info-soft: #f0f9ff;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 6px -2px rgba(15, 23, 42, 0.05), 0 12px 24px -6px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 24px 48px -12px rgba(15, 23, 42, 0.22);
+
+  --ring: 0 0 0 3px rgba(37, 99, 235, 0.22);
+
+  --font: var(--font-inter), "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* PrimeReact reads some of these directly. */
+  --primary-color: var(--brand-600);
+  --primary-color-text: #ffffff;
+  --font-family: var(--font);
+  --border-radius: var(--radius-sm);
+  --focus-ring: var(--ring);
+}
+
+/* ---------------- Type ---------------- */
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* PrimeReact sets its own family on components; bring them into line. */
+.p-component,
+.p-inputtext,
+.p-button,
+.p-dropdown-item,
+.p-tooltip-text {
+  font-family: var(--font);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--ink);
+  letter-spacing: -0.015em;
+}
+
+.page-title {
+  font-size: 1.65rem;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  margin: 0 0 0.3rem;
+  color: var(--ink);
+}
+.page-subtitle {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin: 0 0 1.6rem;
+  max-width: 72ch;
+}
+
+/* A page title with an action beside it. On a phone the action drops below
+   the text instead of being pushed off the edge. */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+}
+.page-head > :first-child {
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+.page-head > .p-button,
+.page-head > :last-child:not(:first-child) {
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+}
+@media (max-width: 640px) {
+  .page-head {
+    margin-bottom: 1.25rem;
+  }
+  .page-head .page-subtitle {
+    margin-bottom: 0;
+  }
+  .page-head > .p-button {
+    margin-top: 0;
+  }
+}
+
+a {
+  color: var(--brand-600);
+}
+
+/* Read by screen readers, not drawn. */
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------------- Surfaces ---------------- */
+
+.card,
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.card {
+  padding: 1.4rem;
+}
+
+/* ==========================================================================
+   PrimeReact component overrides — inside PrimeReact's own layer
+   --------------------------------------------------------------------------
+   PrimeReact ships its theme inside `@layer primereact`. Layered rules lose to
+   *every* unlayered rule, whatever their specificity — so these overrides,
+   written unlayered at first, beat all of PrimeReact unconditionally. A plain
+   `.p-button { background: blue }` then overrode `.p-button-danger`,
+   `.p-button-text` and the rest: red buttons went blue, icon-only text
+   buttons became blank blue squares, and invalid inputs lost their red border.
+
+   Inside the same layer, ordinary specificity applies again: a severity or
+   variant class beats the base rule, and these win ties because they load
+   later. Page stylesheets stay unlayered, so they still win over all of it.
+   ========================================================================== */
+
+@layer primereact {
+  /* ---------------- Buttons ---------------- */
+
+  .p-button {
+    border-radius: 10px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    padding: 0.62rem 1.05rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease,
+      color 0.15s ease, transform 0.08s ease;
+  }
+  .p-button:not(:disabled):active {
+    transform: translateY(1px);
+  }
+  .p-button:focus-visible {
+    box-shadow: var(--ring);
+  }
+
+  /*
+   * Primary. A plain `.p-button` rule is enough: PrimeReact's severity and
+   * variant classes (`.p-button.p-button-danger`, `.p-button.p-button-outlined`)
+   * are more specific, so they still win where they apply.
+   */
+  .p-button {
+    background: var(--brand-600);
+    border-color: var(--brand-600);
+    color: #fff;
+  }
+  .p-button:not(:disabled):hover {
+    background: var(--brand-700);
+    border-color: var(--brand-700);
+  }
+
+  .p-button.p-button-outlined {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--ink-2);
+    box-shadow: var(--shadow-xs);
+  }
+  .p-button.p-button-outlined:not(:disabled):hover {
+    background: var(--surface-2);
+    border-color: var(--faint);
+    color: var(--ink);
+  }
+  /* An outlined button that carries a meaning keeps its colour on the text. */
+  .p-button.p-button-outlined.p-button-danger {
+    color: var(--bad);
+    border-color: #fecaca;
+  }
+  .p-button.p-button-outlined.p-button-success {
+    color: var(--ok);
+    border-color: #bbf7d0;
+  }
+  .p-button.p-button-outlined.p-button-warning {
+    color: var(--warn);
+    border-color: #fde68a;
+  }
+
+  .p-button.p-button-text {
+    color: var(--brand-600);
+  }
+  .p-button.p-button-text:not(:disabled):hover {
+    background: var(--brand-50);
+  }
+  .p-button.p-button-text.p-button-secondary {
+    color: var(--muted);
+  }
+  .p-button.p-button-text.p-button-secondary:not(:disabled):hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+
+  .p-button:disabled {
+    opacity: 0.5;
+    box-shadow: none !important;
+  }
+
+  .p-button.p-button-sm {
+    padding: 0.45rem 0.8rem;
+    font-size: 0.85rem;
+    border-radius: 9px;
+  }
+
+  /* ---------------- Tags: tinted, not solid ---------------- */
+
+  .p-tag {
+    background: var(--brand-50);
+    color: var(--brand-700);
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.74rem;
+    padding: 0.22rem 0.65rem;
+    letter-spacing: 0.005em;
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+  }
+  .p-tag.p-tag-success {
+    background: var(--ok-soft);
+    color: #15803d;
+    box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.18);
+  }
+  .p-tag.p-tag-info {
+    background: var(--info-soft);
+    color: #0369a1;
+    box-shadow: inset 0 0 0 1px rgba(2, 132, 199, 0.16);
+  }
+  .p-tag.p-tag-warning {
+    background: var(--warn-soft);
+    color: #b45309;
+    box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.2);
+  }
+  .p-tag.p-tag-danger {
+    background: var(--bad-soft);
+    color: #b91c1c;
+    box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.18);
+  }
+  .p-tag.p-tag-secondary {
+    background: #f1f5f9;
+    color: var(--ink-2);
+    box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.18);
+  }
+  .p-tag .p-tag-icon {
+    font-size: 0.72rem;
+  }
+
+  /* ---------------- Inputs ---------------- */
+
+  .p-inputtext,
+  .p-password-input,
+  .p-inputnumber-input,
+  .p-inputtextarea {
+    border-radius: 10px;
+    border-color: var(--border-strong);
+    color: var(--ink);
+    box-shadow: var(--shadow-xs);
+  }
+  .p-inputtext:enabled:hover {
+    border-color: var(--faint);
+  }
+  .p-inputtext:enabled:focus {
+    border-color: var(--brand-500);
+    box-shadow: var(--ring);
+  }
+  .p-inputtext::placeholder {
+    color: var(--faint);
+  }
+
+  /* A password box fills its field like every other input. PrimeReact wraps
+     the input in an IconField of its own, which has to stretch too or the box
+     stops short of the field above it. */
+  .p-password,
+  .p-password > .p-icon-field,
+  .p-password .p-inputtext {
+    width: 100%;
+  }
+  .p-password > .p-icon-field {
+    display: block;
+  }
+
+  /* A number field's input sizes itself from its character count and, as a
+     flex item, would not shrink below that — so a narrow wrapper overflowed
+     onto whatever sat next to it. */
+  .p-inputnumber {
+    max-width: 100%;
+  }
+  .p-inputnumber-input {
+    min-width: 0;
+  }
+
+  .p-checkbox .p-checkbox-box {
+    border-radius: 6px;
+    border-color: var(--border-strong);
+  }
+  .p-checkbox .p-checkbox-box.p-highlight {
+    background: var(--brand-600);
+    border-color: var(--brand-600);
+  }
+
+  /* ---------------- The stepper ----------------
+     PrimeReact paints each step's link white, which drew a white box over the
+     connecting line behind every number. Transparent link, and the number
+     carries its own surface. */
+
+  .p-steps .p-steps-item .p-menuitem-link {
+    background: transparent;
+  }
+  .p-steps .p-steps-item:before {
+    border-top-color: var(--border-strong);
+  }
+  .p-steps .p-steps-item .p-menuitem-link .p-steps-number {
+    background: var(--surface);
+    border: 1.5px solid var(--border-strong);
+    color: var(--muted);
+    font-weight: 600;
+    width: 2.1rem;
+    height: 2.1rem;
+    font-size: 0.9rem;
+    box-shadow: 0 0 0 4px var(--bg);
+  }
+  .p-steps .p-steps-item .p-menuitem-link .p-steps-title {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.85rem;
+  }
+  .p-steps .p-steps-item.p-highlight .p-steps-number {
+    background: var(--brand-600);
+    border-color: var(--brand-600);
+    color: #fff;
+    box-shadow: 0 0 0 4px var(--bg), 0 4px 10px -2px rgba(37, 99, 235, 0.5);
+  }
+  .p-steps .p-steps-item.p-highlight .p-steps-title {
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  /* ---------------- Tables ---------------- */
+
+  .p-datatable .p-datatable-thead > tr > th {
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 0.74rem;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-color: var(--border);
+    padding: 0.8rem 1rem;
+  }
+  .p-datatable .p-datatable-tbody > tr > td {
+    border-color: #eef1f6;
+    padding: 0.85rem 1rem;
+    color: var(--ink-2);
+  }
+  .p-datatable .p-datatable-tbody > tr {
+    transition: background-color 0.12s ease;
+  }
+  .p-datatable .p-datatable-tbody > tr:hover {
+    background: #f8fbff;
+  }
+  .p-datatable .p-datatable-wrapper {
+    border-radius: var(--radius);
+  }
+  .p-paginator {
+    background: transparent;
+    border: 0;
+  }
+  .p-paginator .p-paginator-pages .p-paginator-page {
+    border-radius: 8px;
+    min-width: 2.25rem;
+    height: 2.25rem;
+  }
+  .p-paginator .p-paginator-pages .p-paginator-page.p-highlight {
+    background: var(--brand-50);
+    color: var(--brand-700);
+    font-weight: 700;
+  }
+
+  /* ---------------- Dialogs and overlays ---------------- */
+
+  .p-dialog {
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .p-dialog .p-dialog-header {
+    padding: 1.25rem 1.4rem 0.6rem;
+    border: 0;
+  }
+  .p-dialog .p-dialog-header .p-dialog-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+  .p-dialog .p-dialog-content {
+    padding: 0.6rem 1.4rem 1.4rem;
+  }
+  .p-dialog-mask.p-component-overlay {
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(3px);
+  }
+
+  .p-message {
+    border-radius: var(--radius);
+    border-width: 0 0 0 4px;
+  }
+  .p-toast .p-toast-message {
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+  }
+  .p-menu,
+  .p-overlaypanel {
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+  }
+
+  /* ---------------- Tab menus and select buttons ---------------- */
+
+  .p-selectbutton .p-button {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    color: var(--ink-2);
+    box-shadow: none !important;
+  }
+  .p-selectbutton .p-button.p-highlight {
+    background: var(--brand-600);
+    border-color: var(--brand-600);
+    color: #fff;
+  }
+
+  /* ---------------- Motion ---------------- */
+
+  @media (prefers-reduced-motion: reduce) {
+    .p-button,
+    .p-datatable .p-datatable-tbody > tr {
+      transition: none;
+    }
+  }
+}

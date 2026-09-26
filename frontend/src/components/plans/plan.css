@@ -1,3 +1,34 @@
+.seatgrid-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: 100%;
+}
+
+.seatgrid-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.seatgrid-orientation-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+.seatgrid-hint {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* A long coach scrolls inside this box so the page itself never moves sideways. */
+.seatgrid-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  padding-bottom: 0.4rem;
+}
+
 .seatgrid {
   display: inline-flex;
   flex-direction: column;
@@ -156,4 +187,79 @@
   color: #b45309;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ *
+ * Horizontal orientation
+ *
+ * A transpose, not a rotation: every axis that ran down the page now runs
+ * across it, and vice versa. Nothing is rotated except the two station labels,
+ * so seat numbers, badges and buttons all stay upright and readable.
+ * ------------------------------------------------------------------ */
+.seatgrid--horizontal {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+/* Each row and its trailing divider sit side by side instead of stacked. */
+.seatgrid--horizontal .seatgrid-rowwrap {
+  display: flex;
+  flex-direction: row;
+}
+
+.seatgrid--horizontal .seatgrid-row {
+  flex-direction: column;
+  padding: 0 0.25rem;
+}
+
+.seatgrid--horizontal .seatgrid-cells {
+  flex-direction: column;
+}
+
+.seatgrid--horizontal .row-gutter {
+  flex-direction: column;
+  min-width: 0;
+  min-height: 2rem;
+}
+
+/* The origin and destination read along the length of the coach, like a
+   platform sign. The arrows stay upright so they keep pointing the right way. */
+.seatgrid--horizontal .seatgrid-station {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 0.5rem;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+.seatgrid--horizontal .seatgrid-station .pi {
+  writing-mode: horizontal-tb;
+  margin: 0;
+}
+
+.seatgrid--horizontal .seatgrid-divider {
+  flex-direction: column;
+  margin: 0 0.15rem;
+}
+.seatgrid--horizontal .seatgrid-divider .line {
+  width: 0;
+  height: auto;
+  flex: 1;
+  border-top: none;
+  border-left: 2px dashed #f59e0b;
+}
+.seatgrid--horizontal .seatgrid-divider .label {
+  writing-mode: vertical-rl;
+}
+
+/* A seat plan page: header, then its cards, with room between them. */
+.plan-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.plan-page > .page-head .page-subtitle {
+  margin-bottom: 0;
 }

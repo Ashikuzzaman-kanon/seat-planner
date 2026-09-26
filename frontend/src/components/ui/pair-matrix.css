@@ -1,0 +1,287 @@
+/* ==========================================================================
+   Pair matrix (PairMatrix.js)
+   ========================================================================== */
+
+.pm-frame {
+  position: relative;
+  max-width: 100%;
+}
+
+/* A fade at whichever edge has more grid beyond it. */
+.pm-frame::before,
+.pm-frame::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0.5rem;
+  width: 2.25rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 3;
+}
+.pm-frame::before {
+  left: 0;
+  background: linear-gradient(to right, var(--pm-surface, #fff), transparent);
+}
+.pm-frame::after {
+  right: 0;
+  background: linear-gradient(to left, var(--pm-surface, #fff), transparent);
+}
+.pm-frame[data-more-right]::after,
+.pm-frame[data-more-left]::before {
+  opacity: 1;
+}
+
+.pm-scroll {
+  overflow: auto;
+  max-width: 100%;
+  max-height: min(70vh, 36rem);
+  padding-bottom: 0.5rem;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.pm {
+  border-collapse: separate;
+  border-spacing: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.pm-caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* ---------------- Headers ---------------- */
+
+.pm th {
+  font-weight: 650;
+  white-space: nowrap;
+  color: var(--ink-2, #334155);
+  background: var(--pm-surface, #fff);
+  transition: color 0.12s ease, background-color 0.12s ease;
+}
+
+.pm thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 0.35rem 0.25rem 0.45rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.03em;
+  text-align: center;
+}
+
+.pm-corner {
+  left: 0;
+  z-index: 3 !important;
+  text-align: left !important;
+  font-size: 0.66rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint, #94a3b8) !important;
+}
+.pm-corner span,
+.pm-corner .pi {
+  vertical-align: middle;
+}
+.pm-corner .pi {
+  font-size: 0.6rem;
+  margin: 0 0.35rem 0 0.2rem;
+}
+.pm-corner__to .pi {
+  margin: 0 0 0 0.2rem;
+}
+
+.pm-rowhead {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  padding: 0 0.6rem 0 0.25rem;
+  text-align: left;
+  max-width: 9.5rem;
+}
+.pm-rowhead strong {
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.15;
+}
+.pm-rowhead small {
+  display: block;
+  max-width: 8.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--faint, #94a3b8);
+}
+
+.pm-colhead.is-lit,
+.pm-rowhead.is-lit {
+  color: var(--brand-700, #1d4ed8);
+}
+.pm-colhead.is-lit {
+  box-shadow: inset 0 -2px 0 var(--brand-500, #3b82f6);
+}
+.pm-rowhead.is-lit {
+  box-shadow: inset -2px 0 0 var(--brand-500, #3b82f6);
+}
+.pm-rowhead.is-lit small {
+  color: var(--brand-600, #2563eb);
+}
+
+/* ---------------- Cells ---------------- */
+
+.pm td {
+  padding: 0;
+  border-radius: 9px;
+}
+/* The hovered cell's row and column, traced back to their stations. */
+.pm td.is-lit > .pm-cell {
+  border-color: rgba(59, 130, 246, 0.35);
+}
+.pm-void {
+  min-width: 3.2rem;
+}
+
+.pm-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  width: 100%;
+  min-width: 3.2rem;
+  height: 2.6rem;
+  padding: 0.25rem 0.4rem 0.35rem;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--pm-bg, #f1f5f9);
+  color: var(--pm-ink, #334155);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.pm-cell__n {
+  line-height: 1;
+}
+/* The share still free, as a length. */
+.pm-cell__bar {
+  width: 70%;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--pm-bar, #94a3b8) calc(var(--pm-fill, 0) * 100%),
+    rgba(15, 23, 42, 0.09) calc(var(--pm-fill, 0) * 100%)
+  );
+}
+
+.pm-cell:not(:disabled):hover,
+.pm-cell:focus-visible {
+  outline: none;
+  border-color: var(--pm-bar, #3b82f6);
+  box-shadow: 0 4px 12px -4px rgba(15, 23, 42, 0.25);
+  transform: translateY(-1px);
+}
+.pm-cell:disabled {
+  cursor: default;
+}
+/* Can't be chosen here (too few seats for the party): faded, still readable. */
+.pm-cell:disabled:not(.is-none) {
+  opacity: 0.55;
+}
+.pm-cell.is-none {
+  cursor: not-allowed;
+}
+.pm-cell.is-chosen {
+  border-color: var(--brand-600, #2563eb);
+  box-shadow: 0 0 0 2px var(--brand-600, #2563eb), 0 6px 14px -6px rgba(37, 99, 235, 0.6);
+}
+.pm-cell.is-chosen::after {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--brand-600, #2563eb);
+  box-shadow: 0 0 0 2px #fff;
+}
+
+/* ---------------- Legend ---------------- */
+
+.pm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1.25rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, #e6eaf1);
+  font-size: 0.78rem;
+  color: var(--muted, #64748b);
+}
+.pm-legend__scale {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pm-legend__scale i {
+  width: 7rem;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #ef4444 0%,
+    hsl(20 75% 55%) 20%,
+    hsl(42 85% 55%) 45%,
+    hsl(90 60% 48%) 72%,
+    hsl(138 62% 42%) 100%
+  );
+}
+.pm-legend__chosen {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.pm-legend__chosen i {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px var(--brand-600, #2563eb);
+}
+.pm-legend__note {
+  font-style: italic;
+  color: var(--faint, #94a3b8);
+}
+.pm-legend__total {
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .pm-rowhead small {
+    display: none;
+  }
+  .pm-cell,
+  .pm-void {
+    min-width: 2.9rem;
+  }
+  .pm-legend__total {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-cell {
+    transition: none;
+  }
+}

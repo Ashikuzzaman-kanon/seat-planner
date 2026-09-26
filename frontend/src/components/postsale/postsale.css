@@ -1,0 +1,519 @@
+/*
+ * Returning a ticket, and the queue that decides what needs deciding.
+ *
+ * Narrow-first like the rest of the buying flow: a passenger deciding whether
+ * to give a ticket back is usually doing it on a phone, often in a hurry.
+ */
+
+/* ---------------- Return dialog ---------------- */
+
+.return-dialog,
+.transfer-dialog,
+.decide-dialog {
+  width: 94vw;
+  max-width: 34rem;
+}
+
+.return-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(7rem, 100%), 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.return-facts dt {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+.return-facts dd {
+  margin: 0.15rem 0 0;
+  font-weight: 600;
+}
+
+.return-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.return-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.9rem;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.return-option:hover:not(.is-unavailable) {
+  border-color: #93c5fd;
+}
+.return-option.is-chosen {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 1px #1d4ed8;
+}
+.return-option.is-unavailable {
+  opacity: 0.65;
+  cursor: not-allowed;
+  background: #f9fafb;
+}
+
+.return-option__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.return-option__amount {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #047857;
+  white-space: nowrap;
+}
+.return-option__blocked {
+  font-size: 0.78rem;
+  color: #b91c1c;
+  white-space: nowrap;
+}
+
+.return-option__describe {
+  margin: 0.3rem 0 0;
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+.return-option__detail {
+  margin: 0.45rem 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+.return-option__detail--muted {
+  color: #9ca3af;
+}
+.return-option__detail--blocked {
+  color: #b91c1c;
+}
+
+.return-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1.2rem;
+}
+.return-actions__spacer {
+  flex: 1 1 auto;
+}
+
+/* ---------------- Transfer ---------------- */
+
+.transfer-current {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.transfer-fields {
+  margin-bottom: 0.9rem;
+}
+@media (min-width: 640px) {
+  .transfer-fields {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.transfer-reason {
+  margin-bottom: 0.9rem;
+}
+.transfer-reason textarea,
+.transfer-reason input {
+  width: 100%;
+}
+
+.wallet-requests-link {
+  text-decoration: none;
+}
+
+/* ---------------- Ticket row actions ---------------- */
+
+.ticket-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+/* ---------------- Refunds ---------------- */
+
+.refund-ceiling {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+.refund-progress {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #f3f4f6;
+}
+.refund-progress__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #4b5563;
+  margin-bottom: 0.4rem;
+}
+
+.refund-segments {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(12rem, 100%), 1fr));
+  gap: 0.4rem;
+}
+.refund-segments li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  color: #6b7280;
+}
+.refund-segments li.is-resold {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+.refund-segments li strong {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.refund-segments li small {
+  color: inherit;
+  opacity: 0.7;
+}
+
+.refund-note {
+  margin: 0.8rem 0 0;
+  font-size: 0.82rem;
+  color: #4b5563;
+}
+.refund-note--muted {
+  color: #9ca3af;
+}
+
+/* ---------------- Request queues ---------------- */
+
+.queue-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.queue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: left;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 1rem;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  position: relative;
+}
+.queue-card:hover {
+  border-color: #93c5fd;
+}
+.queue-card.is-chosen {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+}
+.queue-card__count {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1;
+  color: #1d4ed8;
+}
+.queue-card strong {
+  font-size: 0.95rem;
+}
+.queue-card small {
+  color: #6b7280;
+  font-size: 0.78rem;
+}
+.queue-card__readonly {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+}
+
+.request-reason {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: #4b5563;
+  font-style: italic;
+}
+.request-who {
+  margin: 0.8rem 0 0;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+.request-decision {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  color: #4b5563;
+}
+.request-when {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.request-readonly {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.decide-summary {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------- Per-departure return switches ---------------- */
+
+.refund-switches {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.refund-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+.refund-switch small {
+  color: #6b7280;
+}
+
+
+/* ---------------- Profile ---------------- */
+
+.profile-page {
+  max-width: 44rem;
+}
+
+.profile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.profile-identity {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+.profile-identity > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.profile-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+.profile-identity strong {
+  overflow-wrap: anywhere;
+}
+
+.profile-fields {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 640px) {
+  .profile-fields {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  /* The name gets the full width; the two short fields share the row below. */
+  .profile-fields .passenger-field:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+.profile-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+/* ---------------- Connecting standing ---------------- */
+
+.standing-dialog {
+  width: 94vw;
+  max-width: 34rem;
+}
+
+.standing-intro {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: #4b5563;
+}
+
+/* The shape of the journey: what the seat covers, and what it does not. */
+.standing-journey {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+  margin-bottom: 1.1rem;
+}
+.standing-journey__leg {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 0.6rem 0.4rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  background: repeating-linear-gradient(
+    45deg,
+    #fafafa,
+    #fafafa 6px,
+    #f4f4f5 6px,
+    #f4f4f5 12px
+  );
+}
+.standing-journey__seat {
+  flex: 2 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  border: 1px solid #1d4ed8;
+  background: #eff6ff;
+  border-radius: 8px;
+  padding: 0.6rem 0.5rem;
+  text-align: center;
+  min-width: 0;
+}
+.standing-journey__seat small {
+  color: #4b5563;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.standing-held {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.standing-held__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+
+.standing-legs {
+  margin-bottom: 1.1rem;
+}
+.standing-legs h4 {
+  margin: 0 0 0.15rem;
+  font-size: 0.92rem;
+}
+.standing-legs__hint {
+  margin: 0 0 0.6rem;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+.standing-legs ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.standing-leg {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.standing-leg:hover:not(:disabled) {
+  border-color: #1d4ed8;
+}
+.standing-leg.is-chosen {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 1px #1d4ed8;
+}
+.standing-leg.is-unavailable {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: #f9fafb;
+}
+.standing-leg__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.standing-leg__fare {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.standing-leg__room {
+  color: #6b7280;
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+.standing-leg__blocked {
+  color: #b45309;
+  font-size: 0.75rem;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* A standing ticket has no seat number, so the list says what it is instead. */
+.ticket-standing {
+  color: #b45309;
+  font-weight: 600;
+}

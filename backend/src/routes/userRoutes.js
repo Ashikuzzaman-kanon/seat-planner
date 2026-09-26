@@ -4,23 +4,23 @@ const userController = require("../controllers/userController");
 const authenticate = require("../middleware/auth");
 const { requirePermission } = require("../middleware/authorize");
 const validate = require("../middleware/validate");
-const { changeRoleRules } = require("../validators/userValidators");
-const { PERMISSIONS } = require("../constants/roles");
+const { setRolesRules } = require("../validators/userValidators");
+const { PERMISSIONS } = require("../constants/permissions");
 
 // Every route here requires a logged-in user.
 router.use(authenticate);
 
-// List / inspect users — admins and super admins.
 router.get("/", requirePermission(PERMISSIONS.USER_VIEW), userController.listUsers);
 router.get("/:id", requirePermission(PERMISSIONS.USER_VIEW), userController.getUser);
 
-// Change a user's role — super admins only.
-router.patch(
-  "/:id/role",
+// Replace the roles a user holds. Bounded by the escalation guard: a caller can
+// only grant or revoke roles whose permissions they already hold themselves.
+router.put(
+  "/:id/roles",
   requirePermission(PERMISSIONS.USER_MANAGE_ROLES),
-  changeRoleRules,
+  setRolesRules,
   validate,
-  userController.changeRole
+  userController.setRoles
 );
 
 module.exports = router;

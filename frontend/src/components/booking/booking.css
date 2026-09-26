@@ -1,0 +1,2534 @@
+/*
+ * The buying flow.
+ *
+ * Built narrow-first. A passenger books from a phone on a platform far more
+ * often than from a desk, so every row here stacks by default and only spreads
+ * out when there is room for it.
+ */
+
+.book-page {
+  max-width: 62rem;
+}
+
+/* ---------------- Progress ---------------- */
+
+.book-progress {
+  margin: 0 0 1.25rem;
+}
+.book-progress ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+}
+.book-progress li {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+/* The line from the previous dot to this one; filled once that step is done. */
+.book-progress li + li::before {
+  content: "";
+  position: absolute;
+  top: 1rem;
+  right: 50%;
+  width: 100%;
+  height: 3px;
+  margin-right: 1.15rem;
+  width: calc(100% - 2.3rem);
+  border-radius: 2px;
+  background: var(--border, #e6eaf1);
+  transform: translateY(-50%);
+}
+.book-progress li.is-done + li::before {
+  background: linear-gradient(90deg, #2563eb, #4f46e5);
+}
+.book-progress__dot {
+  position: relative;
+  z-index: 1;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--muted, #64748b);
+  background: #fff;
+  border: 2px solid var(--border, #e6eaf1);
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.book-progress__dot .pi {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.book-progress li.is-done .book-progress__dot {
+  color: #fff;
+  border-color: transparent;
+  background: #2563eb;
+}
+.book-progress li.is-now .book-progress__dot {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16), 0 6px 14px -6px rgba(79, 70, 229, 0.7);
+}
+.book-progress__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  white-space: nowrap;
+}
+.book-progress li.is-now .book-progress__label {
+  color: var(--ink, #0f172a);
+  font-weight: 700;
+}
+.book-progress li.is-done .book-progress__label {
+  color: var(--ink-2, #334155);
+}
+.book-progress__caption {
+  display: none;
+  margin: 0.7rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted, #64748b);
+}
+.book-progress__caption strong {
+  color: var(--ink, #0f172a);
+}
+@media (max-width: 560px) {
+  .book-progress__label {
+    display: none;
+  }
+  .book-progress__caption {
+    display: block;
+  }
+}
+
+/* ---------------- What is being bought ---------------- */
+
+.book-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1.1rem;
+  margin: 0 0 1rem;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  background: var(--brand-50, #eff5ff);
+  border: 1px solid var(--brand-100, #dbe7fe);
+  font-size: 0.86rem;
+  color: var(--ink-2, #334155);
+}
+.book-summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.book-summary .pi {
+  font-size: 0.78rem;
+  color: var(--brand-600, #2563eb);
+}
+.book-summary__train {
+  font-weight: 700;
+  color: var(--ink, #0f172a);
+}
+
+.book-step {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.book-centre {
+  display: flex;
+  justify-content: center;
+  padding: 2.5rem 0;
+}
+
+.book-message {
+  width: 100%;
+}
+
+.book-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.book-back {
+  align-self: flex-start;
+}
+
+/* ---------------- Journey ---------------- */
+
+.journey-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 1.35rem 1.4rem 1.4rem;
+}
+
+/* From, swap, To and Seats on one line where there is room. */
+.journey-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.journey-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.journey-field label,
+.journey-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted, #64748b);
+  font-weight: 650;
+}
+.journey-field .p-dropdown {
+  width: 100%;
+}
+.journey-station.p-dropdown {
+  min-height: 3rem;
+}
+
+.journey-swap.p-button {
+  width: 2.6rem;
+  height: 2.6rem;
+  margin-bottom: 0.2rem;
+  padding: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--brand-600, #2563eb);
+  border-color: var(--border-strong, #d5dbe5);
+}
+.journey-swap.p-button:not(:disabled):hover {
+  background: var(--brand-50, #eff5ff);
+  border-color: var(--brand-200, #bfd5fe);
+  color: var(--brand-700, #1d4ed8);
+}
+.journey-swap.p-button .p-button-icon {
+  transition: transform 0.25s ease;
+}
+.journey-swap.p-button:not(:disabled):hover .p-button-icon {
+  transform: rotate(180deg);
+}
+
+/* The seat counter: quiet outlined steps either side of the number, not three
+   solid blue blocks competing with the Search button. */
+.journey-count.p-inputnumber {
+  display: inline-flex;
+  height: 3rem;
+  border: 1px solid var(--border-strong, #d5dbe5);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+.journey-count .p-inputnumber-input {
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 0;
+}
+.journey-count .journey-count__btn.p-button {
+  width: 2.6rem;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-2, #334155);
+  box-shadow: none;
+}
+.journey-count .journey-count__btn.p-button:not(:disabled):hover {
+  background: var(--brand-50, #eff5ff);
+  color: var(--brand-700, #1d4ed8);
+}
+.journey-count .journey-count__btn.p-button:disabled {
+  opacity: 0.35;
+}
+
+/* Date strip and the Search button. */
+.journey-when {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+}
+.journey-field--dates {
+  flex: 1 1 auto;
+}
+
+.date-rail {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  /* The right padding is what the fade covers, so the last chip can still be
+     scrolled fully into the clear. */
+  padding: 0.15rem 1.75rem 0.35rem 0.1rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.75rem), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 1.75rem), transparent);
+}
+.date-chip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  min-width: 3.6rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border, #e6eaf1);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink-2, #334155);
+  font: inherit;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.date-chip small {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  white-space: nowrap;
+}
+.date-chip strong {
+  font-size: 1.1rem;
+  font-weight: 750;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.date-chip:hover {
+  border-color: var(--brand-200, #bfd5fe);
+  background: var(--brand-50, #eff5ff);
+}
+.date-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.date-chip.is-on {
+  border-color: transparent;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #fff;
+  box-shadow: 0 8px 18px -8px rgba(79, 70, 229, 0.7);
+}
+.date-chip.is-on small {
+  color: rgba(255, 255, 255, 0.85);
+}
+.date-rail__empty {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted, #64748b);
+}
+
+.journey-search.p-button {
+  flex: 0 0 auto;
+  height: 3.1rem;
+  padding: 0 1.5rem;
+  margin-bottom: 0.35rem;
+  border: 0;
+  border-radius: 12px;
+  font-size: 0.98rem;
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 60%, #7c3aed 100%);
+  box-shadow: 0 12px 24px -12px rgba(79, 70, 229, 0.75);
+}
+.journey-search.p-button:not(:disabled):hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 60%, #6d28d9 100%);
+}
+.journey-search.p-button:disabled {
+  opacity: 1;
+  background: linear-gradient(135deg, #a5bff7 0%, #aeb0f3 60%, #c3adf5 100%);
+  box-shadow: none;
+}
+
+/* A station in the dropdown list, and in the closed field. */
+.station-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+.station-opt__code {
+  flex: 0 0 auto;
+  min-width: 3rem;
+  padding: 0.2rem 0.35rem;
+  border-radius: 7px;
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-align: center;
+  color: var(--brand-700, #1d4ed8);
+  background: var(--brand-50, #eff5ff);
+  border: 1px solid var(--brand-100, #dbe7fe);
+}
+.station-opt__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.station-opt__text strong {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.station-opt__text small {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--muted, #64748b);
+}
+.p-dropdown-item.p-highlight .station-opt__code {
+  background: #fff;
+}
+
+.station-val {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.station-val__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 550;
+}
+.station-val__code {
+  flex: 0 0 auto;
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  color: var(--muted, #64748b);
+  background: var(--surface-2, #f8fafc);
+  border: 1px solid var(--border, #e6eaf1);
+}
+
+@media (max-width: 899px) {
+  /* From and To stacked, the swap button sitting on the seam between them the
+     way travel apps put it, and the seat counter under them. The negative
+     margins give the button a zero-height row of its own, centred on the gap,
+     so nothing has to be positioned by pixel. */
+  .journey-route {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.85rem;
+  }
+  .journey-swap.p-button {
+    justify-self: end;
+    position: relative;
+    z-index: 2;
+    margin: -1.3rem 3.1rem -1.3rem 0;
+    box-shadow: var(--shadow-sm);
+  }
+  .journey-swap.p-button .p-button-icon {
+    transform: rotate(90deg);
+  }
+  .journey-swap.p-button:not(:disabled):hover .p-button-icon {
+    transform: rotate(270deg);
+  }
+  .journey-field--count {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .journey-when {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .journey-search.p-button {
+    width: 100%;
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .journey-form {
+    padding: 1.1rem 1rem 1.15rem;
+  }
+  .date-chip {
+    min-width: 3.4rem;
+  }
+}
+
+/* ---------------- Departure results ---------------- */
+
+.departure-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.departure-list__head {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted, #64748b);
+}
+.departure-list__head strong {
+  color: var(--ink, #0f172a);
+}
+
+.departure-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.15rem 1.3rem 1rem;
+  background: #fff;
+  border: 1px solid var(--border, #e6eaf1);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.departure-card:hover {
+  border-color: var(--brand-200, #bfd5fe);
+  box-shadow: var(--shadow-md);
+}
+.departure-card.is-full {
+  background: var(--surface-2, #f8fafc);
+}
+
+.departure-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+.departure-card__head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 750;
+}
+.departure-card__head h3 .pi {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--brand-600, #2563eb);
+  background: var(--brand-50, #eff5ff);
+}
+
+.departure-seats {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: #047857;
+  background: #ecfdf5;
+}
+.departure-seats.is-scarce {
+  color: #b45309;
+  background: #fffbeb;
+}
+.departure-seats.is-short {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+.departure-seats .pi {
+  font-size: 0.8rem;
+}
+
+/* Departure — line with the journey time — arrival. */
+.departure-times {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(5rem, 1.2fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+.departure-times__end {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.departure-times__end--to {
+  text-align: right;
+}
+.departure-times strong {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.departure-times strong sup {
+  font-size: 0.5em;
+  font-weight: 700;
+  color: #b45309;
+  margin-left: 0.15em;
+}
+.departure-times__end span {
+  font-size: 0.83rem;
+  color: var(--muted, #64748b);
+  overflow-wrap: anywhere;
+}
+.departure-times__line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+.departure-times__line small {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  white-space: nowrap;
+}
+.departure-times__line span {
+  position: relative;
+  width: 100%;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, #cbd5e1 0 6px, transparent 6px 11px);
+}
+.departure-times__line span::before,
+.departure-times__line span::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: #fff;
+  border: 2px solid var(--brand-500, #3b82f6);
+}
+.departure-times__line span::before {
+  left: -2px;
+}
+.departure-times__line span::after {
+  right: -2px;
+  background: var(--brand-500, #3b82f6);
+}
+
+/* Each class a chip: what it is, what it costs, how many are left. */
+.departure-classes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.departure-classes li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e6eaf1);
+  background: var(--surface-2, #f8fafc);
+  font-size: 0.84rem;
+}
+.departure-classes__name {
+  color: var(--ink-2, #334155);
+  font-weight: 550;
+}
+.departure-classes strong {
+  font-weight: 750;
+  color: var(--ink, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+.departure-classes small {
+  color: var(--muted, #64748b);
+  white-space: nowrap;
+  font-size: 0.74rem;
+}
+.departure-classes li.is-short {
+  opacity: 0.6;
+}
+
+.departure-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 0.85rem;
+  border-top: 1px dashed var(--border, #e6eaf1);
+}
+.departure-card__buy {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: auto;
+}
+.departure-fare {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+.departure-fare span {
+  font-size: 0.78rem;
+  color: var(--muted, #64748b);
+}
+.departure-fare strong {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .departure-card {
+    padding: 1rem 1rem 0.9rem;
+  }
+  .departure-times {
+    grid-template-columns: minmax(0, 1fr) 4.5rem minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+  .departure-times strong {
+    font-size: 1.35rem;
+  }
+  .departure-card__foot {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .departure-card__buy {
+    margin-left: 0;
+    justify-content: space-between;
+  }
+  .departure-room.p-button {
+    align-self: center;
+  }
+}
+
+/* ---------------- Seats ---------------- */
+
+.seat-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.seat-class {
+  min-width: 12rem;
+}
+.seat-count-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--brand-700, #1d4ed8);
+  background: var(--brand-50, #eff5ff);
+  white-space: nowrap;
+}
+.seat-count-note .pi {
+  font-size: 0.78rem;
+}
+
+.seat-auto h3,
+.seat-manual h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+}
+.seat-auto__hint {
+  margin: 0 0 1rem;
+  font-size: 0.86rem;
+  color: var(--muted, #64748b);
+}
+
+.seat-prefs,
+.seat-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+/* A preference is a pill to toggle; the checkbox inside still carries the
+   state for keyboards and screen readers, the pill just makes it look like
+   something to tap. */
+.seat-pref {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem 0.5rem 0.65rem;
+  border: 1px solid var(--border-strong, #d5dbe5);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.88rem;
+  font-weight: 550;
+  color: var(--ink-2, #334155);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.seat-pref:hover {
+  border-color: var(--brand-200, #bfd5fe);
+  background: var(--brand-50, #eff5ff);
+}
+.seat-pref:has(input:checked) {
+  border-color: var(--brand-500, #3b82f6);
+  background: var(--brand-50, #eff5ff);
+  color: var(--brand-700, #1d4ed8);
+}
+.seat-pref .pi {
+  color: var(--muted, #64748b);
+}
+.seat-pref:has(input:checked) .pi {
+  color: var(--brand-600, #2563eb);
+}
+.seat-toggles .seat-pref {
+  border-style: dashed;
+}
+
+/* ---- The proposal ---- */
+
+.seat-proposal {
+  border-top: 1px solid var(--border, #e6eaf1);
+  padding-top: 1.1rem;
+}
+.seat-proposal__head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+.seat-proposal__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 700;
+  color: var(--ink, #0f172a);
+}
+.seat-proposal__title .pi {
+  color: #7c3aed;
+}
+
+.seat-chips {
+  list-style: none;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+/* Each seat a small ticket stub: the number large, the coach and class beside. */
+.seat-chips li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.85rem 0.55rem 0.6rem;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--brand-200, #bfd5fe);
+  box-shadow: 0 6px 16px -10px rgba(37, 99, 235, 0.55);
+}
+.seat-chip__seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.1rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 9px;
+  color: #fff;
+  background: linear-gradient(160deg, #2563eb, #4f46e5);
+  line-height: 1.05;
+}
+.seat-chip__seat small {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.seat-chip__seat strong {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.seat-chip__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+  color: var(--ink-2, #334155);
+}
+.seat-chip__class {
+  font-style: normal;
+  font-size: 0.76rem;
+  color: var(--muted, #64748b);
+}
+.seat-chip__marks {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+.seat-chip__marks .pi {
+  font-size: 0.8rem;
+  color: var(--brand-600, #2563eb);
+}
+.seat-proposal__class {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: var(--ink-2, #334155);
+  font-weight: 550;
+}
+
+.seat-refusal {
+  border-top: 1px solid var(--border, #e6eaf1);
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.seat-breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.seat-breakdown li {
+  display: flex;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  background: var(--surface-2, #f8fafc);
+  border: 1px solid var(--border, #e6eaf1);
+  border-radius: 8px;
+  padding: 0.3rem 0.6rem;
+}
+
+.seat-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.seat-hold.p-button {
+  border: 0;
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 60%, #7c3aed 100%);
+  box-shadow: 0 10px 22px -12px rgba(79, 70, 229, 0.8);
+}
+.seat-hold.p-button:not(:disabled):hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 60%, #6d28d9 100%);
+}
+
+/* In "choose myself", the running choice and the Hold button stay on screen
+   while the coach scrolls beneath them. */
+.seat-actions--sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  justify-content: space-between;
+  margin: 1rem -1.4rem -1.4rem;
+  padding: 0.85rem 1.4rem;
+  border-top: 1px solid var(--border, #e6eaf1);
+  border-radius: 0 0 var(--radius-lg, 16px) var(--radius-lg, 16px);
+  background: rgba(255, 255, 255, 0.94);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.seat-picked-count {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink-2, #334155);
+}
+
+.seat-manual__hint {
+  margin: 0 0 0.9rem;
+  font-size: 0.88rem;
+  color: var(--muted, #64748b);
+}
+
+@media (max-width: 640px) {
+  .seat-count-note {
+    margin-left: 0;
+  }
+  .seat-class {
+    min-width: 0;
+  }
+  .seat-actions--sticky {
+    margin: 1rem -1rem -1rem;
+    padding: 0.75rem 1rem;
+  }
+  .seat-actions--sticky .p-button {
+    flex: 1 1 auto;
+  }
+}
+
+/* ---------------- Hold bar ---------------- */
+
+.book-holdbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.book-holdbar > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.book-holdbar__seats {
+  font-size: 0.85rem;
+  color: #4b5563;
+  overflow-wrap: anywhere;
+}
+.book-holdbar__note {
+  color: #6b7280;
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+}
+
+.hold-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.hold-timer strong {
+  font-variant-numeric: tabular-nums;
+}
+.hold-timer small {
+  color: #047857;
+}
+.hold-timer.is-urgent {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+.hold-timer.is-urgent small {
+  color: #b91c1c;
+}
+.hold-timer.is-out {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #6b7280;
+}
+
+/* ---------------- Passengers ---------------- */
+
+.passenger-forms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.passenger-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+.passenger-card__head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.passenger-seat {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.passenger-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.85rem;
+}
+@media (min-width: 720px) {
+  .passenger-fields {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1.4fr);
+  }
+}
+
+.passenger-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.passenger-field label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  font-weight: 600;
+}
+.passenger-field input {
+  width: 100%;
+}
+
+.field-error {
+  color: #b91c1c;
+  font-size: 0.75rem;
+}
+
+/* ---------------- Payment ---------------- */
+
+.payment-summary h3,
+.payment-methods h3 {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+}
+
+.fare-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fare-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+.fare-lines li > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.fare-lines small {
+  color: #6b7280;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+.fare-lines span {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.fare-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-top: 0.85rem;
+  font-size: 1.05rem;
+}
+.fare-total strong {
+  font-size: 1.35rem;
+  color: #1d4ed8;
+}
+
+.payment-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.8rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  margin-bottom: 0.6rem;
+  cursor: pointer;
+}
+.payment-option.is-chosen {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+}
+.payment-option.is-unavailable {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.payment-option__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.payment-option__body small {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.payment-wallet-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+/* ---------------- Confirmation ---------------- */
+
+.confirm-head {
+  text-align: center;
+}
+.confirm-tick {
+  font-size: 2.6rem;
+  color: #059669;
+}
+.confirm-head h2 {
+  margin: 0.5rem 0 1rem;
+  font-size: 1.3rem;
+}
+
+.confirm-reference {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  border-radius: 10px;
+  padding: 0.7rem 1.4rem;
+  margin-bottom: 1.25rem;
+}
+.confirm-reference span {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+}
+.confirm-reference strong {
+  font-size: 1.7rem;
+  letter-spacing: 0.12em;
+  color: #111827;
+}
+
+.confirm-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr));
+  gap: 0.9rem;
+  margin: 0 0 1.25rem;
+  text-align: left;
+}
+.confirm-facts dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+.confirm-facts dd {
+  margin: 0.15rem 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.ticket-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr));
+  gap: 1rem;
+}
+
+/* A ticket drawn as a boarding pass: a coloured band, the journey, a tear
+   line with notches, and the QR on the stub. */
+.ticket-card {
+  --stub: 13.5rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 18px;
+  border: 1px solid var(--border, #e6eaf1);
+  box-shadow: var(--shadow-md);
+  -webkit-mask:
+    radial-gradient(circle 10px at 0 calc(100% - var(--stub)), transparent 9.5px, #000 10px) left / 51% 100% no-repeat,
+    radial-gradient(circle 10px at 100% calc(100% - var(--stub)), transparent 9.5px, #000 10px) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle 10px at 0 calc(100% - var(--stub)), transparent 9.5px, #000 10px) left / 51% 100% no-repeat,
+    radial-gradient(circle 10px at 100% calc(100% - var(--stub)), transparent 9.5px, #000 10px) right / 51% 100% no-repeat;
+}
+.ticket-card__band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  color: #fff;
+  background: linear-gradient(135deg, #1d4ed8, #4f46e5 60%, #7c3aed);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+.ticket-card__band > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.ticket-card__band .p-tag {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+.ticket-card__body {
+  padding: 0.9rem 1rem 0.8rem;
+  text-align: center;
+}
+.ticket-card__route {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted, #64748b);
+}
+.ticket-card__route .pi {
+  font-size: 0.7rem;
+  margin: 0 0.2rem;
+}
+.ticket-card__head {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.ticket-card__head > div {
+  display: flex;
+  flex-direction: column;
+}
+.ticket-card__label {
+  font-size: 0.65rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint, #94a3b8);
+}
+.ticket-card__head strong {
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.ticket-card__head strong.ticket-card__date {
+  font-size: 1rem;
+  line-height: 2.1;
+}
+.ticket-passenger {
+  margin: 0.75rem 0 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.ticket-number {
+  margin: 0.1rem 0 0;
+  font-size: 0.78rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--muted, #64748b);
+  letter-spacing: 0.06em;
+}
+.ticket-card__tear {
+  margin: 0 1rem;
+  border-top: 2px dashed var(--border, #e6eaf1);
+}
+.ticket-card__stub {
+  height: var(--stub);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem;
+}
+.ticket-qr {
+  width: 150px;
+  height: 150px;
+  border-radius: 8px;
+}
+.ticket-qr--placeholder {
+  background: #f3f4f6;
+}
+.ticket-fare {
+  margin: 0;
+  font-weight: 750;
+  color: var(--brand-700, #1d4ed8);
+}
+
+/* ---------------- Bookings list ---------------- */
+
+.bookings-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.bookings-search {
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+.bookings-search input {
+  width: 100%;
+}
+.bookings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+.bookings-new {
+  text-decoration: none;
+}
+
+.bookings-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: #6b7280;
+}
+.bookings-empty .pi {
+  font-size: 2rem;
+  margin-bottom: 0.6rem;
+  display: block;
+}
+
+.bookings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.booking-row__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+}
+.booking-row__head h3 {
+  margin: 0.25rem 0 0.2rem;
+  font-size: 1.08rem;
+}
+.booking-ref {
+  display: inline-block;
+  padding: 0.12rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  font-weight: 750;
+  color: var(--brand-700, #1d4ed8);
+  background: var(--brand-50, #eff5ff);
+}
+.booking-journey {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--ink-2, #334155);
+  display: flex;
+  gap: 0.35rem 1rem;
+  flex-wrap: wrap;
+}
+.booking-journey .pi {
+  font-size: 0.72rem;
+  color: var(--faint, #94a3b8);
+}
+.booking-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted, #64748b);
+}
+.booking-row__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+.booking-row__meta strong {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.booking-tickets {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0.6rem 0 0;
+  border-top: 1px solid var(--border, #e6eaf1);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.booking-tickets li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0.5rem;
+  border-radius: 12px;
+  transition: background-color 0.15s ease;
+}
+.booking-tickets li:hover {
+  background: var(--surface-2, #f8fafc);
+}
+/* The coach and seat, as a small badge the eye can find down the list. */
+.booking-seat {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 3rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 10px;
+  line-height: 1.1;
+  color: var(--brand-700, #1d4ed8);
+  background: var(--brand-50, #eff5ff);
+  border: 1px solid var(--brand-100, #dbe7fe);
+}
+.booking-seat small {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.booking-seat strong {
+  font-size: 1rem;
+  font-weight: 800;
+}
+.booking-seat.is-standing {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+.booking-ticket__who {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.booking-tickets small {
+  color: var(--muted, #64748b);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+.booking-tickets .ticket-actions {
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .booking-row__meta {
+    flex-direction: row-reverse;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+  .booking-tickets li {
+    flex-wrap: wrap;
+    padding: 0.5rem 0;
+  }
+  .booking-tickets .ticket-actions {
+    width: 100%;
+    justify-content: flex-end;
+    border-top: 1px dashed var(--border, #e6eaf1);
+    padding-top: 0.25rem;
+  }
+}
+
+.booking-row__actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #f3f4f6;
+}
+.booking-paid {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.qr-dialog {
+  width: 92vw;
+  max-width: 22rem;
+}
+.qr-dialog__body {
+  text-align: center;
+}
+.qr-dialog__body img {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+}
+.qr-dialog__number {
+  margin: 0.5rem 0 0;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.qr-dialog__hint {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* An overnight leg arrives on a different day, and the card has to say so. */
+.booking-overnight {
+  color: #b45309;
+  font-style: normal;
+}
+.confirm-overnight {
+  display: block;
+  color: #b45309;
+  font-weight: 500;
+  font-size: 0.78rem;
+}
+
+/* ---------------- Where there is room ---------------- */
+
+.matrix-dialog {
+  width: 96vw;
+  max-width: 48rem;
+}
+
+.matrix-intro {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.matrix-chosen {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  margin-bottom: 1rem;
+}
+.matrix-chosen.is-short {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.matrix-chosen > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.matrix-chosen__label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+.matrix-chosen strong {
+  overflow-wrap: anywhere;
+}
+.matrix-chosen__count {
+  font-weight: 700;
+  white-space: nowrap;
+  color: #065f46;
+}
+.matrix-chosen.is-short .matrix-chosen__count {
+  color: #991b1b;
+}
+
+.matrix-views {
+  margin-bottom: 1rem;
+}
+
+.matrix-row {
+  margin-bottom: 1.25rem;
+}
+.matrix-row h4 {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+}
+.matrix-row__hint {
+  margin: 0 0 0.7rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.matrix-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/*
+ * One stretch of the journey: the station, a bar showing how much of the
+ * train is still free on the way there, and the count. Read down the list and
+ * the bars show where the train fills and where it empties again.
+ */
+.matrix-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(4rem, 7.5rem) auto 1rem;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  padding: 0.6rem 0.8rem 0.6rem 0.9rem;
+  border: 1px solid var(--border, #e6eaf1);
+  border-left: 4px solid var(--pm-bar, #94a3b8);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  color: var(--ink, #0f172a);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.matrix-item:hover:not(:disabled),
+.matrix-item:focus-visible {
+  outline: none;
+  background: var(--brand-50, #eff5ff);
+  border-color: var(--brand-200, #bfd5fe);
+  border-left-color: var(--pm-bar, #94a3b8);
+}
+.matrix-item:hover:not(:disabled) .matrix-item__go {
+  color: var(--brand-600, #2563eb);
+  transform: translateX(2px);
+}
+.matrix-item:disabled {
+  cursor: not-allowed;
+  background: var(--surface-2, #f8fafc);
+}
+.matrix-item:disabled .matrix-item__name {
+  color: var(--muted, #64748b);
+}
+.matrix-item.is-chosen {
+  border-color: var(--brand-600, #2563eb);
+  border-left-color: var(--brand-600, #2563eb);
+  box-shadow: 0 0 0 1px var(--brand-600, #2563eb);
+}
+.matrix-item__name {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.matrix-item__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--pm-bar, #94a3b8) calc(var(--pm-fill, 0) * 100%),
+    #e9edf3 calc(var(--pm-fill, 0) * 100%)
+  );
+}
+.matrix-item__count {
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--pm-ink, #0f172a);
+}
+.matrix-item__count small {
+  font-weight: 500;
+  font-size: 0.75rem;
+  color: var(--muted, #64748b);
+}
+.matrix-item__tag {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand-700, #1d4ed8);
+  background: var(--brand-50, #eff5ff);
+  border: 1px solid var(--brand-200, #bfd5fe);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  white-space: nowrap;
+}
+.matrix-item__go {
+  color: var(--faint, #94a3b8);
+  font-size: 0.8rem;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+@media (max-width: 520px) {
+  .matrix-item {
+    grid-template-columns: minmax(0, 1fr) auto 0.8rem;
+    gap: 0.35rem 0.6rem;
+  }
+  .matrix-item__bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+.departure-room.p-button {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+/* ---------------- Open checkouts ---------------- */
+
+.open-checkouts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.open-checkout {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-left: 4px solid #f59e0b;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+
+.open-checkout__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+.open-checkout__body span {
+  font-size: 0.85rem;
+  color: #4b5563;
+  overflow-wrap: anywhere;
+}
+.open-checkout__body em {
+  font-style: normal;
+  color: #9ca3af;
+}
+.open-checkout__body small {
+  font-size: 0.78rem;
+  color: #78350f;
+}
+
+.open-checkout__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+.open-checkout__actions {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+}
+
+@media (max-width: 560px) {
+  .open-checkout__side {
+    align-items: stretch;
+    width: 100%;
+  }
+  .open-checkout__actions {
+    justify-content: flex-end;
+  }
+}
+
+/* ---------------- The waitlist ---------------- */
+
+.waitlist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.waitlist-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #94a3b8;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+
+/* An open offer is the urgent one: a seat is out of sale until it is answered. */
+.waitlist-card.is-offered {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  border-left-color: #16a34a;
+}
+
+.waitlist-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1 1 18rem;
+}
+
+.waitlist-card__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.waitlist-card__journey {
+  font-size: 0.85rem;
+  color: #4b5563;
+  overflow-wrap: anywhere;
+}
+.waitlist-card__journey em {
+  font-style: normal;
+  color: #9ca3af;
+}
+
+.waitlist-card__place {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+.waitlist-card__seats {
+  font-size: 0.78rem;
+  color: #15803d;
+  font-weight: 600;
+}
+
+.waitlist-card__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+
+.waitlist-card__actions {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.waitlist-card__paid {
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
+.waitlist-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #15803d;
+}
+.waitlist-clock.is-urgent {
+  color: #b91c1c;
+}
+
+@media (max-width: 560px) {
+  .waitlist-card__side {
+    align-items: stretch;
+    width: 100%;
+  }
+}
+
+/* ---------------- Joining ---------------- */
+
+.waitlist-dialog__lead {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.waitlist-dialog__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.waitlist-dialog__row label,
+.waitlist-passenger label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.waitlist-dialog__row label span,
+.waitlist-passenger label span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.waitlist-dialog__note {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.waitlist-dialog__heading {
+  margin: 1.1rem 0 0.2rem;
+  font-size: 0.95rem;
+}
+.waitlist-dialog__why {
+  margin: 0 0 0.8rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.waitlist-passenger {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem 0.9rem;
+  margin: 0 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.waitlist-passenger legend {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #6b7280;
+  padding: 0 0.35rem;
+}
+.waitlist-passenger__pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  gap: 0.6rem;
+}
+
+.waitlist-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* ==========================================================================
+   The coach, drawn as it is laid out
+   --------------------------------------------------------------------------
+   The grid is the plan's own: `--coach-columns` comes from the approved
+   layout, and a blank cell holds the aisle open. Nothing here decides where a
+   seat goes — that was decided in the planner and approved.
+
+   Taken seats are drawn, not hidden. A map of only the free seats is not a map.
+   ========================================================================== */
+
+.seat-map__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.coach-orient {
+  display: inline-flex;
+  border: 1px solid #e0e6ee;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #fff;
+}
+.coach-orient__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  background: transparent;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.coach-orient__btn + .coach-orient__btn {
+  border-left: 1px solid #e0e6ee;
+}
+.coach-orient__btn:hover {
+  background: #f3f6fa;
+}
+.coach-orient__btn.is-on {
+  background: #2563eb;
+  color: #fff;
+}
+.coach-orient__btn:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.4);
+}
+.coach-orient__btn .pi {
+  font-size: 0.7rem;
+}
+
+.coach-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0;
+  background: #f8fafc;
+  border: 1px solid #e8edf3;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  color: #4b5563;
+}
+.coach-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.coach-legend .pi {
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+/* Swatches drawn like the seats: a body and a backrest. */
+.coach-legend__swatch {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 4px 4px 3px 3px;
+  border: 1px solid #cfd8e3;
+  border-top: 3px solid #a9b6c8;
+  background: #fff;
+  display: inline-block;
+}
+.coach-legend__swatch.is-chosen {
+  background: linear-gradient(160deg, #2563eb, #4f46e5);
+  border-color: #3730a3;
+  border-top-color: #312e81;
+}
+.coach-legend__swatch.is-taken {
+  background: repeating-linear-gradient(135deg, #eef1f5 0 3px, #e1e6ed 3px 6px);
+  border-color: #e2e8f0;
+  border-top-color: #cbd5e1;
+}
+.coach-legend__swatch.is-window {
+  border-top-color: #38bdf8;
+}
+.coach-legend .coach-legend__power {
+  color: #d97706;
+}
+
+.seat-map {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.coach {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+/* A flex child of the map must not shrink: that is what turned five drawn
+   coaches into five slivers. */
+.coach {
+  flex: 0 0 auto;
+}
+
+/* The whole bar is the control — a lone chevron is a worse target than the
+   thing people already want to press. */
+.coach__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  background: #f8fafc;
+  border: 0;
+  border-bottom: 1px solid #eef1f5;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.coach__head:hover {
+  background: #f1f5f9;
+}
+.coach__head:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.35);
+}
+
+.coach.is-open .coach__head {
+  background: #eef4ff;
+  border-bottom-color: #dbe6fb;
+}
+
+.coach__head-main {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-size: 0.95rem;
+  min-width: 0;
+}
+
+.coach__head-side {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.coach__chevron {
+  font-size: 0.7rem;
+  color: #6b7280;
+  align-self: center;
+}
+
+.coach__mine {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #1d4ed8;
+  background: #dbe6fb;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+}
+.coach__code {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.coach__class {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1d4ed8;
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: baseline;
+}
+.coach__class em {
+  font-style: normal;
+  font-weight: 500;
+  color: #6b7280;
+}
+.coach__free {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #15803d;
+}
+.coach__free.is-none {
+  color: #9ca3af;
+}
+
+.coach__noplan {
+  margin: 0;
+  padding: 1rem 0.9rem;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+/* The carriage itself. Scrolls rather than squashing: a coach drawn narrower
+   than its plan is no longer the plan. */
+.coach__body {
+  padding: 0.9rem;
+  overflow: auto;
+}
+
+.coach__grid {
+  display: flex;
+  gap: 0.3rem;
+  min-width: min-content;
+  width: max-content;
+  margin: 0 auto;
+}
+
+.coach__row {
+  display: grid;
+  gap: 0.3rem;
+}
+
+/* ---- Down the page ----
+   Rows stack top to bottom, cells run left to right within a row. Suits a
+   phone: the coach is narrow and grows downwards. */
+.coach__body--vertical .coach__grid {
+  flex-direction: column;
+}
+.coach__body--vertical .coach__row {
+  grid-template-columns: repeat(var(--coach-columns, 4), 2.6rem);
+  justify-content: center;
+}
+/* Long carriages would otherwise push the Hold button out of reach. */
+.coach__body--vertical {
+  max-height: 32rem;
+}
+
+/* ---- Across ----
+   The same plan turned a quarter turn: each row becomes a vertical strip and
+   the strips run left to right, the way a train is drawn on a platform board.
+   Wide screens fit a whole carriage this way. */
+.coach__body--horizontal .coach__grid {
+  flex-direction: row;
+  align-items: flex-start;
+  margin: 0;
+}
+.coach__body--horizontal .coach__row {
+  grid-template-columns: 2.6rem;
+  grid-auto-rows: 2.6rem;
+}
+.coach__body--horizontal .coach__row-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 0.3rem;
+}
+
+.coach-cell {
+  width: 2.6rem;
+  height: 2.6rem;
+}
+
+.coach-cell--blank {
+  /* The aisle. Deliberately empty and deliberately the same size as a seat, so
+     the rows either side line up the way they do in the carriage. */
+  visibility: hidden;
+}
+
+/*
+ * A seat, drawn as one: a body and, along the top edge, a backrest. The
+ * backrest carries meaning — sky blue for a window seat — so the number
+ * stays the only thing written on it.
+ */
+.coach-seat {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px 8px 6px 6px;
+  border: 1px solid #cfd8e3;
+  border-top: 4px solid #a9b6c8;
+  background: #fff;
+  color: #0f172a;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 1px 1px rgba(15, 23, 42, 0.05);
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease,
+    transform 0.08s ease, box-shadow 0.15s ease;
+}
+
+.coach-seat.is-window {
+  border-top-color: #38bdf8;
+}
+
+.coach-seat:hover:not(:disabled) {
+  border-color: #93b4f5;
+  border-top-color: #2563eb;
+  background: #eff5ff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px -4px rgba(37, 99, 235, 0.45);
+}
+
+.coach-seat:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+  border-color: #2563eb;
+}
+
+.coach-seat.is-chosen {
+  background: linear-gradient(160deg, #2563eb, #4f46e5);
+  border-color: #3730a3;
+  border-top-color: #312e81;
+  color: #fff;
+  box-shadow: 0 6px 14px -6px rgba(79, 70, 229, 0.75);
+}
+.coach-seat.is-chosen:hover:not(:disabled) {
+  background: linear-gradient(160deg, #1d4ed8, #4338ca);
+  border-top-color: #312e81;
+}
+
+/* Taken: hatched and faded — out, and not only by colour: it is also not
+   focusable, and its label says "taken". */
+.coach-seat.is-taken {
+  background: repeating-linear-gradient(135deg, #eef1f5 0 5px, #e3e8ee 5px 10px);
+  border-color: #e2e8f0;
+  border-top-color: #cbd5e1;
+  color: #a3adbd;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* At the limit, the free seats stop inviting a click without looking sold. */
+.coach-seat.is-free:disabled:not(.is-taken) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.coach-seat__number {
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The charging point, tucked in the corner. */
+.coach-seat__power {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  font-size: 0.5rem !important;
+  color: #d97706;
+}
+.coach-seat.is-chosen .coach-seat__power {
+  color: #fde68a;
+}
+
+/* A tick on the chosen seat, so it reads as chosen without colour. */
+.coach-seat__tick {
+  position: absolute;
+  top: -9px;
+  right: -7px;
+  width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 0.5rem !important;
+  color: #fff;
+  background: #16a34a;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+/* Where the planner marked the coach turning round. Turns with the map. */
+.coach__split {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #9ca3af;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.coach__body--vertical .coach__split {
+  margin: 0.45rem 0 0.15rem;
+}
+.coach__body--vertical .coach__split::before,
+.coach__body--vertical .coach__split::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: repeating-linear-gradient(to right, #d5dae2 0 6px, transparent 6px 12px);
+}
+
+/* Across, the divider is a vertical rule and the label would not fit beside
+   it — so the line carries the meaning and the text is left for screen
+   readers. */
+.coach__body--horizontal .coach__split {
+  flex-direction: column;
+  align-self: stretch;
+  margin: 0 0.25rem;
+  width: 1px;
+  padding: 0;
+  background: repeating-linear-gradient(to bottom, #d5dae2 0 6px, transparent 6px 12px);
+}
+.coach__body--horizontal .coach__split span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .coach__row {
+    grid-template-columns: repeat(var(--coach-columns, 4), 2.4rem);
+  }
+  .coach-cell {
+    width: 2.4rem;
+    height: 2.4rem;
+  }
+  .coach-legend {
+    gap: 0.6rem;
+    font-size: 0.74rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-seat {
+    transition: none;
+  }
+}
+
+/* Where a search scrolls to. Zero-height; the margin keeps the answer clear of
+   the header when it arrives. */
+.journey-answer {
+  height: 0;
+  scroll-margin-top: 1rem;
+}
+
+/* ---------------- First booking: the buyer's own details ---------------- */
+
+.profile-needed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  border-color: #fde68a;
+  background: linear-gradient(180deg, #fffbeb, #fff 70%);
+}
+.profile-needed__head {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+.profile-needed__head > .pi {
+  flex: 0 0 auto;
+  width: 2.4rem;
+  height: 2.4rem;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  color: #b45309;
+  background: #fef3c7;
+}
+.profile-needed__head strong {
+  font-size: 0.98rem;
+}
+.profile-needed__head p {
+  margin: 0.2rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--ink-2, #334155);
+}
+.profile-needed__choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.profile-needed__other {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--muted, #64748b);
+}
+.profile-needed__other a .pi {
+  font-size: 0.7rem;
+}
+.profile-needed__other .p-button-link {
+  padding: 0;
+  font-size: 0.86rem;
+  vertical-align: baseline;
+}

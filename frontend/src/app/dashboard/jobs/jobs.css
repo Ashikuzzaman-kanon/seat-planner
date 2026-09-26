@@ -1,0 +1,194 @@
+/* Background jobs (Phase 8B). */
+
+.jobs-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: #047857;
+  background: #ecfdf5;
+}
+.jobs-live .pi {
+  font-size: 0.55rem;
+  animation: jobs-pulse 1.4s ease-in-out infinite;
+}
+@keyframes jobs-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Status filter with counts — a glance says whether anything needs a person. */
+.jobs-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+.jobs-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--border, #e6eaf1);
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 0.86rem;
+  color: var(--ink-2, #334155);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.jobs-filter b {
+  min-width: 1.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  text-align: center;
+  background: var(--surface-2, #f8fafc);
+  font-variant-numeric: tabular-nums;
+}
+.jobs-filter:hover {
+  border-color: var(--faint, #94a3b8);
+}
+.jobs-filter.is-on {
+  border-color: var(--brand-600, #2563eb);
+  background: var(--brand-50, #eff5ff);
+  color: var(--brand-700, #1d4ed8);
+}
+.jobs-filter--failed b {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+.jobs-filter--running b {
+  color: #b45309;
+  background: #fffbeb;
+}
+
+.job-id {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted, #64748b);
+  font-weight: 600;
+}
+.job-what {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.job-what small {
+  font-size: 0.76rem;
+  color: var(--muted, #64748b);
+  overflow-wrap: anywhere;
+}
+.job-what code {
+  font-size: 0.72rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 5px;
+  background: var(--surface-2, #f8fafc);
+  border: 1px solid var(--border, #e6eaf1);
+}
+.job-muted {
+  color: var(--faint, #94a3b8);
+}
+.job-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 7rem;
+}
+.job-progress .p-progressbar {
+  height: 6px;
+  border-radius: 999px;
+}
+.job-progress small {
+  font-size: 0.75rem;
+  color: var(--muted, #64748b);
+  font-variant-numeric: tabular-nums;
+}
+.job-attempts {
+  display: flex;
+  flex-direction: column;
+  font-variant-numeric: tabular-nums;
+}
+.job-attempts small {
+  font-size: 0.72rem;
+  color: #b45309;
+}
+.job-attempts small .ui-when {
+  display: inline;
+}
+.job-attempts small .ui-when > * {
+  display: inline;
+  margin-left: 0.2rem;
+  font-size: inherit;
+  color: inherit;
+}
+
+.ui-table .p-datatable-tbody > tr.job-row--focus {
+  box-shadow: inset 3px 0 0 var(--brand-600, #2563eb);
+  background: var(--brand-50, #eff5ff);
+}
+
+.job-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.25rem 0.25rem 0.5rem;
+}
+.job-details h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted, #64748b);
+}
+.job-details pre {
+  margin: 0;
+  max-height: 16rem;
+  overflow: auto;
+  padding: 0.7rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--surface-2, #f8fafc);
+  border: 1px solid var(--border, #e6eaf1);
+}
+.job-details pre.job-error {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.job-details__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+  gap: 0.9rem;
+}
+.job-details__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  margin: 0;
+}
+.job-details__facts dt {
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint, #94a3b8);
+}
+.job-details__facts dd {
+  margin: 0.15rem 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jobs-live .pi {
+    animation: none;
+  }
+}

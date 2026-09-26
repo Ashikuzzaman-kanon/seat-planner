@@ -1,0 +1,275 @@
+/* Shared layout for the network management screens. */
+
+.net-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.net-search {
+  flex: 1 1 18rem;
+  min-width: 0;
+  position: relative;
+}
+.net-toolbar-check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+/* ---- Route builder ---- */
+
+.route-summary {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.route-hint {
+  margin: 0 0 0.9rem;
+  font-size: 0.85rem;
+  color: #6b7280;
+  max-width: 62ch;
+}
+
+/* A long route scrolls inside its own box rather than pushing the dialog wide. */
+.route-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.route-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.route-table th {
+  text-align: left;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  font-weight: 600;
+  padding: 0.4rem 0.4rem;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+.route-table td {
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+.route-seq {
+  color: #9ca3af;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.route-day {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+.day-badge {
+  display: inline-block;
+  min-width: 1.9rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0.12rem 0.3rem;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #6b7280;
+}
+/* An overnight leg is the one thing on this screen worth noticing at a glance. */
+.day-badge.on {
+  background: #fef3c7;
+  color: #b45309;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .net-toolbar {
+    gap: 0.5rem;
+  }
+  .net-search {
+    flex: 1 0 100%;
+  }
+}
+
+/* ---- Schedule editor ---- */
+
+.schedule-block {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.schedule-days {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+/* Narrow enough that all seven fit a row on a laptop, wrapping on a phone. */
+.schedule-day .p-button {
+  min-width: 4.2rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.82rem;
+}
+
+.schedule-dates {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+/* ---- Departure board ---- */
+
+.dep-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(10rem, 100%), 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+.dep-metric {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  background: #fff;
+}
+.dep-metric-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.dep-metric-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  margin-top: 0.2rem;
+}
+
+.dep-date {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dep-day {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+/* Seats on a departure: the total, then what it is made of, one class a line.
+   Tags were tried and squeezed into circles in a narrow column. */
+.dep-seats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 9.5rem;
+}
+.dep-seats > strong {
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+.dep-classes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.dep-classes li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--muted, #64748b);
+  white-space: nowrap;
+}
+.dep-classes b {
+  font-weight: 600;
+  color: var(--ink-2, #334155);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Departure seat list (dialog) ---- */
+
+.dep-seats-intro {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: var(--muted, #64748b);
+}
+.dep-seat-coach {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.dep-seat-coach small {
+  font-size: 0.76rem;
+  color: var(--muted, #64748b);
+}
+.dep-seat-features {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.dep-seat-features > span:not(.dep-seat-none) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-2, #334155);
+  background: var(--surface-2, #f8fafc);
+  border: 1px solid var(--border, #e6eaf1);
+  white-space: nowrap;
+}
+.dep-seat-features .pi {
+  font-size: 0.72rem;
+  color: var(--brand-600, #2563eb);
+}
+.dep-seat-none {
+  color: var(--faint, #94a3b8);
+}
+.dep-seat-pos {
+  font-size: 0.85rem;
+  color: var(--ink-2, #334155);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.dep-seat-note {
+  font-size: 0.8rem;
+  color: var(--muted, #64748b);
+}
+
+/* ---- Departure row actions ----
+   Four icon buttons: seats, coaches, rebuild, cancel or reinstate. Kept to one
+   line and a little smaller than the default, so the row fits its card on a
+   laptop without the last one scrolling out of view. */
+.dep-actions {
+  display: flex;
+  gap: 0.15rem;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+.dep-actions .p-button.p-button-icon-only {
+  width: 2.35rem;
+  height: 2.35rem;
+}
+.ui-table .p-datatable-tbody > tr > td.dep-actions-cell {
+  padding-left: 0.4rem;
+  padding-right: 0.5rem;
+}

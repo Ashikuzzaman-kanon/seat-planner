@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { PERMISSIONS } from "@/constants/roles";
+import { PERMISSIONS } from "@/constants/permissions";
 import PlanEditor from "@/components/plans/PlanEditor";
 
 export default function EditPlanPage() {

@@ -8,7 +8,7 @@ import { Message } from "primereact/message";
 import { Toast } from "primereact/toast";
 import { ProgressSpinner } from "primereact/progressspinner";
 import { useAuth } from "@/contexts/AuthContext";
-import { PERMISSIONS } from "@/constants/roles";
+import { PERMISSIONS } from "@/constants/permissions";
 import { PLAN_STATUS, PLAN_STATUS_LABELS, PLAN_STATUS_SEVERITY } from "@/constants/planStatus";
 import { getPlan } from "@/lib/plans";
 import SeatGrid from "@/components/plans/SeatGrid";
@@ -84,10 +84,10 @@ export default function ViewPlanPage() {
   ];
 
   return (
-    <div>
+    <div className="plan-page">
       <Toast ref={toast} />
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
+      <div className="page-head">
         <div>
           <h1 className="page-title" style={{ marginBottom: 4 }}>
             {plan.trainName?.name} · Coach {plan.coachNo}{" "}
@@ -95,7 +95,7 @@ export default function ViewPlanPage() {
           </h1>
           <p className="page-subtitle">{plan.coachType?.name} · {plan.coachClass?.name}</p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <Button label="Back" icon="pi pi-arrow-left" outlined severity="secondary" onClick={() => router.push("/dashboard/plans")} />
           <Button label="Export PDF" icon="pi pi-file-pdf" loading={exporting} onClick={exportPdf} />
           {hasPermission(PERMISSIONS.PLAN_UPDATE) && editable && (
