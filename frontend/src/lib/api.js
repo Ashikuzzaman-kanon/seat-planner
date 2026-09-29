@@ -65,10 +65,26 @@ async function refreshSession() {
   return data;
 }
 
+/*
+ * What to say when the answer carries no message of ours — it came from
+ * something in front of the API (the hosting platform's proxy or firewall), or
+ * nothing answered at all. axios's own "Request failed with status code 429"
+ * means nothing to the person looking at it.
+ */
+const PLATFORM_MESSAGES = {
+  429: "Too many requests reached the server just now. Wait a minute and try again.",
+  502: "The server is starting up or briefly unavailable. Try again in a minute.",
+  503: "The server is starting up or briefly unavailable. Try again in a minute.",
+  504: "The server took too long to answer. Try again in a minute.",
+};
+
 function normalizeError(err) {
+  const status = err.response?.status;
   const message =
     err.response?.data?.error?.message ||
     err.response?.data?.message ||
+    PLATFORM_MESSAGES[status] ||
+    (!err.response ? "Can't reach the server. Check your connection and try again." : null) ||
     err.message ||
     "Request failed";
   const normalized = new Error(message);
