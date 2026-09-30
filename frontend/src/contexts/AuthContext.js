@@ -16,6 +16,9 @@ export function AuthProvider({ children }) {
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Set when the session could not be checked because the server did not
+  // answer — as opposed to answering "not signed in".
+  const [unreachable, setUnreachable] = useState(null);
 
   const clearSession = useCallback(() => {
     clearTokens();
@@ -40,8 +43,17 @@ export function AuthProvider({ children }) {
       setUser(data.user);
       setRoles(data.roles || []);
       setPermissions(data.permissions || []);
-    } catch {
-      clearSession();
+      setUnreachable(null);
+    } catch (err) {
+      // Only the server saying "no" ends the session. A server that is asleep,
+      // restarting or out of reach says nothing about it, so the tokens are
+      // kept and the page offers to try again instead of signing you out.
+      if (err.status === 401 || err.status === 403) {
+        clearSession();
+        setUnreachable(null);
+      } else {
+        setUnreachable(err.message || "The server could not be reached.");
+      }
     } finally {
       setLoading(false);
     }
@@ -111,6 +123,7 @@ export function AuthProvider({ children }) {
     roles,
     permissions,
     loading,
+    unreachable,
     login,
     logout,
     adoptSession,

@@ -1,0 +1,28 @@
+/* "Starting the server…" — pinned to the top of the window, above everything. */
+.server-waking {
+  position: fixed;
+  top: 0.75rem;
+  left: 50%;
+  z-index: 3000;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  width: max-content;
+  max-width: min(34rem, calc(100vw - 1.5rem));
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--brand-200, #bfd5fe);
+  border-radius: var(--radius, 12px);
+  background: var(--brand-50, #eff5ff);
+  box-shadow: var(--shadow-md);
+  color: var(--ink-2, #334155);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.server-waking .pi {
+  margin-top: 0.15rem;
+  color: var(--brand-600, #2563eb);
+}
+.server-waking strong {
+  color: var(--ink, #0f172a);
+}
