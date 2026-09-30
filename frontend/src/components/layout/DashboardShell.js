@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Menu } from "primereact/menu";
 import { ProgressSpinner } from "primereact/progressspinner";
+import { Button } from "primereact/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/constants/permissions";
 import { roleLabel } from "@/constants/roles";
@@ -36,15 +37,17 @@ function initials(name = "") {
  * here is the same component, so the two cannot drift apart.
  */
 export default function DashboardShell({ children }) {
-  const { user, roles, loading, logout, hasPermission } = useAuth();
+  const { user, roles, loading, unreachable, refresh, logout, hasPermission } = useAuth();
+  const [retrying, setRetrying] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const account = useRef(null);
 
-  // Redirect unauthenticated users to login once auth state is known.
+  // Redirect unauthenticated users to login once auth state is known — but
+  // not when the server simply did not answer: that is not being signed out.
   useEffect(() => {
-    if (!loading && !user) router.replace("/login");
-  }, [loading, user, router]);
+    if (!loading && !user && !unreachable) router.replace("/login");
+  }, [loading, user, unreachable, router]);
 
   const groups = useMemo(() => visibleGroups(hasPermission), [hasPermission]);
   const here = locate(pathname);
@@ -67,6 +70,28 @@ export default function DashboardShell({ children }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen]);
+
+  if (!loading && !user && unreachable) {
+    const retry = async () => {
+      setRetrying(true);
+      try {
+        await refresh();
+      } finally {
+        setRetrying(false);
+      }
+    };
+    return (
+      <div className="dash-loading">
+        <div className="dash-unreachable" role="alert">
+          <i className="pi pi-cloud" aria-hidden="true" />
+          <h1>Can&apos;t reach the server</h1>
+          <p>{unreachable}</p>
+          <p className="dash-unreachable__note">You are still signed in — nothing was lost.</p>
+          <Button label="Try again" icon="pi pi-refresh" onClick={retry} loading={retrying} />
+        </div>
+      </div>
+    );
+  }
 
   if (loading || !user) {
     return (

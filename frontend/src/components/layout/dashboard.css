@@ -20,6 +20,39 @@
   background: var(--bg);
 }
 
+/* The session could not be checked because the server did not answer. */
+.dash-unreachable {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  max-width: 26rem;
+  margin: 1rem;
+  padding: 2rem 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+.dash-unreachable > .pi {
+  font-size: 2rem;
+  color: var(--brand-600);
+}
+.dash-unreachable h1 {
+  margin: 0.25rem 0 0;
+  font-size: 1.25rem;
+}
+.dash-unreachable p {
+  margin: 0;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.dash-unreachable .dash-unreachable__note {
+  margin-bottom: 0.75rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 /* ---------------- Sidebar ---------------- */
 
 .dash-sidebar {

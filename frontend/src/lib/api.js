@@ -46,6 +46,58 @@ export function setSessionExpiredHandler(handler) {
   onSessionExpired = handler;
 }
 
+/* ---------------------------------------------------------------- *
+ * Waking a sleeping server
+ * ---------------------------------------------------------------- */
+
+/*
+ * The API runs on Render's free tier, which puts it to sleep after 15 idle
+ * minutes. A request that reaches a sleeping API through the Vercel proxy is
+ * refused with 429 ("hibernate-rate-limited") instead of waking it: those
+ * requests come from Vercel's servers, whose wake-ups Render rations. A request
+ * the browser makes itself, straight to the API, is held while it starts
+ * (about 30 seconds) — so that is how it gets woken.
+ *
+ * One wake-up at a time: the first refusal starts it, every request refused
+ * meanwhile waits for the same one, and then each is sent once more. Only a
+ * 429 without a body of ours is treated this way — it provably never reached
+ * the API, so sending it again cannot, say, buy a ticket twice.
+ */
+let wakePromise = null;
+let onServerWaking = null;
+
+/** Lets the page show that the server is starting while requests wait for it. */
+export function setServerWakingHandler(handler) {
+  onServerWaking = handler;
+}
+
+const WAKE_TIMEOUT_MS = 90_000;
+
+const refusedWhileAsleep = (err) =>
+  err.response?.status === 429 && !err.response?.data?.error && Boolean(config.wakeUrl);
+
+function wakeServer() {
+  if (!wakePromise) {
+    onServerWaking?.(true);
+    // no-cors: the answer itself is not needed, only that one arrived. The
+    // request is held until the API is up, and resolves then.
+    wakePromise = fetch(config.wakeUrl, {
+      mode: "no-cors",
+      cache: "no-store",
+      signal: AbortSignal.timeout(WAKE_TIMEOUT_MS),
+    })
+      .then(
+        () => true,
+        () => false
+      )
+      .finally(() => {
+        onServerWaking?.(false);
+        wakePromise = null;
+      });
+  }
+  return wakePromise;
+}
+
 /**
  * Access tokens are deliberately short-lived, so a 401 is expected during
  * normal use rather than exceptional. One refresh is attempted per failed
@@ -72,7 +124,7 @@ async function refreshSession() {
  * means nothing to the person looking at it.
  */
 const PLATFORM_MESSAGES = {
-  429: "Too many requests reached the server just now. Wait a minute and try again.",
+  429: "The server is starting up or busy. Wait a minute and try again.",
   502: "The server is starting up or briefly unavailable. Try again in a minute.",
   503: "The server is starting up or briefly unavailable. Try again in a minute.",
   504: "The server took too long to answer. Try again in a minute.",
@@ -93,11 +145,24 @@ function normalizeError(err) {
   return normalized;
 }
 
+/*
+ * The calls that issue, exchange or revoke tokens. A 401 from one of these is
+ * the answer itself ("wrong password", "that refresh token is spent"), not an
+ * expired access token, so it is never met with a refresh. Everything else —
+ * /auth/me and the profile included — is.
+ */
+const TOKEN_CALL = /\/auth\/(login|refresh|logout|register|verify-email|resend-verification|forgot-password|reset-password)$/;
+
 api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const original = err.config;
-    const isAuthCall = original?.url?.includes("/auth/");
+    const isAuthCall = TOKEN_CALL.test(original?.url || "");
+
+    if (refusedWhileAsleep(err) && original && !original._woken) {
+      original._woken = true;
+      if (await wakeServer()) return api(original);
+    }
 
     if (err.response?.status === 401 && original && !original._retried && !isAuthCall) {
       original._retried = true;
