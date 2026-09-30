@@ -267,7 +267,7 @@ here is planned on GitHub Actions.
 
 **In Seat Planner.** Web on Vercel, API on Render (Docker), MySQL on Aiven, audit log on MongoDB Atlas. The web app proxies `/api` to the API, so the browser only ever talks to one origin.
 
-**Code.** [API proxy](../frontend/next.config.mjs#L11) · [README: Deployment](../README.md)
+**Code.** [API proxy](../frontend/next.config.mjs#L18) · [README: Deployment](../README.md)
 
 ### 30. ✅ Security in deployment
 

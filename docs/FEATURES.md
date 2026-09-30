@@ -338,7 +338,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **In Seat Planner.** A short-lived JWT access token plus a refresh token that is rotated on every use and stored only as a hash. The browser refreshes automatically, sharing one refresh between simultaneous requests. A password reset signs out every session.
 
-**Code.** [tokenService.issueRefreshToken](../backend/src/services/tokenService.js#L46) · [tokenService.rotateRefreshToken](../backend/src/services/tokenService.js#L74) · [auth middleware](../backend/src/middleware/auth.js) · [api.js (refresh)](../frontend/src/lib/api.js#L51)
+**Code.** [tokenService.issueRefreshToken](../backend/src/services/tokenService.js#L46) · [tokenService.rotateRefreshToken](../backend/src/services/tokenService.js#L74) · [auth middleware](../backend/src/middleware/auth.js) · [api.js (refresh)](../frontend/src/lib/api.js#L103)
 
 **Goal topics covered.** ✅ [Authentication and authorization](LEARNING-GOALS.md#35--authentication-and-authorization)
 
@@ -368,7 +368,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **In Seat Planner.** Docker images for both halves; Docker Compose for self-hosting, with Caddy in front (it serves HTTPS automatically when given a domain); live on Vercel (web), Render (API), Aiven (MySQL) and MongoDB Atlas. Database migrations run on every start.
 
-**Code.** [backend/Dockerfile](../backend/Dockerfile) · [frontend/Dockerfile](../frontend/Dockerfile) · [docker-compose.yml](../docker-compose.yml) · [Caddyfile](../Caddyfile) · [next.config.mjs (API proxy)](../frontend/next.config.mjs#L11)
+**Code.** [backend/Dockerfile](../backend/Dockerfile) · [frontend/Dockerfile](../frontend/Dockerfile) · [docker-compose.yml](../docker-compose.yml) · [Caddyfile](../Caddyfile) · [next.config.mjs (API proxy)](../frontend/next.config.mjs#L18)
 
 **Goal topics covered.** ✅ [Dockerfile basics and dockerizing Node.js](LEARNING-GOALS.md#27--dockerfile-basics-and-dockerizing-nodejs) · ✅ [Docker Compose, environment, volumes and networking](LEARNING-GOALS.md#28--docker-compose-environment-volumes-and-networking) · ✅ [Cloud deployment](LEARNING-GOALS.md#29--cloud-deployment) · ✅ [Security in deployment](LEARNING-GOALS.md#30--security-in-deployment) · ✅ [Schema deployment strategy](LEARNING-GOALS.md#17--schema-deployment-strategy) · 🟡 [CI/CD](LEARNING-GOALS.md#31--cicd) · 🟡 [Rollback and disaster recovery](LEARNING-GOALS.md#32--rollback-and-disaster-recovery)
 
