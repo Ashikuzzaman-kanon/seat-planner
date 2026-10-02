@@ -64,6 +64,9 @@ const env = {
     user: process.env.EMAIL_USER || "",
     pass: process.env.EMAIL_PASS || "",
     from: process.env.EMAIL_FROM || "Seat Planner <no-reply@seatplanner.local>",
+    // Tests only: every message that is not actually sent is also appended to
+    // this file as one JSON line, so a test can see what would have gone out.
+    outbox: process.env.EMAIL_OUTBOX || "",
     // Brevo's HTTP API. When the key is set it is used instead of SMTP — for
     // hosts that block outbound SMTP, as Render's free tier does.
     brevoApiKey: process.env.BREVO_API_KEY || "",
@@ -87,5 +90,8 @@ const env = {
 };
 
 env.isProduction = env.nodeEnv === "production";
+// The integration tests run the app with NODE_ENV=test: same behaviour, less
+// chatter (no SQL echo, no request log).
+env.isTest = env.nodeEnv === "test";
 
 module.exports = env;

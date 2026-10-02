@@ -5,7 +5,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-for-unit-tests";
 process.env.DB_NAME = process.env.DB_NAME || "seat_planner";
 process.env.DB_USER = process.env.DB_USER || "root";
 
-const { bookingTemplate, isUnroutable } = require("../src/services/emailService");
+const { bookingTemplate, isUnroutable } = require("../../src/services/emailService");
 
 test("reserved domains never reach a real mail server", () => {
   for (const address of [

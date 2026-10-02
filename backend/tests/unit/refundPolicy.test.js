@@ -9,7 +9,7 @@ const {
   applyDeduction,
   splitAcross,
   hoursUntil,
-} = require("../src/utils/refundPolicy");
+} = require("../../src/utils/refundPolicy");
 
 const SLABS = [
   { hoursBefore: 96, deductionPercent: 10 },
@@ -366,7 +366,7 @@ test("no deduction slab or bound applies to it", () => {
 });
 
 test("it is not something a passenger may ask for", () => {
-  const { PASSENGER_POLICIES } = require("../src/utils/refundPolicy");
+  const { PASSENGER_POLICIES } = require("../../src/utils/refundPolicy");
   assert.ok(!PASSENGER_POLICIES.includes(REFUND_TYPE.DISRUPTION));
   assert.deepEqual([...PASSENGER_POLICIES].sort(), ["convenient", "demand"]);
 });

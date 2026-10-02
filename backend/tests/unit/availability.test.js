@@ -10,7 +10,7 @@ const {
   matchesFilters,
   computeAvailability,
   summarise,
-} = require("../src/utils/availability");
+} = require("../../src/utils/availability");
 
 /**
  * The route used throughout: A(1) - B(2) - C(3) - D(4), giving segments

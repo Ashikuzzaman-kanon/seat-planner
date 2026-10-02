@@ -71,7 +71,7 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-if (!env.isProduction) app.use(morgan("dev"));
+if (!env.isProduction && !env.isTest) app.use(morgan("dev"));
 
 // Opens the per-request context (request id, caller, client details) that the
 // audit log reads from. Must sit above the routes.

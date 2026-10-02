@@ -36,7 +36,7 @@ let email;
 test.before(async () => {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   process.env.BREVO_API_URL = `http://127.0.0.1:${server.address().port}/v3/smtp/email`;
-  email = require("../src/services/emailService");
+  email = require("../../src/services/emailService");
 });
 
 test.after(() => {
@@ -45,7 +45,7 @@ test.after(() => {
 });
 
 test("a display-name address is split into name and email", () => {
-  const { parseAddress } = require("../src/services/emailService");
+  const { parseAddress } = require("../../src/services/emailService");
   assert.deepEqual(parseAddress("Seat Planner <no-reply@x.com>"), { name: "Seat Planner", email: "no-reply@x.com" });
   assert.deepEqual(parseAddress('"Seat Planner" <no-reply@x.com>'), { name: "Seat Planner", email: "no-reply@x.com" });
   assert.deepEqual(parseAddress("<no-reply@x.com>"), { email: "no-reply@x.com" });
@@ -53,7 +53,7 @@ test("a display-name address is split into name and email", () => {
 });
 
 test("attachments are sent base64-encoded, under Brevo's field names", () => {
-  const { brevoPayload } = require("../src/services/emailService");
+  const { brevoPayload } = require("../../src/services/emailService");
   const pdf = Buffer.from("%PDF-1.4 ticket");
   const payload = brevoPayload({
     from: "Seat Planner <a@b.com>",
@@ -69,7 +69,7 @@ test("attachments are sent base64-encoded, under Brevo's field names", () => {
 });
 
 test("no attachment field when there is nothing attached", () => {
-  const { brevoPayload } = require("../src/services/emailService");
+  const { brevoPayload } = require("../../src/services/emailService");
   const payload = brevoPayload({ from: "a@b.com", to: "c@d.com", subject: "s", html: "h" });
   assert.equal("attachment" in payload, false);
 });

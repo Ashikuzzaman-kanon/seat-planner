@@ -230,10 +230,35 @@ screen, not in environment variables.
 
 ## Tests
 
+Every push runs them on GitHub Actions (`.github/workflows/ci.yml`): the
+backend's unit and integration tests with coverage, and a production build of
+the frontend.
+
 ```bash
 cd backend
-node --test tests/              # unit tests: availability, auto-select, refunds, money, tokens, job retries…
+npm test                        # unit tests — pure logic: availability, auto-select, refunds, money, tokens…
+npm run test:integration        # integration suites against a fresh test database (needs MySQL)
+npm run coverage                # both, measured; fails below 90% lines/functions, 70% branches
 ```
+
+**Integration tests** (`backend/tests/integration/`) build their own database
+— never the development one: the name must end in `_test`
+(`TEST_DB_NAME`, default `seat_planner_test`). It is migrated and seeded the
+way a developer sets up locally, snapshotted, and restored before every suite,
+so each suite starts from the same data whatever ran before it. The API runs
+inside the test runner; each suite in `suites/` talks to it over HTTP.
+
+- `npm run test:integration -- waitlist` runs only suites whose name contains
+  "waitlist"; add `--reuse` to skip rebuilding the database.
+- Set `TEST_MONGO_URI` (a database ending in `_test`) to include the audit-log
+  checks; without it they are skipped.
+- Mail is never sent: what would have gone out is written to
+  `tests/integration/.work/outbox.jsonl`.
+
+**Browser checks** (`e2e/`) drive the running web app in Chrome at laptop and
+phone widths — every page, every dialog, the booking flow, demo data, waking a
+sleeping server. They need the API and the web app running locally with the
+development data; see [e2e/README.md](e2e/README.md).
 
 ## Deployment
 

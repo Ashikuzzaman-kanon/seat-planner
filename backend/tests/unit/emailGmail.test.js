@@ -48,7 +48,7 @@ test.before(async () => {
   const base = `http://127.0.0.1:${server.address().port}`;
   process.env.GMAIL_TOKEN_URL = `${base}/token`;
   process.env.GMAIL_SEND_URL = `${base}/send`;
-  email = require("../src/services/emailService");
+  email = require("../../src/services/emailService");
 });
 
 test.after(() => {

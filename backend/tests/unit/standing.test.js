@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { REFUSAL, connection, roomFor, fareFor, segmentsFor } = require("../src/utils/standing");
+const { REFUSAL, connection, roomFor, fareFor, segmentsFor } = require("../../src/utils/standing");
 
 /* ------------------------------------------------------------------ *
  * Contiguity

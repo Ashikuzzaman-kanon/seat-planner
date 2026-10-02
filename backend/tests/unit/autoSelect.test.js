@@ -10,7 +10,7 @@ const {
   findSameCoach,
   TOGETHERNESS,
   REFUSAL,
-} = require("../src/utils/autoSelect");
+} = require("../../src/utils/autoSelect");
 
 /**
  * A coach laid out like a real one: two seats, aisle, two seats. The aisle is a

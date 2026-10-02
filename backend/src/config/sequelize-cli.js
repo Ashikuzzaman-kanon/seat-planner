@@ -23,6 +23,8 @@ function cfg(database) {
 // sequelize-cli picks the block matching NODE_ENV (default "development").
 module.exports = {
   development: cfg(process.env.DB_NAME || "seat_planner"),
-  test: cfg(process.env.DB_NAME_TEST || "seat_planner_test"),
+  // The app reads DB_NAME whatever NODE_ENV is; migrations must agree, or a
+  // test run migrates one database and tests another.
+  test: cfg(process.env.DB_NAME || "seat_planner_test"),
   production: cfg(process.env.DB_NAME || "seat_planner"),
 };

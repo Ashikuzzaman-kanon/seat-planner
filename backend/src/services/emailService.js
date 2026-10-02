@@ -1,3 +1,4 @@
+const fs = require("fs");
 const nodemailer = require("nodemailer");
 const MailComposer = require("nodemailer/lib/mail-composer");
 const env = require("../config/env");
@@ -29,10 +30,13 @@ const brevo = !gmail && Boolean(env.email.brevoApiKey);
 
 let transporter = null;
 
+// Startup chatter is skipped under test; everything else behaves the same.
+const say = env.isTest ? () => {} : (...args) => console.info(...args);
+
 if (gmail) {
-  console.info("[email] sending through the Gmail API");
+  say("[email] sending through the Gmail API");
 } else if (brevo) {
-  console.info("[email] sending through Brevo's HTTP API");
+  say("[email] sending through Brevo's HTTP API");
 } else if (env.email.host) {
   transporter = nodemailer.createTransport({
     host: env.email.host,
@@ -45,10 +49,10 @@ if (gmail) {
     greetingTimeout: 10_000,
     socketTimeout: SEND_TIMEOUT_MS,
   });
-  console.info(`[email] sending through SMTP at ${env.email.host}:${env.email.port}`);
+  say(`[email] sending through SMTP at ${env.email.host}:${env.email.port}`);
 } else {
   // No SMTP configured: fall back to logging so the flow is testable in dev.
-  console.warn(
+  if (!env.isTest) console.warn(
     "[email] No GMAIL_*, BREVO_API_KEY or EMAIL_HOST is set — verification codes will be logged to the console instead of emailed."
   );
 }
@@ -202,7 +206,13 @@ async function sendMail({ to, subject, html, attachments }) {
     // out, not for reading a ticket in.
     const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     const why = routed ? "unroutable address" : "no email route configured";
-    console.info(
+    if (env.email.outbox) {
+      fs.appendFileSync(
+        env.email.outbox,
+        `${JSON.stringify({ at: new Date().toISOString(), why, to, subject, text, attachments: (attachments || []).map((a) => a.filename) })}\n`
+      );
+    }
+    say(
       `\n[email:${why}] To: ${to}\n[email] Subject: ${subject}${files}\n[email] ${text.slice(0, 400)}${
         text.length > 400 ? "…" : ""
       }\n`
