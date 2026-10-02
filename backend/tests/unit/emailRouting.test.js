@@ -72,7 +72,7 @@ test("the confirmation names everything a passenger checks at a glance", () => {
 
 test("every seat is listed, one line per passenger", () => {
   const html = bookingTemplate(BOOKING);
-  assert.equal((html.match(/seat <strong>/g) || []).length, 2);
+  assert.equal((html.match(/Coach KA · Seat 1[23]/g) || []).length, 2);
 });
 
 test("missing pieces render as a dash rather than 'undefined'", () => {

@@ -32,3 +32,4 @@ tools/certs/
 backend/tests/integration/.work/
 backend/coverage/
 e2e/shots/
+tools/.email-previews/
