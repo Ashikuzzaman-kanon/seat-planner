@@ -1,8 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { backoffSeconds, isPermanent, CAP_SECONDS } = require("../src/utils/jobRetry");
-const ApiError = require("../src/utils/ApiError");
+const { backoffSeconds, isPermanent, CAP_SECONDS } = require("../../src/utils/jobRetry");
+const ApiError = require("../../src/utils/ApiError");
 
 /**
  * When a durable job fails (Phase 8B): whether it is tried again, and how long

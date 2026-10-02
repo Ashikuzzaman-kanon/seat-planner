@@ -27,3 +27,8 @@ Thumbs.db
 # Self-signed certificates for serving the app over HTTPS on a local network
 # (tools/lan-https.js). Machine-specific and regenerated on demand.
 tools/certs/
+
+# Test runs
+backend/tests/integration/.work/
+backend/coverage/
+e2e/shots/

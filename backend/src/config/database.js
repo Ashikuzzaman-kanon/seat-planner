@@ -14,7 +14,7 @@ const sequelize = new Sequelize(env.db.name, env.db.user, env.db.pass, {
   port: env.db.port,
   dialect: "mysql",
   dialectOptions,
-  logging: env.isProduction ? false : (msg) => console.debug(msg),
+  logging: env.isProduction || env.isTest ? false : (msg) => console.debug(msg),
   define: {
     underscored: true, // snake_case columns
     timestamps: true,

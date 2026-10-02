@@ -1,0 +1,16 @@
+{
+  "name": "seat-planner-e2e",
+  "private": true,
+  "description": "Browser checks: drive the running web app in Chrome at laptop and phone widths.",
+  "scripts": {
+    "audit": "node audit-ui.js",
+    "dialogs": "node dialogs.js",
+    "demo-data": "node demo-ui.js",
+    "wake": "node test-wake.js",
+    "booking": "node flow.js && node flow2.js",
+    "all": "node audit-ui.js && node dialogs.js && node demo-ui.js && node test-wake.js"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^23.11.1"
+  }
+}

@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { toMinor, toMajor, format, sum, split, divide, percentage } = require("../src/utils/money");
+const { toMinor, toMajor, format, sum, split, divide, percentage } = require("../../src/utils/money");
 
 /* ------------------------------------------------------------------ *
  * Conversion

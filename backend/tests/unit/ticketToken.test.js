@@ -5,7 +5,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || "test-secret-for-unit-tests";
 process.env.DB_NAME = process.env.DB_NAME || "seat_planner";
 process.env.DB_USER = process.env.DB_USER || "root";
 
-const { issue, verify, qrContent } = require("../src/utils/ticketToken");
+const { issue, verify, qrContent } = require("../../src/utils/ticketToken");
 
 const TICKET = {
   ticketNumber: "TKT4H7K2M9",
@@ -124,7 +124,7 @@ test("two tickets never produce the same token", () => {
 });
 
 test("qrContent encodes a scannable URL when one is configured", () => {
-  const env = require("../src/config/env");
+  const env = require("../../src/config/env");
   const original = env.ticket.verifyUrl;
 
   env.ticket.verifyUrl = "https://rail.example/verify";
