@@ -266,6 +266,10 @@ The live deployment follows `master`:
 
 - **Vercel** builds `frontend/` (framework preset Next.js) with
   `NEXT_PUBLIC_API_BASE_URL=/api` and `BACKEND_ORIGIN` set to the API URL.
+  Every branch and pull request also gets a preview address. Previews call the
+  same API, and use its data, so the API's `CORS_ORIGINS` names them with a
+  pattern — `*` stands for one piece of a host name, never a dot:
+  `https://seat-planner-sable.vercel.app,https://seat-planner-*-ashikuzzaman-kanons-projects.vercel.app`
 - **Render** builds `backend/Dockerfile`. The container runs
   `npm run migrate && npm start`, so pending migrations apply on every deploy.
 - **Aiven** hosts MySQL (TLS required).
