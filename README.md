@@ -219,6 +219,7 @@ Backend environment (`backend/.env`):
 | `BREVO_API_KEY` | no | Send through Brevo's HTTP API instead — also HTTPS. `EMAIL_FROM` must be a verified Brevo sender |
 | `EMAIL_HOST` `EMAIL_PORT` `EMAIL_SECURE` `EMAIL_USER` `EMAIL_PASS` `EMAIL_FROM` | no | SMTP; with neither this nor Brevo, mail is logged to the console |
 | `CORS_ORIGINS` | production | Comma-separated allowed origins |
+| `APP_URL` | no | The web app's address, for buttons and the logo in emails. Defaults to the first `CORS_ORIGINS` entry |
 | `SUPER_ADMIN_NAME` `SUPER_ADMIN_EMAIL` `SUPER_ADMIN_PASSWORD` | for seeding | Used by `npm run seed:superadmin` |
 
 Frontend: `NEXT_PUBLIC_API_BASE_URL` (use `/api`) and, in production,
@@ -254,6 +255,10 @@ inside the test runner; each suite in `suites/` talks to it over HTTP.
   checks; without it they are skipped.
 - Mail is never sent: what would have gone out is written to
   `tests/integration/.work/outbox.jsonl`.
+
+**Emails**: `node tools/preview-emails.js` renders every email the system
+sends, with sample data, to `tools/.email-previews/` — open its `index.html`
+after changing a template. They share one layout, `backend/src/emails/layout.js`.
 
 **Browser checks** (`e2e/`) drive the running web app in Chrome at laptop and
 phone widths — every page, every dialog, the booking flow, demo data, waking a

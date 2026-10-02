@@ -358,13 +358,28 @@ async function create({ userId, holdReference: reference, passengers, method = "
  * would be the worse failure. The tickets are always re-downloadable from the
  * booking, so a lost email is a nuisance rather than a loss.
  */
+/** When the train leaves the passenger's station and reaches theirs, as HH:MM — for the email. */
+async function journeyTimes(booking) {
+  const trip = await Trip.findByPk(booking.tripId, { attributes: ["trainId"] });
+  if (!trip) return {};
+  const stops = await RouteStop.findAll({
+    where: { trainId: trip.trainId, stationId: [booking.fromStationId, booking.toStationId] },
+  });
+  const at = (stationId, prefer) => {
+    const stop = stops.find((s) => s.stationId === stationId);
+    const time = stop && (prefer === "departure" ? stop.departureTime || stop.arrivalTime : stop.arrivalTime || stop.departureTime);
+    return time ? String(time).slice(0, 5) : null;
+  };
+  return { departs: at(booking.fromStationId, "departure"), arrives: at(booking.toStationId, "arrival") };
+}
+
 async function deliver(booking, userId) {
   try {
     const user = await User.findByPk(userId, { attributes: ["email"] });
     if (!user?.email) return;
 
-    const pdf = await ticketDocuments.bookingPdf(booking);
-    await email.sendBookingConfirmation({ to: user.email, booking, pdf });
+    const [pdf, times] = await Promise.all([ticketDocuments.bookingPdf(booking), journeyTimes(booking)]);
+    await email.sendBookingConfirmation({ to: user.email, booking, pdf, times });
   } catch (err) {
     console.error(`[booking] could not send tickets for ${booking.reference}: ${err.message}`);
   }

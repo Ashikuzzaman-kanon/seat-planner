@@ -90,6 +90,11 @@ const env = {
 };
 
 env.isProduction = env.nodeEnv === "production";
+
+// Where the web app lives, for links in emails. APP_URL if set; otherwise the
+// first allowed origin, which in production is the web app's own address.
+env.appUrl =
+  process.env.APP_URL || env.corsOrigins.find((o) => /^https?:\/\//.test(o) && !o.includes("*")) || "http://localhost:3000";
 // The integration tests run the app with NODE_ENV=test: same behaviour, less
 // chatter (no SQL echo, no request log).
 env.isTest = env.nodeEnv === "test";

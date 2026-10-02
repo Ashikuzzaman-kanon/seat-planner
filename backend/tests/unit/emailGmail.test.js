@@ -72,7 +72,7 @@ test("a message is exchanged for a token, then sent as raw MIME with it", async 
   const mime = decode(calls.send[0].body.raw);
   assert.match(mime, /^To: passenger@gmail\.com/m);
   assert.match(mime, /^From: Seat Planner <me@gmail\.com>/m);
-  assert.match(mime, /^Subject: Verify your email/m);
+  assert.match(mime, /^Subject: Your Seat Planner verification code/m);
   assert.match(mime, /424242/);
 });
 

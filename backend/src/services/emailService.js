@@ -3,6 +3,7 @@ const nodemailer = require("nodemailer");
 const MailComposer = require("nodemailer/lib/mail-composer");
 const env = require("../config/env");
 const ApiError = require("../utils/ApiError");
+const ui = require("../emails/layout");
 
 /*
  * How mail leaves the building, in order of preference:
@@ -67,12 +68,13 @@ function parseAddress(value) {
 }
 
 /** The request body Brevo's transactional email endpoint takes. */
-function brevoPayload({ from, to, subject, html, attachments }) {
+function brevoPayload({ from, to, subject, html, text, attachments }) {
   return {
     sender: parseAddress(from),
     to: [{ email: to }],
     subject,
     htmlContent: html,
+    ...(text ? { textContent: text } : {}),
     ...(attachments?.length
       ? {
           attachment: attachments.map((a) => ({
@@ -142,12 +144,13 @@ async function gmailAccessToken({ fresh = false } = {}) {
 }
 
 /** The message as Gmail's `messages.send` takes it: raw MIME, base64url. */
-async function gmailRaw({ from, to, subject, html, attachments }) {
+async function gmailRaw({ from, to, subject, html, text, attachments }) {
   const mime = await new MailComposer({
     from,
     to,
     subject,
     html,
+    ...(text ? { text } : {}),
     ...(attachments?.length ? { attachments } : {}),
   })
     .compile()
@@ -194,27 +197,29 @@ const UNROUTABLE = [
 
 const isUnroutable = (address) => UNROUTABLE.some((pattern) => pattern.test(String(address || "").trim()));
 
-async function sendMail({ to, subject, html, attachments }) {
+async function sendMail({ to, subject, html, text, attachments }) {
   const routed = gmail || brevo || Boolean(transporter);
+  // Every message goes out with a plain-text version too: some clients show
+  // nothing else, and spam filters look for one.
+  const plain = text || ui.toText(html);
   if (!routed || isUnroutable(to)) {
     const files = attachments?.length
       ? `\n[email] Attachments: ${attachments
           .map((a) => `${a.filename} (${a.content?.length ?? 0} bytes)`)
           .join(", ")}`
       : "";
-    // Long bodies are truncated: the console is for confirming the mail went
-    // out, not for reading a ticket in.
-    const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
     const why = routed ? "unroutable address" : "no email route configured";
     if (env.email.outbox) {
       fs.appendFileSync(
         env.email.outbox,
-        `${JSON.stringify({ at: new Date().toISOString(), why, to, subject, text, attachments: (attachments || []).map((a) => a.filename) })}\n`
+        `${JSON.stringify({ at: new Date().toISOString(), why, to, subject, text: plain, attachments: (attachments || []).map((a) => a.filename) })}\n`
       );
     }
+    // Long bodies are truncated: the console is for confirming the mail went
+    // out, not for reading a ticket in.
     say(
-      `\n[email:${why}] To: ${to}\n[email] Subject: ${subject}${files}\n[email] ${text.slice(0, 400)}${
-        text.length > 400 ? "…" : ""
+      `\n[email:${why}] To: ${to}\n[email] Subject: ${subject}${files}\n${plain.slice(0, 600)}${
+        plain.length > 600 ? "…" : ""
       }\n`
     );
     return;
@@ -222,15 +227,16 @@ async function sendMail({ to, subject, html, attachments }) {
 
   try {
     if (gmail) {
-      await sendWithGmail({ to, subject, html, attachments });
+      await sendWithGmail({ to, subject, html, text: plain, attachments });
     } else if (brevo) {
-      await sendWithBrevo({ to, subject, html, attachments });
+      await sendWithBrevo({ to, subject, html, text: plain, attachments });
     } else {
       await transporter.sendMail({
         from: env.email.from,
         to,
         subject,
         html,
+        text: plain,
         ...(attachments?.length ? { attachments } : {}),
       });
     }
@@ -244,40 +250,58 @@ async function sendMail({ to, subject, html, attachments }) {
   }
 }
 
-function otpTemplate(title, intro, code, ttlMinutes) {
-  return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-      <h2 style="color: #2563eb;">${title}</h2>
-      <p>${intro}</p>
-      <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px; color: #111827;">${code}</p>
-      <p style="color: #6b7280;">This code expires in ${ttlMinutes} minutes. If you didn't request it, you can ignore this email.</p>
-    </div>`;
+/* ------------------------------------------------------------------ *
+ * Codes: verifying an address, resetting a password
+ * ------------------------------------------------------------------ */
+
+function verificationEmail(to, code, ttlMinutes) {
+  const subject = "Your Seat Planner verification code";
+  return {
+    subject,
+    html: ui.page({
+      subject,
+      preheader: `${code} — enter it to finish creating your account. It expires in ${ttlMinutes} minutes.`,
+      eyebrow: "Verify your email",
+      title: "Your verification code",
+      intro: "Enter this code to finish creating your Seat Planner account.",
+      body:
+        ui.code(code, { caption: `Expires in ${ttlMinutes} minutes` }) +
+        ui.button("Enter the code", ui.appUrl(`/verify-email?email=${encodeURIComponent(to)}`)) +
+        ui.callout("If you did not sign up for Seat Planner, ignore this email — nothing happens without the code.", {
+          tone: "neutral",
+        }),
+    }),
+  };
+}
+
+function passwordResetEmail(to, code, ttlMinutes) {
+  const subject = "Your Seat Planner password reset code";
+  return {
+    subject,
+    html: ui.page({
+      subject,
+      preheader: `${code} — use it to choose a new password. It expires in ${ttlMinutes} minutes.`,
+      eyebrow: "Password reset",
+      title: "Reset your password",
+      intro: "Use this code to choose a new password. Every device signed in to your account will be signed out.",
+      body:
+        ui.code(code, { caption: `Expires in ${ttlMinutes} minutes` }) +
+        ui.button("Choose a new password", ui.appUrl(`/reset-password?email=${encodeURIComponent(to)}`)) +
+        ui.callout(
+          "Did not ask for this? Your password has not changed, and it will not unless someone enters this code. " +
+            "You can safely ignore this email.",
+          { tone: "warning", title: "Not you?" }
+        ),
+    }),
+  };
 }
 
 async function sendVerificationEmail(to, code, ttlMinutes) {
-  await sendMail({
-    to,
-    subject: "Verify your email",
-    html: otpTemplate(
-      "Email Verification",
-      "Use the code below to verify your account:",
-      code,
-      ttlMinutes
-    ),
-  });
+  await sendMail({ to, ...verificationEmail(to, code, ttlMinutes) });
 }
 
 async function sendPasswordResetEmail(to, code, ttlMinutes) {
-  await sendMail({
-    to,
-    subject: "Reset your password",
-    html: otpTemplate(
-      "Password Reset",
-      "Use the code below to reset your password:",
-      code,
-      ttlMinutes
-    ),
-  });
+  await sendMail({ to, ...passwordResetEmail(to, code, ttlMinutes) });
 }
 
 /**
@@ -288,67 +312,56 @@ async function sendPasswordResetEmail(to, code, ttlMinutes) {
  * check they booked the right day, and the attachment is what they show at the
  * gate. The booking reference appears in the subject so the mail is findable by
  * search months later.
+ *
+ * `times` — when the train leaves the passenger's station and reaches theirs —
+ * is looked up by the caller; without it the journey simply shows no times.
  */
-function bookingTemplate(booking) {
-  const row = (label, value) => `
-    <tr>
-      <td style="padding:6px 16px 6px 0;color:#6b7280;font-size:13px;">${label}</td>
-      <td style="padding:6px 0;color:#111827;font-size:14px;font-weight:600;">${value}</td>
-    </tr>`;
+function bookingTemplate(booking, times = {}) {
+  const tickets = booking.tickets || [];
+  const date = booking.boardingDate || booking.trip?.departureDate || "—";
+  const arrivesNote = booking.nightsOnBoard > 0 ? `arrives ${booking.arrivalDate} (the next day)` : null;
 
-  const tickets = (booking.tickets || [])
-    .map(
-      (t) => `
-      <tr>
-        <td style="padding:8px 0;border-top:1px solid #e5e7eb;font-size:14px;color:#111827;">
-          ${t.passengerName}
-        </td>
-        <td style="padding:8px 0;border-top:1px solid #e5e7eb;font-size:14px;color:#111827;text-align:right;">
-          Coach <strong>${t.coachCode || "—"}</strong>, seat <strong>${t.seatNumber}</strong>
-        </td>
-      </tr>`
-    )
-    .join("");
-
-  return `
-    <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#1f2937;max-width:560px;">
-      <h2 style="color:#1d4ed8;margin:0 0 4px;">Your tickets are confirmed</h2>
-      <p style="margin:0 0 20px;color:#6b7280;">
-        Booking reference <strong style="color:#111827;">${booking.reference}</strong>
-      </p>
-
-      <table style="border-collapse:collapse;margin-bottom:20px;">
-        ${row("Train", booking.trip?.train?.name || "—")}
-        ${row("Journey", `${booking.fromStation?.name || "—"} → ${booking.toStation?.name || "—"}`)}
-        ${row(
-          "Travelling on",
-          booking.boardingDate || booking.trip?.departureDate || "—"
-        )}
-        ${
-          booking.nightsOnBoard > 0
-            ? row("Arriving", `${booking.arrivalDate} (the next day)`)
-            : ""
-        }
-        ${row("Total paid", booking.totalFormatted || "—")}
-      </table>
-
-      <table style="border-collapse:collapse;width:100%;margin-bottom:20px;">${tickets}</table>
-
-      <p style="color:#6b7280;font-size:13px;margin:0 0 8px;">
-        Your tickets are attached as a PDF, one page each with its own QR code.
-        Carry the National ID used for this booking.
-      </p>
-      <p style="color:#6b7280;font-size:13px;margin:0;">
-        Tickets are valid only for the journey, date, seat and passenger shown.
-      </p>
-    </div>`;
+  return ui.page({
+    subject: `Tickets confirmed — ${booking.reference}`,
+    preheader: `${booking.trip?.train?.name || "Your train"}, ${date}: ${tickets.length} ticket${tickets.length === 1 ? "" : "s"}, PDF attached.`,
+    eyebrow: "Booking confirmed",
+    tone: "success",
+    title: "Your tickets are confirmed",
+    intro: ui.trusted(
+      `Booking reference ${ui.esc(ui.strong(booking.reference || "—"))}. Your tickets are attached as a PDF — one page each, with its own QR code.`
+    ),
+    body:
+      ui.journey({
+        from: booking.fromStation?.name || "—",
+        to: booking.toStation?.name || "—",
+        departs: times.departs,
+        arrives: times.arrives,
+        train: booking.trip?.train?.name || "—",
+        date,
+        note: arrivesNote,
+      }) +
+      (tickets.length ? ui.sectionTitle(`Passengers (${tickets.length})`) : "") +
+      ui.people(
+        tickets.map((t) => [t.passengerName || "—", `Coach ${t.coachCode || "—"} · Seat ${t.seatNumber || "—"}`])
+      ) +
+      ui.amount({
+        label: "Total paid",
+        value: booking.totalMinor != null ? ui.taka(booking.totalMinor) : booking.totalFormatted || "—",
+        tone: "brand",
+      }) +
+      ui.button("View your tickets", ui.appUrl("/dashboard/bookings")) +
+      ui.callout(
+        "Carry the National ID used for this booking. Tickets are valid only for the journey, date, seat and passenger shown.",
+        { tone: "neutral" }
+      ),
+  });
 }
 
-async function sendBookingConfirmation({ to, booking, pdf }) {
+async function sendBookingConfirmation({ to, booking, pdf, times }) {
   await sendMail({
     to,
     subject: `Tickets confirmed — ${booking.reference}`,
-    html: bookingTemplate(booking),
+    html: bookingTemplate(booking, times),
     attachments: pdf
       ? [{ filename: `ticket-${booking.reference}.pdf`, content: pdf, contentType: "application/pdf" }]
       : undefined,
@@ -361,6 +374,8 @@ module.exports = {
   sendPasswordResetEmail,
   sendBookingConfirmation,
   bookingTemplate,
+  verificationEmail,
+  passwordResetEmail,
   // Exported so the guard is tested as it is used, rather than through a copy
   // of the patterns that can quietly drift out of step with these.
   isUnroutable,
