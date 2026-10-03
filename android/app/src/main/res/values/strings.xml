@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Seat Planner</string>
+    <string name="cancel">Cancel</string>
+    <string name="back">Back</string>
+
+    <!-- The strip across the top while the app is on a developer's computer. -->
+    <string name="dev_strip">DEV · %1$s · tap to leave</string>
+
+    <!-- Instead of the WebView's own error page. -->
+    <string name="error_title">Can\'t reach Seat Planner</string>
+    <string name="error_text">Check that the phone is online, then try again. Nothing you had done is lost.</string>
+    <string name="error_title_local">Can\'t reach %1$s</string>
+    <string name="error_text_local">Is the computer on the same Wi-Fi as this phone, with the dev server running? Windows Firewall must allow Node.js on private networks.</string>
+    <string name="error_retry">Try again</string>
+    <string name="no_app_for_link">No app on this phone can open that link</string>
+
+    <!-- Switch links, from a computer's "Open on phone" page. -->
+    <string name="switch_title">Use your computer?</string>
+    <string name="switch_text">Pages will come from %1$s instead of the live site, until you switch back.\n\nOnly do this if you scanned the code on your own computer.</string>
+    <string name="switch_yes">Switch</string>
+    <string name="switch_already">Already using %1$s</string>
+    <string name="link_refused_title">Can\'t use that address</string>
+    <string name="link_refused_text">The app only switches to a computer on this network — an address like 192.168.0.12:3000.\n\nThe link asked for: %1$s</string>
+
+    <string name="production_title">Back to the live site?</string>
+    <string name="production_text">Pages will come from %1$s again.</string>
+    <string name="production_yes">Use the live site</string>
+
+    <!-- The hidden server screen. -->
+    <string name="server_title">Server</string>
+    <string name="server_settings">Server settings</string>
+    <string name="server_intro">Where the app loads its pages from. Only for testing — passengers never need this screen.</string>
+    <string name="server_now_production">Now showing: the live site</string>
+    <string name="server_now_local">Now showing: your computer, %1$s</string>
+    <string name="server_production">Live site</string>
+    <string name="server_wifi">Your computer, over Wi-Fi</string>
+    <string name="server_address_hint">Address</string>
+    <string name="server_address_help">Shown on the computer\'s Open on phone page</string>
+    <string name="server_address_error">Use an address on this network, like 192.168.0.12:3000</string>
+    <string name="server_recent">Used before</string>
+    <string name="server_usb">Your computer, over USB</string>
+    <string name="server_usb_help">Run adb reverse tcp:3000 tcp:3000 on the computer first. Use this to test the ticket scanner: phones only allow the camera on https or localhost.</string>
+    <string name="server_test">Test connection</string>
+    <string name="server_use">Use this server</string>
+    <string name="server_testing">Trying %1$s…</string>
+    <string name="server_reached">Reached %1$s — HTTP %2$d in %3$d ms</string>
+    <string name="server_unreached">Couldn\'t reach %1$s: %2$s</string>
+    <string name="server_footer">Seat Planner %1$s. Opened by holding three fingers on the screen for three seconds, or by scanning the code on your computer\'s Open on phone page.</string>
+
+    <!-- The tickets PDF. -->
+    <string name="pdf_failed">Couldn\'t open the tickets. Try again.</string>
+    <string name="pdf_share">Save or send the tickets</string>
+</resources>
