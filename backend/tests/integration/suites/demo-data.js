@@ -143,9 +143,18 @@ async function runJob(token, action) {
   }
   check("the delete succeeds", job?.status === "succeeded", JSON.stringify(job?.lastError));
   const after = await counts();
-  const drift = Object.keys(baseline).filter((t) => !["jobs", "refresh_tokens"].includes(t) && baseline[t] !== after[t]);
+  // Jobs and sessions are the record of having run it. So are the notifications
+  // telling the super admin each job finished — about the demo, not part of it.
+  const drift = Object.keys(baseline).filter(
+    (t) => !["jobs", "refresh_tokens", "notifications"].includes(t) && baseline[t] !== after[t]
+  );
   check("every table is back to exactly what it held before", drift.length === 0,
     drift.map((t) => `${t}: ${baseline[t]} -> ${after[t]}`).join(", "));
+  const told = (await call("GET", "/notifications?category=system&limit=50", { token: su })).body.notifications
+    .filter((n) => n.type.startsWith("job.demo."));
+  check("the only notifications left are the super admin's job announcements",
+    after.notifications - baseline.notifications === told.length && told.length >= 2,
+    `${baseline.notifications} -> ${after.notifications}, announcements ${told.length}`);
   const gone = await call("POST", "/auth/login", { body: { email: "checker1@example.com", password: "Checker123!" } });
   check("checker1 is gone", gone.status === 401, `${gone.status}`);
   const stillHere = await login("planner1@example.com", "Planner123!");

@@ -18,6 +18,7 @@ const walletService = require("./walletService");
 const emailService = require("./emailService");
 const ui = require("../emails/layout");
 const notify = require("./notificationService");
+const inbox = require("./inboxService");
 const money = require("../utils/money");
 
 /**
@@ -487,15 +488,34 @@ async function offerTo(entry, trip) {
  * in-app is a queue that mostly lapses.
  */
 async function notifyOffer(entry, trip, held, minutes) {
-  const user = await User.findByPk(entry.userId);
-  if (!user?.email) return;
-
   const [from, to] = await Promise.all([
     Station.findByPk(entry.fromStationId),
     Station.findByPk(entry.toStationId),
   ]);
 
   const plural = held.seats.length === 1 ? "" : "s";
+
+  // In the app as well as by email — and first, so an account with no address,
+  // or a mail server that is down, still sees the offer while it is open.
+  await inbox.tryAdd(entry.userId, {
+    type: "waitlist.offer",
+    category: inbox.CATEGORY.WAITLIST,
+    tone: "success",
+    title: `A seat came free — confirm within ${minutes} minutes`,
+    body: [
+      trip.train?.name,
+      [from?.name, to?.name].filter(Boolean).join(" → ").replace(/_/g, " "),
+      trip.departureDate,
+      `${held.seats.length} seat${plural} held for you (${entry.reference})`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    link: "/dashboard/bookings",
+    key: `waitlist:${entry.reference}:offer:${held.hold.reference}`,
+  });
+
+  const user = await User.findByPk(entry.userId);
+  if (!user?.email) return;
 
   const subject = `A seat came free — ${trip.train?.name || "your train"}, ${entry.reference}`;
   await emailService.sendMail({

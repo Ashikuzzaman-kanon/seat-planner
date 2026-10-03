@@ -11,6 +11,16 @@ const { normalizeLayout } = require("../utils/normalizeLayout");
 const { countSeats } = require("../utils/seatMaterializer");
 const { PLAN_STATUS } = require("../constants/planStatus");
 const { PERMISSIONS } = require("../constants/permissions");
+const inbox = require("./inboxService");
+
+/** "Ekota 705 · S_CHAIR-92", or as much of it as a draft has. */
+const planLabel = (plan) => [plan.coachNo, plan.trainName?.name].filter(Boolean).join(" · ") || `plan #${plan.id}`;
+
+/** Tell a plan's author what happened to it — unless they did it themselves. */
+async function tellAuthor(plan, actor, notification) {
+  if (!plan.createdById || plan.createdById === actor?.id) return;
+  await inbox.tryAdd(plan.createdById, { category: inbox.CATEGORY.PLAN, link: `/dashboard/plans/${plan.id}`, ...notification });
+}
 
 // Eager-load reference names and authors for full plan responses.
 const INCLUDES = [
@@ -189,6 +199,22 @@ async function submitPlan({ user, permissions, id }) {
   }
 
   await plan.save();
+
+  if (plan.status === PLAN_STATUS.PENDING) {
+    await inbox.toHolders(
+      PERMISSIONS.PLAN_APPROVE,
+      {
+        type: "plan.submitted",
+        category: inbox.CATEGORY.PLAN,
+        tone: "info",
+        title: `Seat plan waiting for approval — ${planLabel(plan)}`,
+        body: `${user.fullName || user.email} submitted it${plan.coachClass ? ` (${plan.coachClass.name})` : ""}.`,
+        link: "/dashboard/approvals",
+      },
+      { except: [user.id] }
+    );
+  }
+
   return getPlan({ user, permissions, id: plan.id });
 }
 
@@ -203,6 +229,12 @@ async function approvePlan({ user, permissions, id }) {
   plan.approvedAt = new Date();
   plan.rejectionReason = null;
   await plan.save();
+  await tellAuthor(plan, user, {
+    type: "plan.approved",
+    tone: "success",
+    title: `Seat plan approved — ${planLabel(plan)}`,
+    body: `Approved by ${user.fullName || user.email}. Coaches built from it now carry its seats on new departures.`,
+  });
   return getPlan({ user, permissions, id: plan.id });
 }
 
@@ -216,6 +248,13 @@ async function rejectPlan({ user, permissions, id, reason }) {
   plan.approvedById = null;
   plan.approvedAt = null;
   await plan.save();
+  await tellAuthor(plan, user, {
+    type: "plan.rejected",
+    tone: "warning",
+    title: `Seat plan sent back — ${planLabel(plan)}`,
+    body: `${user.fullName || user.email}: “${plan.rejectionReason}” Fix it and submit it again.`,
+    link: `/dashboard/plans/${plan.id}/edit`,
+  });
   return getPlan({ user, permissions, id: plan.id });
 }
 

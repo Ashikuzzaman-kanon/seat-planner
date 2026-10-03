@@ -291,11 +291,28 @@ async function runJob(token, action) {
 
   const end = await tableCounts();
   // What legitimately differs from the empty start: the jobs that ran, the
-  // sessions signed in, and the outsider this rehearsal added with their wallet.
-  const expectedToDiffer = new Set(["jobs", "refresh_tokens", "users", "user_roles", "wallets", "wallet_transactions"]);
+  // sessions signed in, the outsider this rehearsal added with their wallet —
+  // and the notifications of those two: the super admin's that each job
+  // finished, and the outsider's own about the ticket they bought and returned.
+  const expectedToDiffer = new Set([
+    "jobs",
+    "refresh_tokens",
+    "users",
+    "user_roles",
+    "wallets",
+    "wallet_transactions",
+    "notifications",
+  ]);
   const drift = Object.keys(baseline).filter((t) => !expectedToDiffer.has(t) && baseline[t] !== end[t]);
   check("every other table is exactly as it was before populating", drift.length === 0,
     drift.map((t) => `${t}: ${baseline[t]} -> ${end[t]}`).join(", "));
+  const inbox = async (token) => (await call("GET", "/notifications?limit=50", { token })).body.notifications;
+  const announced = (await inbox(st)).filter((n) => n.type.startsWith("job.demo."));
+  const outsiders = await inbox(outsiderStill.accessToken);
+  check("the only notifications left are those two people's own",
+    end.notifications - baseline.notifications === announced.length + outsiders.length,
+    `${baseline.notifications} -> ${end.notifications}: ${announced.length} announcements, ` +
+      `${outsiders.length} outsider (${outsiders.map((n) => n.type).join(", ")})`);
   check("users: only the outsider added", end.users === baseline.users + 1, `${baseline.users} -> ${end.users}`);
   check("demo_records is empty", end.demo_records === 0, `${end.demo_records}`);
 

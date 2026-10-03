@@ -107,6 +107,7 @@ module.exports = {
     { name: "Background jobs", description: "Work done after the request that asked for it — mass refunds and the messages about them" },
     { name: "Demo data", description: "Filling the system with demonstration data, and removing exactly that again" },
     { name: "Railway data", description: "Loading Bangladesh Railway's timetable and the seat plans transcribed for it" },
+    { name: "Notifications", description: "Each person's in-app inbox: what happened, and what is waiting on them" },
     { name: "Meta", description: "Service metadata" },
   ],
 
@@ -512,6 +513,24 @@ module.exports = {
         blockers: arr(ref("DemoBlocker")),
         job: { ...ref("Job"), nullable: true, description: "A populate or delete still running" },
         lastJob: { ...ref("Job"), nullable: true, description: "The last one that finished, with its result" },
+      }),
+
+      Notification: obj({
+        id: int(),
+        type: str("What happened, e.g. booking.confirmed, refund.paid, plan.submitted, job.failed"),
+        category: { type: "string", enum: ["booking", "refund", "waitlist", "account", "approval", "plan", "system"] },
+        tone: { type: "string", enum: ["info", "success", "warning", "danger", "neutral"] },
+        title: str(),
+        body: { ...str("One or two sentences, written when it happened"), nullable: true },
+        link: { ...str("A path in the app where the current state lives"), nullable: true },
+        read: bool(),
+        readAt: { type: "string", format: "date-time", nullable: true },
+        createdAt: { type: "string", format: "date-time" },
+      }),
+
+      NotificationSummary: obj({
+        unreadCount: int(),
+        latestId: int("The newest notification's id — when it moves, something arrived"),
       }),
 
       RailwayStatus: obj({
@@ -2485,6 +2504,78 @@ module.exports = {
           403: errors[403],
           409: response("Valid tickets are in the way, or a populate is still running", ref("Error")),
         },
+      },
+    },
+
+    "/notifications": {
+      get: {
+        tags: ["Notifications"],
+        summary: "Your notifications, newest first",
+        description:
+          "A page at a time: pass the previous page's `nextCursor` as `before`. `unread=1` narrows to unread, " +
+          "`category` to one kind. Always your own inbox — nobody can read another's.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "unread", in: "query", schema: { type: "string", enum: ["1", "true"] } },
+          { name: "category", in: "query", schema: { type: "string" } },
+          { name: "before", in: "query", schema: { type: "integer" } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 50 } },
+        ],
+        responses: {
+          200: response(
+            "A page",
+            obj({
+              notifications: arr(ref("Notification")),
+              nextCursor: { type: "integer", nullable: true },
+              unreadCount: int(),
+              latestId: int(),
+            })
+          ),
+          401: errors[401],
+        },
+      },
+    },
+
+    "/notifications/summary": {
+      get: {
+        tags: ["Notifications"],
+        summary: "Unread count and newest id — what the bell polls",
+        security: [{ bearerAuth: [] }],
+        responses: { 200: response("Summary", ref("NotificationSummary")), 401: errors[401] },
+      },
+    },
+
+    "/notifications/read": {
+      post: {
+        tags: ["Notifications"],
+        summary: "Mark notifications read",
+        description: "Send `{ ids: [...] }` for some, or `{ all: true }` for every unread one.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: obj({ ids: arr(int()), all: bool() }) } },
+        },
+        responses: { 200: response("New summary", ref("NotificationSummary")), 400: errors[400], 401: errors[401] },
+      },
+    },
+
+    "/notifications/{id}/unread": {
+      post: {
+        tags: ["Notifications"],
+        summary: "Mark one unread again",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: { 200: response("New summary", ref("NotificationSummary")), 404: errors[404] },
+      },
+    },
+
+    "/notifications/{id}": {
+      delete: {
+        tags: ["Notifications"],
+        summary: "Dismiss one",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
+        responses: { 200: response("New summary", ref("NotificationSummary")), 404: errors[404] },
       },
     },
 

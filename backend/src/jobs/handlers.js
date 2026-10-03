@@ -19,6 +19,16 @@ const { AUDIT_ACTIONS } = require("../constants/auditActions");
 /** Tickets refunded per batch. Small enough that each batch is quick, and the lease is renewed between. */
 const BATCH = 25;
 
+/** What the operator who cancelled is told once everyone aboard is refunded. Nothing when nobody was. */
+const refundsFinished = (what) => (summary, job) =>
+  summary?.refunded
+    ? {
+        title: `Refunds finished — ${job.label?.replace(/^Refund everyone on /, "") || what}`,
+        body: `${summary.refunded} ticket(s) refunded in full, ${money.format(summary.paidMinor)} returned to passengers' wallets.`,
+        link: "/dashboard/departures",
+      }
+    : null;
+
 /**
  * Refund everyone owed by one cancellation, in batches, until nobody is.
  *
@@ -55,6 +65,7 @@ async function refundEveryone({ tripId, tripCoachId, reason, actorLabel, afterRe
 jobs.define("refund.trip_cancellation", {
   priority: 10,
   describe: "Refund every ticket on a cancelled departure, and queue each passenger's message",
+  announce: refundsFinished("the cancelled departure"),
   handler: async (payload, ctx) => {
     const trip = await Trip.findByPk(payload.tripId, { include: [{ model: TrainName, as: "train" }] });
     if (!trip) {
@@ -91,6 +102,7 @@ jobs.define("refund.trip_cancellation", {
 jobs.define("refund.coach_cancellation", {
   priority: 10,
   describe: "Refund every passenger on a cancelled coach, and queue each one's message",
+  announce: refundsFinished("the cancelled coach"),
   handler: async (payload, ctx) => {
     const coach = await TripCoach.findOne({ where: { id: payload.tripCoachId, tripId: payload.tripId } });
     if (!coach) {
@@ -148,12 +160,25 @@ jobs.define(demo.JOB_TYPES.POPULATE, {
   priority: 0,
   describe: "Fill the system with demonstration accounts, trains, departures and bookings",
   handler: (_payload, ctx) => demo.populate(ctx),
+  announce: (result) => ({
+    title: "Demo data is ready",
+    body:
+      `${result?.created?.User || 0} account(s), ${result?.created?.Trip || 0} departure(s) and ` +
+      `${result?.created?.Booking || 0} booking(s) created` +
+      (result?.warnings?.length ? `, with ${result.warnings.length} warning(s) to read.` : "."),
+    link: "/dashboard/demo-data",
+  }),
 });
 
 jobs.define(demo.JOB_TYPES.CLEAR, {
   priority: 0,
   describe: "Remove everything the demo data created",
   handler: (_payload, ctx) => demo.clear(ctx),
+  announce: (result) => ({
+    title: "Demo data deleted",
+    body: `${result?.removed?.accounts ?? 0} account(s), ${result?.removed?.departures ?? 0} departure(s) and ${result?.removed?.bookings ?? 0} booking(s) removed.`,
+    link: "/dashboard/demo-data",
+  }),
 });
 
 /* The real railway timetable and seat plans (see services/railwayService). */
@@ -163,6 +188,14 @@ jobs.define(railway.JOB_TYPE, {
   priority: 0,
   describe: "Load the railway timetable and seat plans, and make the trains with plans ready for departures",
   handler: (_payload, ctx) => railway.load(ctx),
+  announce: (result) => ({
+    title: `Railway data loaded — ${result?.ready ?? 0} trains ready for departures`,
+    body:
+      `${result?.trains?.created ?? 0} new train(s), ${result?.routes?.replaced ?? 0} route(s) saved, ` +
+      `${(result?.plans?.approved ?? 0) + (result?.plans?.drafts ?? 0)} new seat plan(s)` +
+      (result?.warnings?.length ? `, ${result.warnings.length} warning(s) to read.` : "."),
+    link: "/dashboard/railway-data",
+  }),
 });
 
 module.exports = jobs;

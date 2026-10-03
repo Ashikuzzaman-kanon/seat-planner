@@ -308,6 +308,13 @@ let cancelledTripId = null;
     check("the seat is offered to them", offered.status === "offered", offered.status);
 
     if (offered.status === "offered") {
+      // The offer's own email goes out in the background. Let it land first, so
+      // it is not taken for the message about the offer lapsing — both carry
+      // the queue reference.
+      const offerSent = () =>
+        sent.some((m) => /A seat came free/.test(m?.subject || "") && (m.subject || "").includes(entry.reference));
+      for (let i = 0; i < 50 && !offerSent(); i++) await pause(100);
+
       // An hour ahead rather than an hour of waiting.
       const before = sent.length;
       const later = new Date(Date.now() + 3 * 60 * 60 * 1000);

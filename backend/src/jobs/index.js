@@ -126,6 +126,13 @@ register("waitlist.offers", {
   handler: async () => waitlistService.expireOffers(),
 });
 
+register("notifications.prune", {
+  describe: "Deletes in-app notifications older than the configured number of days",
+  everyMinutes: 24 * 60,
+  runOnBoot: true,
+  handler: async () => require("../services/inboxService").prune(),
+});
+
 register("jobs.prune", {
   describe: "Deletes background jobs that succeeded longer ago than the configured number of days",
   everyMinutes: 24 * 60,
