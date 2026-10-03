@@ -29,6 +29,14 @@ defined as data.
   journey with a connecting standing ticket.
 - Join a waitlist for a sold-out stretch; a freed seat is offered in one click.
 
+**For everyone**
+- **Notifications**: a bell with the unread count, a panel of the newest, and a
+  full inbox filtered by kind. Bookings, returns paying out, a cancelled train,
+  a seat offered from the waitlist, a request decided, a change of roles — and,
+  for staff, a plan or request waiting on them and background jobs finishing or
+  failing. Kept in the app whether or not the email arrived; checked every 30
+  seconds while the tab is open, with a toast when something new comes in.
+
 **For staff on the train**
 - *Check Tickets*: scan a QR with the phone camera or type the number; eight
   distinct verdicts; scanning can admit the passenger or only read the ticket.
@@ -48,7 +56,7 @@ defined as data.
 - Seat plans: a grid designer for coach layouts, with an approval workflow.
 
 **For administrators**
-- Roles and permissions are data: create roles, grant any of 49 permissions,
+- Roles and permissions are data: create roles, grant any of 50 permissions,
   assign several roles to a user. An escalation guard stops anyone granting
   what they do not hold.
 - A settings store for every tunable rule (timeouts, deductions, abuse weights,
@@ -62,6 +70,9 @@ defined as data.
   and sample bookings; another removes exactly that again. Existing data is
   adopted and never changed, and the delete refuses while anyone outside the
   demo holds a valid ticket on a demo departure.
+- **Railway Data** (super admin): loads Bangladesh Railway's 149 trains, their
+  stations and routes, and the seat plans transcribed from coach diagrams, and
+  makes the 50 trains with plans ready for departures. See *The real railway*.
 
 ## Tech stack
 
