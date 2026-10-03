@@ -109,6 +109,9 @@ const AUDIT_ACTIONS = Object.freeze({
   // Demonstration data, filled in and taken away by the super admin.
   DEMO_POPULATE: "demo.populate",
   DEMO_CLEAR: "demo.clear",
+
+  // The real railway timetable and seat plans, loaded by the super admin.
+  RAILWAY_LOAD: "railway.load",
 });
 
 module.exports = { AUDIT_ACTIONS };

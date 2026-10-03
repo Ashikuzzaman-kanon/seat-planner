@@ -89,6 +89,9 @@ const PERMISSIONS = Object.freeze({
 
   // Demo data
   DEMO_MANAGE: "demo:manage",
+
+  // Real railway data
+  RAILWAY_MANAGE: "railway:manage",
 });
 
 /**
@@ -433,6 +436,16 @@ const PERMISSION_CATALOGUE = Object.freeze([
       "Fill the system with demonstration accounts, trains, departures and bookings, and remove " +
       "them again. Removing touches only what the demo created — but that includes every booking " +
       "made on a demo departure, so it belongs with whoever runs the system.",
+  },
+
+  {
+    key: PERMISSIONS.RAILWAY_MANAGE,
+    group: "Railway data",
+    label: "Load the real railway timetable and seat plans",
+    description:
+      "Load Bangladesh Railway's published stations, trains and routes, and the seat plans transcribed " +
+      "for them, and make the trains that have plans ready for departures. Adds what is missing and " +
+      "leaves anything already there as it is.",
   },
 ]);
 

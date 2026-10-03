@@ -156,4 +156,13 @@ jobs.define(demo.JOB_TYPES.CLEAR, {
   handler: (_payload, ctx) => demo.clear(ctx),
 });
 
+/* The real railway timetable and seat plans (see services/railwayService). */
+const railway = require("../services/railwayService");
+
+jobs.define(railway.JOB_TYPE, {
+  priority: 0,
+  describe: "Load the railway timetable and seat plans, and make the trains with plans ready for departures",
+  handler: (_payload, ctx) => railway.load(ctx),
+});
+
 module.exports = jobs;

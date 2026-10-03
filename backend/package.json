@@ -12,6 +12,8 @@
     "seed:seatplans": "node src/seeders/importSeatPlans.js",
     "seed:network": "node src/seeders/seedNetwork.js",
     "seed:departures": "node src/seeders/seedDepartures.js",
+    "railway:fetch": "node tools/railway/fetch-timetable.js",
+    "railway:load": "node tools/railway/load.js",
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "migrate:status": "sequelize-cli db:migrate:status",

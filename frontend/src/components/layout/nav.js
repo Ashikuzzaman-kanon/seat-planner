@@ -164,6 +164,13 @@ export const NAV_GROUPS = [
         blurb: "Refunds and messages still running",
       },
       {
+        href: "/dashboard/railway-data",
+        label: "Railway Data",
+        icon: "pi pi-directions",
+        permission: PERMISSIONS.RAILWAY_MANAGE,
+        blurb: "Load the real timetable and seat plans",
+      },
+      {
         href: "/dashboard/demo-data",
         label: "Demo Data",
         icon: "pi pi-box",

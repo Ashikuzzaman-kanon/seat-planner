@@ -15,7 +15,6 @@ import { confirmDialog, ConfirmDialog } from "primereact/confirmdialog";
 import {
   fetchTrips,
   fetchTripSeats,
-  generateHorizon,
   rebuildTrip,
   cancelTrip,
   reinstateTrip,
@@ -35,6 +34,7 @@ import { followJob } from "@/lib/jobs";
 import CancelWithReason from "@/components/departures/CancelWithReason";
 import RefundJobBanner from "@/components/departures/RefundJobBanner";
 import TripCoachesDialog from "@/components/departures/TripCoachesDialog";
+import GenerateDialog from "@/components/departures/GenerateDialog";
 const STATUS_FILTER = [
   { label: "All statuses", value: "" },
   { label: "Scheduled", value: "scheduled" },
@@ -60,8 +60,7 @@ export default function DeparturesPage() {
   const [loading, setLoading] = useState(true);
   const [trainFilter, setTrainFilter] = useState(null);
   const [statusFilter, setStatusFilter] = useState("");
-  const [generating, setGenerating] = useState(false);
-  const [report, setReport] = useState(null);
+  const [generateOpen, setGenerateOpen] = useState(false);
   const [seatsFor, setSeatsFor] = useState(null);
   const [seats, setSeats] = useState([]);
   const [seatSearch, setSeatSearch] = useState("");
@@ -123,19 +122,10 @@ export default function DeparturesPage() {
     };
   }, [trips]);
 
-  const generate = async () => {
-    setGenerating(true);
-    try {
-      const result = await generateHorizon({});
-      setReport(result.report);
-      toast.current?.show({ severity: "success", summary: result.message });
-      load();
-    } catch (err) {
-      toast.current?.show({ severity: "error", summary: "Generation failed", detail: err.message });
-    } finally {
-      setGenerating(false);
-    }
-  };
+  // Railway Data links here with ?generate=1 to open the dialog straight away.
+  useEffect(() => {
+    if (canManage && new URLSearchParams(window.location.search).has("generate")) setGenerateOpen(true);
+  }, [canManage]);
 
   const doRebuild = async (trip) => {
     try {
@@ -442,11 +432,10 @@ export default function DeparturesPage() {
           </p>
         </div>
         <Button
-          label="Generate"
+          label="Generate…"
           icon="pi pi-bolt"
-          loading={generating}
           disabled={!canManage}
-          onClick={generate}
+          onClick={() => setGenerateOpen(true)}
         />
       </div>
 
@@ -536,48 +525,12 @@ export default function DeparturesPage() {
         </DataTable>
       </div>
 
-      <Dialog
-        header="Generation report"
-        visible={!!report}
-        style={{ width: "40rem", maxWidth: "95vw" }}
-        onHide={() => setReport(null)}
-      >
-        {report && (
-          <>
-            <p style={{ marginTop: 0 }}>
-              {report.from} to {report.to} ({report.horizonDays} days):{" "}
-              <strong>{report.created}</strong> created, <strong>{report.existing}</strong> already
-              existed, <strong>{report.seatsCreated}</strong> seats materialised.
-            </p>
-            <div className="route-table-scroll">
-              <table className="route-table">
-                <thead>
-                  <tr>
-                    <th>Train</th>
-                    <th style={{ width: "5rem" }}>New</th>
-                    <th style={{ width: "5rem" }}>Existing</th>
-                    <th style={{ width: "5rem" }}>Seats</th>
-                    <th>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.trains.map((t) => (
-                    <tr key={t.train}>
-                      <td>{t.train}</td>
-                      <td>{t.created}</td>
-                      <td>{t.existing}</td>
-                      <td>{t.seats}</td>
-                      <td style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                        {t.notes.join("; ") || "None"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </Dialog>
+      <GenerateDialog
+        visible={generateOpen}
+        onHide={() => setGenerateOpen(false)}
+        trains={trains}
+        onDone={load}
+      />
 
       <CancelWithReason
         visible={Boolean(cancelFor)}

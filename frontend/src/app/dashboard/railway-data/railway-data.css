@@ -1,0 +1,357 @@
+/* Railway data. */
+
+.rd-page .card + .card {
+  margin-top: 1.25rem;
+}
+
+/* ---------------- Status ---------------- */
+
+.rd-status__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+}
+.rd-status__state {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+}
+.rd-status__state strong {
+  display: block;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+.rd-status__state small {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.rd-dot {
+  flex-shrink: 0;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--border-strong);
+  box-shadow: 0 0 0 4px var(--surface-2);
+}
+.rd-dot.is-on {
+  background: var(--ok);
+  box-shadow: 0 0 0 4px var(--ok-soft);
+}
+
+.rd-counts {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+.rd-count {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-width: 0;
+}
+.rd-count b {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.rd-count span {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rd-count span i {
+  font-size: 0.75rem;
+  color: var(--brand-600);
+}
+.rd-count.is-zero b,
+.rd-count.is-zero span i {
+  color: var(--faint);
+}
+@media (max-width: 900px) {
+  .rd-counts {
+    grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  }
+}
+
+/* ---------------- Banners ---------------- */
+
+.rd-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  margin-top: 1.25rem;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius);
+  color: var(--ink-2);
+}
+.card.rd-banner {
+  margin-top: 1.25rem;
+}
+.rd-banner > i {
+  margin-top: 0.2rem;
+  font-size: 1.05rem;
+}
+.rd-banner > div {
+  flex: 1;
+  min-width: 0;
+}
+.rd-banner strong {
+  color: var(--ink);
+}
+.rd-banner p {
+  margin: 0.3rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.rd-banner--warn {
+  border: 1px solid #fcd9a8;
+  background: var(--warn-soft);
+}
+.rd-banner--warn > i {
+  color: var(--warn);
+}
+.rd-banner--info {
+  border: 1px solid var(--brand-200);
+  background: var(--brand-50);
+}
+.rd-banner--info > i {
+  color: var(--brand-600);
+}
+.rd-banner__action {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* ---------------- A load in progress ---------------- */
+
+.rd-job {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--brand-200);
+  border-radius: var(--radius);
+  background: var(--brand-50);
+}
+.rd-job__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.6rem;
+}
+.rd-job__line i {
+  color: var(--brand-600);
+}
+.rd-job__line span {
+  color: var(--ink-2);
+  font-size: 0.88rem;
+}
+.rd-job .p-progressbar {
+  height: 0.4rem;
+}
+.rd-job small {
+  color: var(--muted);
+}
+
+/* ---------------- Sections ---------------- */
+
+.rd-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.rd-section-head h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.rd-section-head h2 small {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.rd-section-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-width: 70ch;
+}
+
+/* ---------------- Last load ---------------- */
+
+.rd-last.is-failed {
+  border-color: #fecaca;
+}
+.rd-error {
+  margin: 0;
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--bad-soft);
+  color: #991b1b;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.rd-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+}
+.rd-summary div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px dashed var(--border);
+}
+.rd-summary dt {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+.rd-summary dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.rd-notes {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.rd-notes li {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.rd-notes li i {
+  margin-top: 0.2rem;
+  color: var(--brand-600);
+}
+.rd-notes--warn li i {
+  color: var(--warn);
+}
+.rd-adjustments {
+  margin-top: 1rem;
+}
+.rd-adjustments summary {
+  cursor: pointer;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* ---------------- Ready trains ---------------- */
+
+.rd-train {
+  display: grid;
+  line-height: 1.3;
+}
+.rd-train strong {
+  color: var(--ink);
+  font-weight: 650;
+}
+.rd-train span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.rd-route {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+}
+.rd-route i {
+  font-size: 0.7rem;
+  color: var(--faint);
+}
+.rd-times {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rd-times sup {
+  margin-left: 0.15rem;
+  color: var(--brand-600);
+  font-weight: 700;
+}
+.rd-runs {
+  color: var(--ink-2);
+  font-size: 0.86rem;
+}
+.rd-coaches {
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+  border-bottom: 1px dotted var(--border-strong);
+}
+.rd-classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.rd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.rd-chip b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.rd-total {
+  font-variant-numeric: tabular-nums;
+}
+
+.rd-confirm p {
+  margin: 0 0 0.5rem;
+}
+.rd-confirm ul {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+  line-height: 1.55;
+}
+.rd-confirm-dialog {
+  width: min(34rem, 94vw);
+}
+
+@media (max-width: 640px) {
+  .rd-banner {
+    flex-wrap: wrap;
+  }
+  .rd-banner__action {
+    width: 100%;
+  }
+}

@@ -179,6 +179,25 @@ Demo accounts follow `<role><n>@example.com` / `<Role>123!` — for example
 `Checker123!`, `user1@example.com` / `User123!`. Anyone can read these
 passwords here, so the button never creates a super admin.
 
+### The real railway
+
+Bangladesh Railway's timetable — 149 trains, their stations and routes — and
+the seat plans transcribed from coach diagrams are loaded from the snapshot in
+`backend/src/data/railway/`:
+
+```bash
+npm run railway:load            # or Administration → Railway Data → Load
+npm run railway:fetch           # refresh the timetable snapshot from the railway (then review the diff)
+```
+
+Loading adds what is missing and never changes what is there. Trains whose seat
+plans are known (50 of them) get coaches, running days and per-kilometre fares,
+ready for departures; diagrams that name no train become draft plans. It never
+generates departures — do that on *Departures → Generate…*. It refuses while
+demo data exists, since the demo's stations share names with the real ones.
+Distances are estimated from running times (the timetable publishes none) and
+can be corrected on each train's route; fares follow.
+
 ### 2. Frontend
 
 ```bash

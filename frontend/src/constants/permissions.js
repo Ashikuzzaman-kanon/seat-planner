@@ -68,4 +68,6 @@ export const PERMISSIONS = {
   JOB_MANAGE: "job:manage",
 
   DEMO_MANAGE: "demo:manage",
+
+  RAILWAY_MANAGE: "railway:manage",
 };

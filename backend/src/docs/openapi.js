@@ -106,6 +106,7 @@ module.exports = {
     { name: "After the sale", description: "Returning a ticket, moving it to another passenger, and the decisions a person has to make" },
     { name: "Background jobs", description: "Work done after the request that asked for it — mass refunds and the messages about them" },
     { name: "Demo data", description: "Filling the system with demonstration data, and removing exactly that again" },
+    { name: "Railway data", description: "Loading Bangladesh Railway's timetable and the seat plans transcribed for it" },
     { name: "Meta", description: "Service metadata" },
   ],
 
@@ -511,6 +512,49 @@ module.exports = {
         blockers: arr(ref("DemoBlocker")),
         job: { ...ref("Job"), nullable: true, description: "A populate or delete still running" },
         lastJob: { ...ref("Job"), nullable: true, description: "The last one that finished, with its result" },
+      }),
+
+      RailwayStatus: obj({
+        snapshot: obj({
+          source: str("Where the timetable was published"),
+          fetchedAt: str("When the committed snapshot was taken"),
+          trains: int(),
+          stations: int(),
+          plans: int("Transcribed layouts"),
+          draftPlans: int("Layouts whose source names no train, saved as drafts"),
+          readyTrains: int("Trains a seat-plan source names, made ready for departures"),
+        }),
+        loaded: obj({
+          trains: int("Snapshot trains present"),
+          withRoutes: int(),
+          stations: int(),
+          approvedPlans: int(),
+          draftPlans: int(),
+        }),
+        generation: obj({
+          automatic: bool("Whether the hourly job generates departures by itself"),
+          horizonDays: int(),
+        }),
+        demoPopulated: bool("Loading is refused while demo data exists"),
+        blocker: { ...str("Why loading is refused right now"), nullable: true },
+        ready: arr(
+          obj({
+            id: int(),
+            name: str(),
+            code: str(),
+            coaches: arr(str()),
+            seats: int(),
+            seatsByClass: { type: "object", additionalProperties: { type: "integer" } },
+            runsOn: arr(int("0 = Sunday")),
+            from: str(),
+            to: str(),
+            departs: str("HH:MM at the origin"),
+            arrives: str("HH:MM at the terminus"),
+            arrivesDayOffset: int(),
+          })
+        ),
+        job: { ...ref("Job"), nullable: true, description: "A load still running" },
+        lastJob: { ...ref("Job"), nullable: true, description: "The last load that finished, with its report" },
       }),
 
       AccountHold: obj({
@@ -2440,6 +2484,43 @@ module.exports = {
           400: response("There is no demo data", ref("Error")),
           403: errors[403],
           409: response("Valid tickets are in the way, or a populate is still running", ref("Error")),
+        },
+      },
+    },
+
+    "/railway-data": {
+      get: {
+        tags: ["Railway data"],
+        summary: "What of the real railway is loaded",
+        description:
+          "The committed timetable snapshot, how much of it is loaded, the trains ready for departures with " +
+          "their line-ups and seats, whether departures are generated automatically, and the load in progress.",
+        ...secured("railway:manage"),
+        responses: {
+          200: response("Status", ref("RailwayStatus")),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/railway-data/load": {
+      post: {
+        tags: ["Railway data"],
+        summary: "Load the timetable and seat plans",
+        description: [
+          "Queues a background job that adds whatever is missing of: every station and train in the snapshot",
+          "with its route, running days and estimated distances; the transcribed seat plans — an approved copy",
+          "for each train a source names, a draft for each source that names none; and coaches, running days",
+          "and per-kilometre fares for the trains that have plans. It never generates departures.",
+          "",
+          "Anything already there is used as it is. A route is replaced only where the timetable differs, and",
+          "never on a train with departures. Refused with 409 while demo data exists.",
+        ].join("\n"),
+        ...secured("railway:manage"),
+        responses: {
+          202: response("Queued — follow it at /jobs/{id}", obj({ message: str(), job: ref("Job") })),
+          403: errors[403],
+          409: response("Demo data has to be deleted first", ref("Error")),
         },
       },
     },
