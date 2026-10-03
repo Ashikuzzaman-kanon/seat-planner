@@ -126,6 +126,13 @@ register("waitlist.offers", {
   handler: async () => waitlistService.expireOffers(),
 });
 
+register("trip.clear_unsold_seats", {
+  describe: "Deletes the unsold seats of trains that left longer ago than the configured number of days",
+  everyMinutes: 24 * 60,
+  runOnBoot: true,
+  handler: async () => require("../services/seatRetentionService").clearDeparted(),
+});
+
 register("notifications.prune", {
   describe: "Deletes in-app notifications older than the configured number of days",
   everyMinutes: 24 * 60,

@@ -112,6 +112,9 @@ const AUDIT_ACTIONS = Object.freeze({
 
   // The real railway timetable and seat plans, loaded by the super admin.
   RAILWAY_LOAD: "railway.load",
+
+  // The daily sweep deleting long-departed trains' unsold seats.
+  SEATS_CLEARED: "trip.seats_cleared",
 });
 
 module.exports = { AUDIT_ACTIONS };

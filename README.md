@@ -49,7 +49,9 @@ defined as data.
 - Departures: weekly schedules generate a rolling horizon of departures; per
   departure, add / remove / cancel / reinstate coaches, switch return policies
   and standing sales, and cancel a whole departure — everyone aboard is refunded
-  in full and told why.
+  in full and told why. Once a train is 90 days gone (a setting), the seats
+  nobody bought are cleared daily to keep the database small; every seat with a
+  ticket or a return, and every booking, payment and refund, is kept.
 - Seat Inventory: a station-pair availability matrix and a per-seat occupancy map
   showing who holds each seat and for which stretch; quota holds for specific
   pairs.

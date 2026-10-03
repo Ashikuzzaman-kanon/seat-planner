@@ -431,6 +431,19 @@ const SETTING_DEFINITIONS = Object.freeze([
     max: 365,
   },
   {
+    key: "trip.keep_unsold_seats_days",
+    group: "Departures",
+    label: "Days a departed train's unsold seats are kept",
+    description:
+      "Once a departure is this many days in the past, the seats nobody bought are deleted to keep the " +
+      "database small — every seat is a row, and these are most of them. Seats with a ticket or a return, " +
+      "and every booking, ticket, payment, refund and wallet record, are kept for good.",
+    type: SETTING_TYPES.INTEGER,
+    default: 90,
+    min: 30,
+    max: 3650,
+  },
+  {
     key: "notifications.keep_days",
     group: "Notifications",
     label: "Days notifications are kept",
