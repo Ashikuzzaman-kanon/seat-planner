@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.seatplanner.app",
+      "sha256_cert_fingerprints": [
+        "12:B1:96:01:8E:72:E9:14:F8:EF:42:9D:7C:B2:F4:69:90:BD:E2:78:43:81:61:9D:61:93:BC:BD:19:4E:8D:4F"
+      ]
+    }
+  }
+]

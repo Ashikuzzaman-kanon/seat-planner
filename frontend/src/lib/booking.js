@@ -1,6 +1,7 @@
 import api from "@/lib/api";
 import config from "@/config";
 import { getToken } from "@/lib/api";
+import { androidApp, tellAndroidApp } from "@/lib/androidApp";
 
 /* ---------------------------------------------------------------- *
  * Shopping
@@ -159,6 +160,9 @@ export async function fetchTicketQr({ bookingId, ticketNumber }) {
  * header, which a plain anchor cannot carry. The blob URL is revoked on the
  * next tick — long enough for the browser to have opened it, short enough not
  * to leak.
+ *
+ * Inside the Android app there is no new tab to open, so the file is handed to
+ * the app instead, which shows it in the phone's PDF viewer.
  */
 export async function openTicketPdf(bookingId) {
   const res = await fetch(`${config.apiBaseUrl}/bookings/${bookingId}/pdf`, {
@@ -170,9 +174,28 @@ export async function openTicketPdf(bookingId) {
     throw new Error(body?.error?.message || "Could not open the tickets");
   }
 
-  const url = URL.createObjectURL(await res.blob());
+  const blob = await res.blob();
+
+  if (androidApp()) {
+    const name =
+      /filename="?([^";]+)"?/.exec(res.headers.get("Content-Disposition") || "")?.[1] || `tickets-${bookingId}.pdf`;
+    tellAndroidApp({ type: "pdf", name, data: await toBase64(blob) });
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
   window.open(url, "_blank", "noopener");
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** A file's bytes as base64, without the `data:…;base64,` prefix. */
+function toBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",", 2)[1] || "");
+    reader.onerror = () => reject(reader.error || new Error("Could not read the tickets"));
+    reader.readAsDataURL(blob);
+  });
 }
 
 /* ---------------------------------------------------------------- *

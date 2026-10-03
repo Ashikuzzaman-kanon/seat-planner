@@ -36,6 +36,10 @@ defined as data.
   for staff, a plan or request waiting on them and background jobs finishing or
   failing. Kept in the app whether or not the email arrived; checked every 30
   seconds while the tab is open, with a toast when something new comes in.
+- **Android app**: the site full screen, with the back button, pull to refresh,
+  the camera for checking tickets and the tickets PDF in the phone's viewer. It
+  loads every page from the live site, so a web deploy needs no app update. See
+  *The Android app*.
 
 **For staff on the train**
 - *Check Tickets*: scan a QR with the phone camera or type the number; eight
@@ -84,12 +88,14 @@ defined as data.
 | Backend | Node.js 20, Express 4, Sequelize 6, express-validator, PDFKit, qrcode, Nodemailer |
 | Data | MySQL 8 (everything transactional) · MongoDB (audit log; optional) |
 | Auth | Short-lived JWT access tokens + rotating, revocable refresh tokens; per-request permission resolution |
+| Android | Kotlin, a WebView over the live site; an APK installed directly, released from GitHub |
 | Deploy | Vercel (frontend) · Render, Docker (API) · Aiven MySQL · Docker Compose + Caddy for self-hosting |
 
 ## How it fits together
 
 ```
- Browser ──▶ Next.js (Vercel)  ── /api/* rewrite ──▶  Express API (Render)
+ Browser or
+ Android app ──▶ Next.js (Vercel)  ── /api/* rewrite ──▶  Express API (Render)
                                                         │
                                    MySQL (Aiven) ◀──────┤  transactions, jobs table
                                    MongoDB (optional) ◀─┘  audit log
@@ -139,6 +145,7 @@ seat-planner/
 │       ├── app/        routes: auth pages, /dashboard/*
 │       ├── components/ booking, checking, departures, inventory, network, ui…
 │       └── lib/        API clients per area
+├── android/            Android app (Kotlin): the site in a WebView — see android/README.md
 ├── tools/lan-https.js  HTTPS proxy for testing the camera scanner from a phone
 ├── docker-compose.yml  MySQL + MongoDB + API + frontend + Caddy
 ├── REQUIREMENTS.md     specification and build log
@@ -225,6 +232,17 @@ npm run dev                     # http://localhost:3000
 Browsers only allow the camera on a secure origin. Run
 `node tools/lan-https.js` and open the printed `https://<your-LAN-IP>:3443`
 address on the phone (accept the self-signed certificate once).
+
+### The Android app
+
+The app in [android/](android/README.md) is the live site full screen, so it
+changes whenever the site does. To try local changes in it, open **Open on
+phone** from the account menu while `npm run dev` runs (or go to
+`http://localhost:3000/dev/phone`): one QR code installs the app from this
+computer, the other switches it to this computer until you tap its **DEV**
+strip. Holding three fingers on the app's screen for three seconds opens the
+same switch by hand. Building, the signing key and releases are in
+[android/README.md](android/README.md).
 
 ### Everything in Docker
 

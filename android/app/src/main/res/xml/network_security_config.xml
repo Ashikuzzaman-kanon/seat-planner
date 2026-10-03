@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Production is https. Plain http is for a developer's own computer, reached
+    over the same Wi-Fi or a USB cable — Android cannot list "any private
+    address" here, so it is allowed in general, and the app itself refuses to
+    load any server but production and this network (see Servers.parseLocal).
+-->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <base-config
+        cleartextTrafficPermitted="true"
+        tools:ignore="InsecureBaseConfiguration">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
