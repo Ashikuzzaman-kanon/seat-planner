@@ -385,6 +385,11 @@ async function rebuild(id) {
   if (trip.status === TRIP_STATUS.CANCELLED) {
     throw ApiError.badRequest("This departure is cancelled — it cannot be rebuilt");
   }
+  if (trip.seatsClearedAt) {
+    throw ApiError.badRequest(
+      "This train left long ago and its unsold seats were cleared to save space — it cannot be rebuilt."
+    );
+  }
 
   /*
    * Rebuilding replaces every seat row, and a ticket points at one.

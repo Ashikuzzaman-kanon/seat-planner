@@ -30,6 +30,7 @@ const ACTION_SEVERITY = {
   "demo.populate": "info",
   "demo.clear": "warning",
   "railway.load": "info",
+  "trip.seats_cleared": "info",
 };
 
 export default function AuditPage() {

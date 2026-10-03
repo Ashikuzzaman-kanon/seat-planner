@@ -34,6 +34,9 @@ class Trip extends Model {
       convenientReturnEnabled: this.convenientReturnEnabled,
       demandReturnEnabled: this.demandReturnEnabled,
       standingEnabled: this.standingEnabled,
+      // Set once the train is long gone and its unsold seats were deleted.
+      seatsClearedAt: this.seatsClearedAt,
+      seatsCleared: this.seatsCleared,
       coaches: this.coaches?.map((c) => c.toPublicJSON()),
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
@@ -77,6 +80,14 @@ Trip.init(
      * only restrict what the class allows, never extend it.
      */
     standingEnabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+
+    /**
+     * When the unsold seats of this long-departed train were deleted, and how
+     * many. Seats a ticket or refund points at are never among them, and each
+     * coach keeps its seat count, so the record of what ran stays whole.
+     */
+    seatsClearedAt: { type: DataTypes.DATE, allowNull: true },
+    seatsCleared: { type: DataTypes.INTEGER, allowNull: true },
   },
   {
     sequelize,
