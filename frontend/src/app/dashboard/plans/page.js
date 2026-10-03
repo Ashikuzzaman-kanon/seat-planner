@@ -98,7 +98,7 @@ export default function PlansPage() {
 
   const onSubmit = (row) => {
     confirmDialog({
-      message: `Submit coach "${row.coachNo}" for approval?`,
+      message: `Submit ${row.coachNo ? `coach "${row.coachNo}"` : "this untitled plan"} for approval?`,
       header: "Submit plan",
       icon: "pi pi-send",
       accept: async () => {
@@ -115,7 +115,7 @@ export default function PlansPage() {
 
   const onDelete = (row) => {
     confirmDialog({
-      message: `Delete plan for coach "${row.coachNo}"? This cannot be undone.`,
+      message: `Delete ${row.coachNo ? `the plan for coach "${row.coachNo}"` : "this untitled plan"}? This cannot be undone.`,
       header: "Delete plan",
       icon: "pi pi-exclamation-triangle",
       acceptClassName: "p-button-danger",
@@ -135,7 +135,10 @@ export default function PlansPage() {
     <Tag value={PLAN_STATUS_LABELS[row.status]} severity={PLAN_STATUS_SEVERITY[row.status]} />
   );
 
-  const trainBody = (row) => row.trainName?.name || DASH;
+  // A draft may not have these yet; say so rather than leave a gap that looks like a fault.
+  const trainBody = (row) =>
+    row.trainName?.name || <span className="plans-unset">{row.status === PLAN_STATUS.DRAFT ? "Not assigned" : DASH}</span>;
+  const coachNoBody = (row) => row.coachNo || <span className="plans-unset">Untitled</span>;
   const refBody = (field) => (row) => row[field]?.name || DASH;
   const updatedBody = (row) => <When value={row.updatedAt} />;
 
@@ -211,7 +214,7 @@ export default function PlansPage() {
           rows={10}
         >
           <Column field="trainName.name" header="Train" body={trainBody} sortable />
-          <Column field="coachNo" header="Coach No" sortable />
+          <Column field="coachNo" header="Coach No" body={coachNoBody} sortable />
           <Column header="Type" body={refBody("coachType")} />
           <Column header="Class" body={refBody("coachClass")} />
           <Column field="status" header="Status" body={statusBody} sortable />

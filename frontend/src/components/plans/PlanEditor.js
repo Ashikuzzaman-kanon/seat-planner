@@ -44,7 +44,7 @@ export default function PlanEditor({ planId }) {
         if (isEdit) {
           const plan = await getPlan(planId);
           setMeta({
-            coachNo: plan.coachNo,
+            coachNo: plan.coachNo || "",
             trainNameId: plan.trainNameId,
             coachTypeId: plan.coachTypeId,
             coachClassId: plan.coachClassId,
@@ -105,22 +105,39 @@ export default function PlanEditor({ planId }) {
     setSelected(null);
   };
 
-  const validate = () => {
-    if (!meta.trainNameId) return "Select a train name";
-    if (!meta.coachTypeId) return "Select a coach type";
-    if (!meta.coachClassId) return "Select a coach class";
-    if (!meta.coachNo.trim()) return "Enter a coach number";
-    return null;
+  /**
+   * What submitting needs. A draft saves with any of it missing — a layout can
+   * be kept before anyone knows its train — so this is only checked on submit.
+   */
+  const missingForSubmit = () => {
+    const missing = [];
+    if (!meta.trainNameId) missing.push("a train");
+    if (!meta.coachTypeId) missing.push("a coach type");
+    if (!meta.coachClassId) missing.push("a coach class");
+    if (!meta.coachNo.trim()) missing.push("a coach number");
+    return missing;
   };
 
   const persist = async () => {
-    const payload = { ...meta, coachNo: meta.coachNo.trim(), layout };
+    const payload = {
+      coachNo: meta.coachNo.trim() || null,
+      trainNameId: meta.trainNameId ?? null,
+      coachTypeId: meta.coachTypeId ?? null,
+      coachClassId: meta.coachClassId ?? null,
+      layout,
+    };
     return isEdit ? updatePlan(planId, payload) : createPlan(payload);
   };
 
   const save = async (thenSubmit = false) => {
-    const err = validate();
-    if (err) return toast.current?.show({ severity: "warn", summary: "Missing info", detail: err });
+    const missing = thenSubmit ? missingForSubmit() : [];
+    if (missing.length) {
+      return toast.current?.show({
+        severity: "warn",
+        summary: "Not ready to submit",
+        detail: `Add ${missing.join(", ")} first — or save it as a draft for now.`,
+      });
+    }
     setSaving(true);
     try {
       const plan = await persist();
@@ -155,7 +172,12 @@ export default function PlanEditor({ planId }) {
       <Toast ref={toast} />
 
       <div className="page-head">
-        <h1 className="page-title">{isEdit ? "Edit Seat Plan" : "New Seat Plan"}</h1>
+        <div>
+          <h1 className="page-title">{isEdit ? "Edit Seat Plan" : "New Seat Plan"}</h1>
+          <p className="page-subtitle">
+            A draft saves with anything still unknown. Submitting needs a train, coach type, class and coach number.
+          </p>
+        </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <Button label="Save draft" icon="pi pi-save" outlined loading={saving} onClick={() => save(false)} />
           <Button label="Save & submit" icon="pi pi-send" loading={saving} onClick={() => save(true)} />
@@ -166,16 +188,16 @@ export default function PlanEditor({ planId }) {
       <div className="card">
         <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
           {field("Train name", (
-            <Select value={meta.trainNameId} options={refOptions(refs.trainNames)} filter
-              onChange={(e) => setMeta((m) => ({ ...m, trainNameId: e.value }))} placeholder="Select train" />
+            <Select value={meta.trainNameId} options={refOptions(refs.trainNames)} filter showClear
+              onChange={(e) => setMeta((m) => ({ ...m, trainNameId: e.value ?? null }))} placeholder="Not decided yet" />
           ))}
           {field("Coach type", (
-            <Select value={meta.coachTypeId} options={refOptions(refs.coachTypes)} filter
-              onChange={(e) => setMeta((m) => ({ ...m, coachTypeId: e.value }))} placeholder="Select type" />
+            <Select value={meta.coachTypeId} options={refOptions(refs.coachTypes)} filter showClear
+              onChange={(e) => setMeta((m) => ({ ...m, coachTypeId: e.value ?? null }))} placeholder="Not decided yet" />
           ))}
           {field("Coach class", (
-            <Select value={meta.coachClassId} options={refOptions(refs.coachClasses)} filter
-              onChange={(e) => setMeta((m) => ({ ...m, coachClassId: e.value }))} placeholder="Select class" />
+            <Select value={meta.coachClassId} options={refOptions(refs.coachClasses)} filter showClear
+              onChange={(e) => setMeta((m) => ({ ...m, coachClassId: e.value ?? null }))} placeholder="Not decided yet" />
           ))}
           {field("Coach no", (
             <InputText value={meta.coachNo} onChange={(e) => setMeta((m) => ({ ...m, coachNo: e.target.value }))} placeholder="e.g. KHA" />
@@ -187,7 +209,7 @@ export default function PlanEditor({ planId }) {
             <InputText value={layout.toStation} onChange={(e) => setLayout((l) => ({ ...l, toStation: e.target.value }))} placeholder="To" />
           ))}
           {!isEdit && field("Start from template", (
-            <Select value={templateId} options={[{ label: "— None —", value: null }, ...templates.map((t) => ({ label: `${t.trainName?.name || "?"} · ${t.coachNo}`, value: t.id }))]}
+            <Select value={templateId} options={[{ label: "— None —", value: null }, ...templates.map((t) => ({ label: `${t.trainName?.name || "No train"} · ${t.coachNo || "untitled draft"}`, value: t.id }))]}
               onChange={(e) => applyTemplate(e.value)} placeholder="Optional" />
           ))}
         </div>

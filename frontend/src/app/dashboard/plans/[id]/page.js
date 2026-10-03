@@ -55,9 +55,9 @@ export default function ViewPlanPage() {
       const ratio = Math.min((pw - 40) / canvas.width, (ph - 40) / canvas.height);
       const w = canvas.width * ratio;
       const h = canvas.height * ratio;
-      pdf.text(`${plan.trainName?.name || ""} · Coach ${plan.coachNo}`, 20, 24);
+      pdf.text(title, 20, 24);
       pdf.addImage(img, "PNG", (pw - w) / 2, 36, w, h);
-      pdf.save(`seat-plan-${plan.trainName?.name || "plan"}-${plan.coachNo}.pdf`.replace(/\s+/g, "_"));
+      pdf.save(`seat-plan-${plan.trainName?.name || "draft"}-${plan.coachNo || plan.id}.pdf`.replace(/\s+/g, "_"));
     } catch (err) {
       toast.current?.show({ severity: "error", summary: "Export failed", detail: err.message });
     } finally {
@@ -73,6 +73,8 @@ export default function ViewPlanPage() {
   }
 
   const editable = [PLAN_STATUS.DRAFT, PLAN_STATUS.PENDING, PLAN_STATUS.REJECTED].includes(plan.status);
+  const title = [plan.trainName?.name, plan.coachNo ? `Coach ${plan.coachNo}` : null].filter(Boolean).join(" · ") ||
+    "Untitled draft";
   const meta = [
     ["Train", plan.trainName?.name],
     ["Coach no", plan.coachNo],
@@ -90,10 +92,13 @@ export default function ViewPlanPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title" style={{ marginBottom: 4 }}>
-            {plan.trainName?.name} · Coach {plan.coachNo}{" "}
+            {title}{" "}
             <Tag value={PLAN_STATUS_LABELS[plan.status]} severity={PLAN_STATUS_SEVERITY[plan.status]} />
           </h1>
-          <p className="page-subtitle">{plan.coachType?.name} · {plan.coachClass?.name}</p>
+          <p className="page-subtitle">
+            {[plan.coachType?.name, plan.coachClass?.name].filter(Boolean).join(" · ") ||
+              "No coach type or class yet"}
+          </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
           <Button label="Back" icon="pi pi-arrow-left" outlined severity="secondary" onClick={() => router.push("/dashboard/plans")} />

@@ -29,6 +29,7 @@ const ACTION_SEVERITY = {
   "auth.password_reset_failed": "danger",
   "demo.populate": "info",
   "demo.clear": "warning",
+  "railway.load": "info",
 };
 
 export default function AuditPage() {

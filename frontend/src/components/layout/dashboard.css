@@ -490,6 +490,11 @@
   font-size: 0.85rem;
   color: var(--muted);
 }
+/* A draft's train or coach number that nobody has decided yet. */
+.plans-unset {
+  color: var(--muted);
+  font-style: italic;
+}
 
 @media (max-width: 640px) {
   .plans-toolbar {

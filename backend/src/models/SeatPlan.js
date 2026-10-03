@@ -4,17 +4,19 @@ const { ALL_PLAN_STATUSES, PLAN_STATUS } = require("../constants/planStatus");
 
 class SeatPlan extends Model {
   static associate(models) {
+    // Train, type and class may all be empty on a draft; submitting a plan for
+    // approval is what requires them (seatPlanService.missingForSubmit).
     SeatPlan.belongsTo(models.TrainName, {
       as: "trainName",
-      foreignKey: { name: "trainNameId", allowNull: false },
+      foreignKey: { name: "trainNameId", allowNull: true },
     });
     SeatPlan.belongsTo(models.CoachType, {
       as: "coachType",
-      foreignKey: { name: "coachTypeId", allowNull: false },
+      foreignKey: { name: "coachTypeId", allowNull: true },
     });
     SeatPlan.belongsTo(models.CoachClass, {
       as: "coachClass",
-      foreignKey: { name: "coachClassId", allowNull: false },
+      foreignKey: { name: "coachClassId", allowNull: true },
     });
     SeatPlan.belongsTo(models.User, {
       as: "createdBy",
@@ -63,7 +65,7 @@ SeatPlan.init(
     },
     coachNo: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     status: {
       type: DataTypes.ENUM(...ALL_PLAN_STATUSES),
