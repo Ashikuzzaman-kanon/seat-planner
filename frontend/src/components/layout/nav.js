@@ -56,6 +56,13 @@ export const NAV_GROUPS = [
         blurb: "Transfers and withdrawals",
       },
       {
+        // Everyone has an inbox.
+        href: "/dashboard/notifications",
+        label: "Notifications",
+        icon: "pi pi-bell",
+        blurb: "Everything that happened, and what is waiting on you",
+      },
+      {
         href: "/dashboard/profile",
         label: "My Profile",
         icon: "pi pi-user",

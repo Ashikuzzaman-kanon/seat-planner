@@ -27,6 +27,7 @@ const fareService = require("./fareService");
 const paymentService = require("./paymentService");
 const settings = require("./settingService");
 const email = require("./emailService");
+const inbox = require("./inboxService");
 const ticketDocuments = require("./ticketDocumentService");
 const audit = require("./auditService");
 
@@ -374,6 +375,25 @@ async function journeyTimes(booking) {
 }
 
 async function deliver(booking, userId) {
+  const seats = booking.tickets?.length || 0;
+  const place = (station) => station?.name?.replace(/_/g, " ");
+  await inbox.tryAdd(userId, {
+    type: "booking.confirmed",
+    category: inbox.CATEGORY.BOOKING,
+    tone: "success",
+    title: `Booking confirmed — ${booking.reference}`,
+    body: [
+      booking.trip?.train?.name,
+      [place(booking.fromStation), place(booking.toStation)].filter(Boolean).join(" → "),
+      booking.boardingDate,
+      `${seats} seat${seats === 1 ? "" : "s"}`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    link: "/dashboard/bookings",
+    key: `booking:${booking.id}:confirmed`,
+  });
+
   try {
     const user = await User.findByPk(userId, { attributes: ["email"] });
     if (!user?.email) return;

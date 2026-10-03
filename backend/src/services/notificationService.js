@@ -1,5 +1,8 @@
 const { User } = require("../models");
 const email = require("./emailService");
+const inbox = require("./inboxService");
+
+const { CATEGORY } = inbox;
 
 /**
  * Telling passengers what happened to their money and their seats.
@@ -39,23 +42,24 @@ const ui = require("../emails/layout");
 const reference = (label, value) => ui.trusted(`${ui.esc(label)} ${ui.esc(ui.strong(value))}`);
 
 /**
- * One way out.
+ * Tell one account, in the app and by email.
  *
- * Takes a user id rather than an address so no caller has to do the lookup, and
- * swallows everything: see the note above about why a failed send must never
- * become a failed operation.
- */
-/**
- * Send one message to one account.
+ * Takes a user id rather than an address so no caller has to do the lookup.
  *
- * Ordinarily a failure is logged and swallowed — a message is a courtesy laid
- * on top of state that is already durable, and must never fail the operation
- * that caused it. `strict` is for a caller that *wants* to know: a queued job
- * sending the message, which retries it on failure instead of losing it.
- * Having no email address is not a failure in either mode; there is nothing to
- * retry.
+ * The in-app notification is written first and on its own: it reaches a
+ * person with no email address, and survives a mail server that is down. It
+ * never throws, and carries a key where a retry could repeat it, so a queued
+ * job that tries the email again leaves one notification, not several.
+ *
+ * Ordinarily an email failure is logged and swallowed — a message is a
+ * courtesy laid on top of state that is already durable, and must never fail
+ * the operation that caused it. `strict` is for a caller that *wants* to know:
+ * a queued job sending the message, which retries it on failure instead of
+ * losing it. Having no email address is not a failure in either mode; there is
+ * nothing to retry.
  */
-async function deliver(userId, { subject, html }, { strict = false } = {}) {
+async function deliver(userId, { subject, html, inApp }, { strict = false } = {}) {
+  if (userId && inApp) await inbox.tryAdd(userId, inApp);
   try {
     if (!userId) return false;
     const user = await User.findByPk(userId, { attributes: ["email"] });
@@ -140,7 +144,29 @@ async function ticketReturned({ userId, refund, ticket, journey, immediate, segm
           ui.button("Follow this return", ui.appUrl("/dashboard/refunds")),
       });
 
-  return deliver(userId, { subject, html });
+  const inApp = immediate
+    ? {
+        type: "refund.paid",
+        tone: "success",
+        title: `Return paid — ${ui.taka(refund.refundedMinor)} credited`,
+        body: [ticket?.ticketNumber && `Ticket ${ticket.ticketNumber}`, journey, "The money is in your wallet now."]
+          .filter(Boolean)
+          .join(" · "),
+      }
+    : {
+        type: "refund.opened",
+        tone: "info",
+        title: "Return open — waiting for the seat to resell",
+        body:
+          `Up to ${ui.taka(refund.maximumMinor)}, paid stretch by stretch as the seat sells again. ` +
+          "Nothing is paid for a stretch that has not resold when the train leaves.",
+      };
+
+  return deliver(userId, {
+    subject,
+    html,
+    inApp: { ...inApp, category: CATEGORY.REFUND, link: "/dashboard/refunds", key: `refund:${refund.reference}:opened` },
+  });
 }
 
 /**
@@ -160,6 +186,17 @@ async function refundSegmentSettled({ userId, refund, paidMinor, remaining }) {
 
   return deliver(userId, {
     subject,
+    inApp: {
+      type: finished ? "refund.completed" : "refund.part_paid",
+      category: CATEGORY.REFUND,
+      tone: "success",
+      title: finished ? `Return complete — ${ui.taka(paidMinor)} credited` : `Part of your return paid — ${ui.taka(paidMinor)}`,
+      body: finished
+        ? `Every part of the seat resold. ${ui.taka(refund.refundedMinor)} paid in all on ${refund.reference}.`
+        : `More of your seat sold. ${remaining} stretch${remaining === 1 ? "" : "es"} still waiting on ${refund.reference}.`,
+      link: "/dashboard/wallet",
+      key: `refund:${refund.reference}:paid:${refund.refundedMinor}`,
+    },
     html: ui.page({
       subject,
       preheader: `${ui.taka(paidMinor)} credited to your wallet.`,
@@ -200,6 +237,18 @@ async function refundClosedUnsold({ userId, refund, unsoldSegments }) {
   const subject = `Return closed — ${refund.reference}`;
   return deliver(userId, {
     subject,
+    inApp: {
+      type: "refund.closed",
+      category: CATEGORY.REFUND,
+      tone: "neutral",
+      title: `Return closed — ${refund.reference}`,
+      body:
+        refund.refundedMinor > 0
+          ? `The train has left. ${ui.taka(refund.refundedMinor)} was paid; ${unsoldSegments} stretch${unsoldSegments === 1 ? "" : "es"} did not resell.`
+          : "The train has left before the seat resold, so this demand-based return pays nothing.",
+      link: "/dashboard/refunds",
+      key: `refund:${refund.reference}:closed`,
+    },
     html: ui.page({
       subject,
       preheader: "The train has left, so this return will not pay any further.",
@@ -247,6 +296,17 @@ function departureCancelledMessage({ ticket, refundMinor, reason, train, journey
   const [from, to] = String(journey || "").split(/\s*→\s*/);
   return {
     subject,
+    inApp: {
+      type: "booking.cancelled_by_railway",
+      category: CATEGORY.BOOKING,
+      tone: "danger",
+      title: `${train || "Your train"} was cancelled — ${ui.taka(refundMinor)} refunded`,
+      body: [journey, date, reason && `Reason: ${reason}`, "Your fare is back in your wallet in full."]
+        .filter(Boolean)
+        .join(" · "),
+      link: "/dashboard/bookings",
+      key: ticket ? `ticket:${ticket}:cancelled` : null,
+    },
     html: ui.page({
       subject,
       preheader: `Your fare of ${ui.taka(refundMinor)} is back in your wallet, in full.`,
@@ -314,6 +374,17 @@ async function approvalDecided({ userId, request, approved, note: decisionNote, 
 
   return deliver(userId, {
     subject,
+    inApp: {
+      type: approved ? "approval.approved" : "approval.rejected",
+      category: CATEGORY.APPROVAL,
+      tone: approved ? "success" : "warning",
+      title: approved ? titles.approved : titles.rejected,
+      body: [`Reference ${request.reference}`, decisionNote && `“${decisionNote}”`, decidedBy && `Decided by ${decidedBy}`]
+        .filter(Boolean)
+        .join(" · "),
+      link: "/dashboard/requests",
+      key: `approval:${request.reference}:decided`,
+    },
     html: ui.page({
       subject,
       preheader: decisionNote || (approved ? "Approved." : "Not approved."),
@@ -374,6 +445,20 @@ function rolesChangedMessage({ granted = [], revoked = [], changedBy, abilities 
 
   return {
     subject,
+    inApp: {
+      type: "account.roles_changed",
+      category: CATEGORY.ACCOUNT,
+      tone: revoked.length && !granted.length ? "warning" : "info",
+      title: granted.length && !revoked.length ? subject : "Your access has changed",
+      body: [
+        granted.length && `Added: ${granted.map((r) => roleName(r.name)).join(", ")}`,
+        revoked.length && `Removed: ${revoked.map((r) => roleName(r.name)).join(", ")}`,
+        changedBy && `Changed by ${changedBy}`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      link: "/dashboard/profile",
+    },
     html: ui.page({
       subject,
       preheader: [
@@ -430,6 +515,14 @@ async function accountHeld({ userId, detail, automatic }) {
   const subject = "Your account cannot book at the moment";
   return deliver(userId, {
     subject,
+    inApp: {
+      type: "account.held",
+      category: CATEGORY.ACCOUNT,
+      tone: "warning",
+      title: "Your account is on hold",
+      body: `${detail ? `${detail} ` : ""}Tickets you already hold are unaffected. A hold can be lifted — ask for a review if it looks wrong.`,
+      link: "/dashboard/bookings",
+    },
     html: ui.page({
       subject,
       preheader: "Existing tickets are unaffected — you can still travel on anything already booked.",
@@ -463,6 +556,14 @@ async function accountReleased({ userId, note: reason }) {
   const subject = "Your account can book again";
   return deliver(userId, {
     subject,
+    inApp: {
+      type: "account.released",
+      category: CATEGORY.ACCOUNT,
+      tone: "success",
+      title: "Your account can book again",
+      body: reason ? `The hold was lifted: ${reason}` : "The hold on your account was lifted.",
+      link: "/dashboard/book",
+    },
     html: ui.page({
       subject,
       preheader: "The hold on your account has been lifted.",
@@ -495,6 +596,15 @@ async function waitlistOfferExpired({ userId, entry, stillQueued, offersMade, li
 
   return deliver(userId, {
     subject,
+    inApp: {
+      type: stillQueued ? "waitlist.offer_missed" : "waitlist.left",
+      category: CATEGORY.WAITLIST,
+      tone: stillQueued ? "warning" : "neutral",
+      title: stillQueued ? "You missed a seat — you are still in the queue" : "You have left the queue",
+      body: [entry.train, entry.journey, `${offersMade} of ${limit} offers missed`].filter(Boolean).join(" · "),
+      link: stillQueued ? "/dashboard/bookings" : "/dashboard/book",
+      key: `waitlist:${entry.reference}:missed:${offersMade}`,
+    },
     html: ui.page({
       subject,
       preheader: stillQueued ? "You kept your place for the next seat returned." : "Your allowance of offers is used up.",

@@ -430,6 +430,18 @@ const SETTING_DEFINITIONS = Object.freeze([
     min: 1,
     max: 365,
   },
+  {
+    key: "notifications.keep_days",
+    group: "Notifications",
+    label: "Days notifications are kept",
+    description:
+      "Notifications older than this are deleted from everyone's inbox, read or not. The emails " +
+      "about the same events are unaffected, and so is everything a notification pointed to.",
+    type: SETTING_TYPES.INTEGER,
+    default: 90,
+    min: 7,
+    max: 730,
+  },
 ]);
 
 const DEFINITIONS_BY_KEY = Object.freeze(

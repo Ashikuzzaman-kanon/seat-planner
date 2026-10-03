@@ -7,6 +7,8 @@ const settings = require("./settingService");
 const audit = require("./auditService");
 const ApiError = require("../utils/ApiError");
 const { AUDIT_ACTIONS } = require("../constants/auditActions");
+const { PERMISSIONS } = require("../constants/permissions");
+const inbox = require("./inboxService");
 const { backoffSeconds, isPermanent } = require("../utils/jobRetry");
 const { runWithContext } = require("../utils/requestContext");
 const demoCapture = require("../utils/demoCapture");
@@ -80,8 +82,60 @@ let busy = false;
  * know a type — an older deploy, a test runner — leaves those jobs alone rather
  * than failing them.
  */
-function define(type, { handler, priority = 0, describe }) {
-  handlers.set(type, { type, handler, priority, describe });
+/**
+ * `announce(result, job)` is for work someone starts and walks away from — a
+ * mass refund, loading data. It returns the in-app notification the person
+ * who started it gets when it finishes. Jobs without it finish quietly.
+ */
+function define(type, { handler, priority = 0, describe, announce }) {
+  handlers.set(type, { type, handler, priority, describe, announce });
+}
+
+/* ---------------- Telling people how it went ---------------- */
+
+const HOUR_MS = 3_600_000;
+
+/** The person who started it, told it finished. Never throws. */
+async function announceFinished(definition, job, result) {
+  if (!definition?.announce || !job.createdById) return;
+  try {
+    const n = definition.announce(result, job);
+    if (n) {
+      await inbox.tryAdd(job.createdById, {
+        type: `job.${job.type}.done`,
+        category: inbox.CATEGORY.SYSTEM,
+        tone: "success",
+        ...n,
+        key: `job:${job.id}:done`,
+      });
+    }
+  } catch (err) {
+    console.error(`[jobs] could not announce #${job.id}: ${err.message}`);
+  }
+}
+
+/**
+ * A job that gave up: its starter is told, and so is everyone who can retry
+ * jobs — once an hour per kind of job, so a mail server going down for an
+ * afternoon is one message, not three hundred.
+ */
+async function announceFailed(job, err) {
+  const notification = {
+    type: "job.failed",
+    category: inbox.CATEGORY.SYSTEM,
+    tone: "danger",
+    title: `Background job failed — ${job.label || job.type}`,
+    body:
+      `It stopped after ${job.attempts} attempt(s): ${String(err?.message || err).slice(0, 200)}. ` +
+      "It can be retried on Background Jobs.",
+    link: `/dashboard/jobs?focus=${job.id}`,
+  };
+  if (job.createdById) await inbox.tryAdd(job.createdById, { ...notification, key: `job:${job.id}:failed` });
+  await inbox.toHolders(
+    PERMISSIONS.JOB_MANAGE,
+    { ...notification, key: `jobs-failed:${job.type}:${Math.floor(Date.now() / HOUR_MS)}` },
+    { except: [job.createdById] }
+  );
 }
 
 /**
@@ -239,6 +293,7 @@ async function run(job) {
       },
       { where: { id: job.id } }
     );
+    await announceFinished(definition, job, result);
   } catch (err) {
     const message = String(err?.stack || err?.message || err).slice(0, 4000);
     const giveUp = job.attempts >= job.maxAttempts || isPermanent(err);
@@ -266,6 +321,7 @@ async function run(job) {
         })
       );
       console.error(`[jobs] #${job.id} ${job.type} failed for good: ${err?.message || err}`);
+      await announceFailed(job, err);
     } else {
       const wait = backoffSeconds(job.attempts, settings.get("jobs.retry_base_seconds"));
       await Job.update(

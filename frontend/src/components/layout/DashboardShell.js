@@ -7,6 +7,8 @@ import { Menu } from "primereact/menu";
 import { ProgressSpinner } from "primereact/progressspinner";
 import { Button } from "primereact/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { NotificationsProvider } from "@/contexts/NotificationsContext";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import { PERMISSIONS } from "@/constants/permissions";
 import { roleLabel } from "@/constants/roles";
 import { visibleGroups, isActive, locate } from "./nav";
@@ -130,6 +132,7 @@ export default function DashboardShell({ children }) {
     },
     { separator: true },
     { label: "My profile", icon: "pi pi-user", command: () => router.push("/dashboard/profile") },
+    { label: "Notifications", icon: "pi pi-bell", command: () => router.push("/dashboard/notifications") },
     ...(canBook
       ? [{ label: "Wallet", icon: "pi pi-wallet", command: () => router.push("/dashboard/wallet") }]
       : []),
@@ -138,125 +141,129 @@ export default function DashboardShell({ children }) {
   ];
 
   return (
-    <div className={`dash-layout${menuOpen ? " menu-open" : ""}`}>
-      {/* Tapping away closes the drawer — the gesture everybody tries first. */}
-      <div className="dash-scrim" onClick={() => setMenuOpen(false)} aria-hidden={!menuOpen} />
+    <NotificationsProvider>
+      <div className={`dash-layout${menuOpen ? " menu-open" : ""}`}>
+        {/* Tapping away closes the drawer — the gesture everybody tries first. */}
+        <div className="dash-scrim" onClick={() => setMenuOpen(false)} aria-hidden={!menuOpen} />
 
-      <aside className="dash-sidebar" id="dash-nav" aria-label="Main navigation">
-        <div className="dash-brand">
-          <Link href="/dashboard" className="brand">
-            <span className="brand__mark" aria-hidden="true">
-              <i className="pi pi-ticket" />
-            </span>
-            <span className="brand__text">
-              <strong>Seat Planner</strong>
-              <small>Railway ticketing</small>
-            </span>
-          </Link>
-          <button
-            type="button"
-            className="dash-close"
-            onClick={() => setMenuOpen(false)}
-            aria-label="Close menu"
-            title="Close menu"
-          >
-            <i className="pi pi-times" aria-hidden="true" />
-          </button>
-        </div>
-
-        <nav className="dash-nav">
-          {groups.map((group) => (
-            <div key={group.key} className="nav-group">
-              <div className="nav-group__label">{group.label}</div>
-              {group.items.map((item) => {
-                const active = isActive(item.href, pathname);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`dash-nav-item${active ? " active" : ""}`}
-                    aria-current={active ? "page" : undefined}
-                  >
-                    <i className={item.icon} aria-hidden="true" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-
-        <div className="dash-me">
-          <span className="avatar" aria-hidden="true">
-            {initials(user.fullName)}
-          </span>
-          <div className="dash-me__who">
-            <strong>{user.fullName}</strong>
-            <span>{primaryRole}</span>
-          </div>
-          <button type="button" className="dash-me__out" onClick={signOut} title="Sign out" aria-label="Sign out">
-            <i className="pi pi-sign-out" aria-hidden="true" />
-          </button>
-        </div>
-      </aside>
-
-      <div className="dash-main">
-        <header className="dash-header">
-          <button
-            type="button"
-            className="dash-burger"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
-            title="Open menu"
-            aria-expanded={menuOpen}
-            aria-controls="dash-nav"
-          >
-            <i className="pi pi-bars" aria-hidden="true" />
-          </button>
-
-          {/* Where you are. The phone shows the brand instead — there is no
-              room for both, and the page title says the rest. */}
-          <div className="dash-crumbs">
-            {here.group && <span className="dash-crumbs__group">{here.group.label}</span>}
-            {here.group && <i className="pi pi-angle-right" aria-hidden="true" />}
-            <span className="dash-crumbs__page">{here.item?.label || "Seat Planner"}</span>
-          </div>
-
-          <Link href="/dashboard" className="brand brand--compact">
-            <span className="brand__mark" aria-hidden="true">
-              <i className="pi pi-ticket" />
-            </span>
-            <strong>Seat Planner</strong>
-          </Link>
-
-          <div className="dash-header__actions">
-            {canBook && !isActive("/dashboard/book", pathname) && (
-              <Link href="/dashboard/book" className="dash-cta" title="Book a ticket">
-                <i className="pi pi-plus" aria-hidden="true" />
-                <span>Book a ticket</span>
-              </Link>
-            )}
-
-            <Menu model={accountItems} popup ref={account} className="acct-menu" popupAlignment="right" />
+        <aside className="dash-sidebar" id="dash-nav" aria-label="Main navigation">
+          <div className="dash-brand">
+            <Link href="/dashboard" className="brand">
+              <span className="brand__mark" aria-hidden="true">
+                <i className="pi pi-ticket" />
+              </span>
+              <span className="brand__text">
+                <strong>Seat Planner</strong>
+                <small>Railway ticketing</small>
+              </span>
+            </Link>
             <button
               type="button"
-              className="dash-account"
-              onClick={(e) => account.current?.toggle(e)}
-              aria-haspopup="true"
-              aria-label="Your account"
-              title="Your account"
+              className="dash-close"
+              onClick={() => setMenuOpen(false)}
+              aria-label="Close menu"
+              title="Close menu"
             >
-              <span className="avatar" aria-hidden="true">
-                {initials(user.fullName)}
-              </span>
-              <span className="dash-account__name">{user.fullName.split(" ")[0]}</span>
-              <i className="pi pi-chevron-down" aria-hidden="true" />
+              <i className="pi pi-times" aria-hidden="true" />
             </button>
           </div>
-        </header>
 
-        <main className="dash-content">{children}</main>
+          <nav className="dash-nav">
+            {groups.map((group) => (
+              <div key={group.key} className="nav-group">
+                <div className="nav-group__label">{group.label}</div>
+                {group.items.map((item) => {
+                  const active = isActive(item.href, pathname);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`dash-nav-item${active ? " active" : ""}`}
+                      aria-current={active ? "page" : undefined}
+                    >
+                      <i className={item.icon} aria-hidden="true" />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+
+          <div className="dash-me">
+            <span className="avatar" aria-hidden="true">
+              {initials(user.fullName)}
+            </span>
+            <div className="dash-me__who">
+              <strong>{user.fullName}</strong>
+              <span>{primaryRole}</span>
+            </div>
+            <button type="button" className="dash-me__out" onClick={signOut} title="Sign out" aria-label="Sign out">
+              <i className="pi pi-sign-out" aria-hidden="true" />
+            </button>
+          </div>
+        </aside>
+
+        <div className="dash-main">
+          <header className="dash-header">
+            <button
+              type="button"
+              className="dash-burger"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Open menu"
+              title="Open menu"
+              aria-expanded={menuOpen}
+              aria-controls="dash-nav"
+            >
+              <i className="pi pi-bars" aria-hidden="true" />
+            </button>
+
+            {/* Where you are. The phone shows the brand instead — there is no
+                room for both, and the page title says the rest. */}
+            <div className="dash-crumbs">
+              {here.group && <span className="dash-crumbs__group">{here.group.label}</span>}
+              {here.group && <i className="pi pi-angle-right" aria-hidden="true" />}
+              <span className="dash-crumbs__page">{here.item?.label || "Seat Planner"}</span>
+            </div>
+
+            <Link href="/dashboard" className="brand brand--compact">
+              <span className="brand__mark" aria-hidden="true">
+                <i className="pi pi-ticket" />
+              </span>
+              <strong>Seat Planner</strong>
+            </Link>
+
+            <div className="dash-header__actions">
+              {canBook && !isActive("/dashboard/book", pathname) && (
+                <Link href="/dashboard/book" className="dash-cta" title="Book a ticket">
+                  <i className="pi pi-plus" aria-hidden="true" />
+                  <span>Book a ticket</span>
+                </Link>
+              )}
+
+              <NotificationBell />
+
+              <Menu model={accountItems} popup ref={account} className="acct-menu" popupAlignment="right" />
+              <button
+                type="button"
+                className="dash-account"
+                onClick={(e) => account.current?.toggle(e)}
+                aria-haspopup="true"
+                aria-label="Your account"
+                title="Your account"
+              >
+                <span className="avatar" aria-hidden="true">
+                  {initials(user.fullName)}
+                </span>
+                <span className="dash-account__name">{user.fullName.split(" ")[0]}</span>
+                <i className="pi pi-chevron-down" aria-hidden="true" />
+              </button>
+            </div>
+          </header>
+
+          <main className="dash-content">{children}</main>
+        </div>
       </div>
-    </div>
+    </NotificationsProvider>
   );
 }
