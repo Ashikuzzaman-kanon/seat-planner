@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { LAYOUTS, RAKES } = require("../../src/data/railway/seatPlans");
+const { LAYOUTS, RAKES, RAKE_SEATS } = require("../../src/data/railway/seatPlans");
 const { buildLayout } = require("../../src/seeders/importSeatPlans");
 const { countSeats } = require("../../src/utils/seatMaterializer");
 const timetable = require("../../src/data/railway/timetable.json");
@@ -37,11 +37,11 @@ test("a plan for an unnamed train is a draft that assumes nothing it was not sho
   assert.equal(plates.coachClass, null);
 });
 
-test("every ready train has at least 500 seats, from its own plans", () => {
+test("every ready train carries 300–400 seats, from its own plans", () => {
   const seen = new Set();
   for (const rake of RAKES) {
     const total = rake.coaches.reduce((n, [, key]) => n + seats.get(key), 0);
-    assert.ok(total >= 500, `${rake.trains.join("/")}: ${total}`);
+    assert.ok(total >= RAKE_SEATS.min && total <= RAKE_SEATS.max, `${rake.trains.join("/")}: ${total}`);
     assert.equal(new Set(rake.coaches.map(([code]) => code)).size, rake.coaches.length, "coach codes repeat");
     for (const n of rake.trains) {
       assert.ok(!seen.has(n), `train ${n} is in two rakes`);
@@ -54,10 +54,17 @@ test("every ready train has at least 500 seats, from its own plans", () => {
   assert.equal(seen.size, 50);
 });
 
-test("the Silk City rake is the station board's: KA–GA cabins, GHA–UMA Snigdha, CHA–DA Shovon Chair", () => {
+test("the Silk City rake keeps the station board's letter for each class", () => {
   const rake = RAKES.find((r) => r.trains.includes(754));
-  assert.deepEqual(rake.coaches.map(([code]) => code), [
-    "KA", "KHA", "GA", "GHA", "UMA", "CHA", "SCHA", "JA", "JHA", "NEO", "TA", "THA", "DA",
-  ]);
-  assert.equal(rake.coaches.reduce((n, [, key]) => n + seats.get(key), 0), 1140);
+  assert.deepEqual(
+    rake.coaches.map(([code, key]) => `${code}:${key}`),
+    [
+      "KA:lhb-board-ac-cabin-48",
+      "KHA:lhb-board-ac-cabin-48",
+      "GHA:lhb-board-snigdha-78",
+      "CHA:lhb-board-shovon-chair-105",
+      "SCHA:lhb-board-shovon-chair-105",
+    ]
+  );
+  assert.equal(rake.coaches.reduce((n, [, key]) => n + seats.get(key), 0), 384);
 });

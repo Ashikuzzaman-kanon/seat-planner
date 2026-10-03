@@ -84,14 +84,14 @@ const tomorrowInDhaka = () => new Date(Date.now() + 6 * 3600_000 + 86_400_000).t
   const ready = new Map(after.ready.map((t) => [t.name, t]));
   const realReady = after.ready.filter((t) => /\(\d+\)$/.test(t.name));
   check("50 real trains are ready", realReady.length === 50, `${realReady.length}`);
-  check("every one with at least 500 seats", realReady.every((t) => t.seats >= 500),
-    realReady.filter((t) => t.seats < 500).map((t) => `${t.name} ${t.seats}`).join(", "));
-  check("Silk City carries the station board's rake: 1,140 seats in 13 coaches",
-    ready.get("SILKCITY EXPRESS (753)")?.seats === 1140 && ready.get("SILKCITY EXPRESS (753)")?.coaches.length === 13,
+  check("every one with 300–400 seats", realReady.every((t) => t.seats >= 300 && t.seats <= 400),
+    realReady.filter((t) => t.seats < 300 || t.seats > 400).map((t) => `${t.name} ${t.seats}`).join(", "));
+  check("Silk City carries 384 seats in 5 coaches",
+    ready.get("SILKCITY EXPRESS (753)")?.seats === 384 && ready.get("SILKCITY EXPRESS (753)")?.coaches.length === 5,
     JSON.stringify(ready.get("SILKCITY EXPRESS (753)")));
-  check("in AC cabin, Snigdha and Shovon Chair",
+  check("still in all three of its classes",
     JSON.stringify(ready.get("SILKCITY EXPRESS (753)")?.seatsByClass) ===
-      JSON.stringify({ "AC Cabin": 144, Snigdha: 156, "Shovon Chair": 840 }),
+      JSON.stringify({ "AC Cabin": 96, Snigdha: 78, "Shovon Chair": 210 }),
     JSON.stringify(ready.get("SILKCITY EXPRESS (753)")?.seatsByClass));
   check("Madhumati's cabin-fitted coach is two sections", ready.get("MADHUMATI EXPRESS (755)")?.coaches.includes("KA-CABIN"));
   check("running days come from the timetable (Madhumati rests on Saturday)",

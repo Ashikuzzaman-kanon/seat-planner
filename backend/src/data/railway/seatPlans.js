@@ -793,12 +793,17 @@ const LAYOUTS = [
   },
 ];
 
+/** Seats a ready train carries: enough to sell, small enough for a free-tier database. */
+const RAKE_SEATS = Object.freeze({ min: 300, max: 400 });
+
 /**
  * Default coach line-ups, front to back, for every train with a plan.
  *
- * The Silk City / Padma / Dhumketu rake is the one the station board shows.
- * The others reuse the train's own plans until the rake reaches 500 seats; a
- * coach is a pointer to a plan, so ten AC Chair coaches share one layout.
+ * A shortened rake of each train's own coaches, every class it has kept, and
+ * 300–400 seats in all: each seat of each departure is a database row, and the
+ * production database is a free tier. A coach is a pointer to a plan, so two
+ * Shovon Chair coaches share one layout. The Silk City / Padma / Dhumketu rake
+ * keeps the coach letters its station board gives each class.
  */
 const RAKES = [
   {
@@ -806,31 +811,32 @@ const RAKES = [
     coaches: [
       ["KA", "lhb-board-ac-cabin-48"],
       ["KHA", "lhb-board-ac-cabin-48"],
-      ["GA", "lhb-board-ac-cabin-48"],
       ["GHA", "lhb-board-snigdha-78"],
-      ["UMA", "lhb-board-snigdha-78"],
-      ...["CHA", "SCHA", "JA", "JHA", "NEO", "TA", "THA", "DA"].map((code) => [code, "lhb-board-shovon-chair-105"]),
+      ["CHA", "lhb-board-shovon-chair-105"],
+      ["SCHA", "lhb-board-shovon-chair-105"],
     ],
   },
   {
     trains: [705, 706, 757, 758],
     coaches: [
       ["KA", "ekota-ac-chair-80"],
-      ["KHA", "ekota-ac-chair-80"],
-      ["GA", "ekota-cabin-48"],
-      ...["GHA", "UMA", "CHA", "SCHA", "JA", "JHA"].map((code) => [code, "ekota-shovon-chair-92"]),
+      ["KHA", "ekota-cabin-48"],
+      ["GA", "ekota-shovon-chair-92"],
+      ["GHA", "ekota-shovon-chair-92"],
     ],
   },
   {
     trains: [725, 726, 763, 764, 795, 796],
     coaches: [
-      ...["KA", "KHA", "GA"].map((code) => [code, "sundarban-snigdha-80"]),
-      ...["GHA", "UMA", "CHA", "SCHA", "JA", "JHA"].map((code) => [code, "sundarban-shovon-chair-92"]),
+      ["KA", "sundarban-snigdha-80"],
+      ["KHA", "sundarban-snigdha-80"],
+      ["GA", "sundarban-shovon-chair-92"],
+      ["GHA", "sundarban-shovon-chair-92"],
     ],
   },
   {
     trains: [727, 728, 747, 748, 715, 716, 761, 762],
-    coaches: ["KA", "KHA", "GA", "GHA", "UMA", "CHA"].map((code) => [code, "rupsha-shovon-chair-92"]),
+    coaches: ["KA", "KHA", "GA", "GHA"].map((code) => [code, "rupsha-shovon-chair-92"]),
   },
   {
     // The cabin-fitted coach is two plans — its chair and cabin sections — so
@@ -839,24 +845,24 @@ const RAKES = [
     coaches: [
       ["KA", "madhumati-chair-41"],
       ["KA-CABIN", "madhumati-cabin-24"],
-      ...["KHA", "GA", "GHA", "UMA", "CHA"].map((code) => [code, "vacuum-shovon-104"]),
+      ...["KHA", "GA", "GHA"].map((code) => [code, "vacuum-shovon-104"]),
     ],
   },
   {
     trains: [733, 734],
     coaches: [
       ["KA", "titumir-cabin-24"],
-      ...["KHA", "GA", "GHA", "UMA", "CHA"].map((code) => [code, "vacuum-shovon-104"]),
+      ...["KHA", "GA", "GHA"].map((code) => [code, "vacuum-shovon-104"]),
     ],
   },
   {
     trains: [783, 784, 731, 732, 779, 780, 775, 776, 57, 58, 77, 78],
-    coaches: ["KA", "KHA", "GA", "GHA", "UMA"].map((code) => [code, "vacuum-shovon-104"]),
+    coaches: ["KA", "KHA", "GA"].map((code) => [code, "vacuum-shovon-104"]),
   },
   {
     trains: [709, 710, 701, 702, 787, 788, 704, 703, 741, 742],
-    coaches: ["KA", "KHA", "GA", "GHA", "UMA", "CHA", "SCHA", "JA", "JHA", "NEO"].map((code) => [code, "mg-ac-chair-55"]),
+    coaches: ["KA", "KHA", "GA", "GHA", "UMA", "CHA", "SCHA"].map((code) => [code, "mg-ac-chair-55"]),
   },
 ];
 
-module.exports = { LAYOUTS, RAKES };
+module.exports = { LAYOUTS, RAKES, RAKE_SEATS };

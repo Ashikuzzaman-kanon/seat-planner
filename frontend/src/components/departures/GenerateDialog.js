@@ -9,8 +9,10 @@ import { Button } from "primereact/button";
 import { Message } from "primereact/message";
 import { generateHorizon } from "@/lib/departures";
 
-/** Bytes one sold-able seat takes on one departure, with its indexes — measured. */
+/** Bytes one seat takes on one departure, with its indexes — measured. */
 const BYTES_PER_SEAT = 210;
+/** A real train's line-up carries 300–400 seats. */
+const SEATS_PER_DEPARTURE = 350;
 
 /**
  * Generate departures for chosen trains, a chosen number of days ahead.
@@ -135,8 +137,8 @@ export default function GenerateDialog({ visible, onHide, trains, defaultDays = 
             <Message
               severity="info"
               style={{ width: "100%", marginTop: "1rem", justifyContent: "flex-start" }}
-              text={`Up to ${(chosen.length * days).toLocaleString()} departures. At about 600 seats each that is roughly ${Math.ceil(
-                (chosen.length * days * 600 * BYTES_PER_SEAT) / 1_000_000
+              text={`Up to ${(chosen.length * days).toLocaleString()} departures. At about ${SEATS_PER_DEPARTURE} seats each that is roughly ${Math.ceil(
+                (chosen.length * days * SEATS_PER_DEPARTURE * BYTES_PER_SEAT) / 1_000_000
               )} MB of the database.`}
             />
           )}
