@@ -1,7 +1,18 @@
+import os from "node:os";
+
 /** @type {import('next').NextConfig} */
 const backendOrigin = process.env.BACKEND_ORIGIN || "http://localhost:4000";
 
+// This computer's own network addresses. A phone testing the Android app
+// against `next dev` opens the site by one of them (see /dev/phone), and Next
+// only lets pages from origins it was told about use its dev-server endpoints.
+const ownAddresses = Object.values(os.networkInterfaces())
+  .flat()
+  .filter((a) => a && (a.family === "IPv4" || a.family === 4) && !a.internal)
+  .map((a) => a.address);
+
 const nextConfig = {
+  allowedDevOrigins: ownAddresses,
   // The API's own health URL, built into the page so the browser can wake a
   // sleeping API directly — see "Waking a sleeping server" in src/lib/api.js.
   env: {

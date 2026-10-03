@@ -11,6 +11,8 @@ import { NotificationsProvider } from "@/contexts/NotificationsContext";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import { PERMISSIONS } from "@/constants/permissions";
 import { roleLabel } from "@/constants/roles";
+import { isLocalHost } from "@/lib/localNetwork";
+import { inAndroidApp } from "@/lib/androidApp";
 import { visibleGroups, isActive, locate } from "./nav";
 import "./dashboard.css";
 
@@ -72,6 +74,16 @@ export default function DashboardShell({ children }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [menuOpen]);
+
+  // "Open on phone" is a developer's tool: only under `next dev`, on this
+  // computer, and not inside the Android app it is for. Worked out after the
+  // first render, since the server cannot know the browser's address.
+  const [onDevComputer, setOnDevComputer] = useState(false);
+  useEffect(() => {
+    setOnDevComputer(
+      process.env.NODE_ENV === "development" && isLocalHost(window.location.hostname) && !inAndroidApp()
+    );
+  }, []);
 
   if (!loading && !user && unreachable) {
     const retry = async () => {
@@ -135,6 +147,9 @@ export default function DashboardShell({ children }) {
     { label: "Notifications", icon: "pi pi-bell", command: () => router.push("/dashboard/notifications") },
     ...(canBook
       ? [{ label: "Wallet", icon: "pi pi-wallet", command: () => router.push("/dashboard/wallet") }]
+      : []),
+    ...(onDevComputer
+      ? [{ label: "Open on phone", icon: "pi pi-mobile", command: () => router.push("/dev/phone") }]
       : []),
     { separator: true },
     { label: "Sign out", icon: "pi pi-sign-out", className: "acct-signout", command: signOut },
