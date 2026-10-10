@@ -40,11 +40,12 @@ defined as data.
   the camera for checking tickets and the tickets PDF in the phone's viewer. It
   loads every page from the live site, so a web deploy needs no app update. See
   *The Android app*.
-- **Subscriptions**: ask for a subscription and a reviewer approves it for a
-  period they choose, or declines it. It runs through the end of its last day
-  and then ends by itself; the subscriber can cancel it at any time, and so can
-  a reviewer. A caller outside the app can ask whether an account holds one —
-  see *Subscriptions and the check API*.
+- **Subscriptions**: ask for a subscription, saying on how many devices, and a
+  reviewer approves it for a period and a number of devices they choose, or
+  declines it. It runs through the end of its last day and then ends by itself;
+  the subscriber can cancel it at any time, and so can a reviewer. A caller
+  outside the app can ask whether an account holds one on the device it is
+  running on — see *Subscriptions and the check API*.
 
 **For staff on the train**
 - *Check Tickets*: scan a QR with the phone camera or type the number; eight
@@ -294,8 +295,8 @@ super admin holds every permission):
 
 | Permission | Allows |
 |---|---|
-| `subscription:manage` | Create a subscription, rename it, close it to new requests, reopen it, delete one nobody has asked for |
-| `subscription:approve` | See the requests, approve one for a period or decline it, change a running subscription's last day, cancel anyone's |
+| `subscription:manage` | Create a subscription, rename it, close it to new requests, reopen it, delete one nobody has asked for. Create the platforms subscriptions are used on, rename them, switch them off |
+| `subscription:approve` | See the requests, approve one for a period and a number of devices, or decline it. Change a running subscription's last day or device counts, cancel anyone's. See an account's devices and why any were turned away; note, block or remove a device |
 
 Everyone signed in sees the *Subscriptions* page and can ask for one. A
 subscription is valid from approval **through the end of its last day in
@@ -306,13 +307,34 @@ who decided what stays on record.
 Each subscription has a **code** — made from its name when it is created, or
 chosen then — which never changes, even if the subscription is renamed.
 
-**Checking from outside the app.** One endpoint takes an email and password and
-says, for every subscription there is, whether that account's is valid now:
+**Devices.** A subscription allows so many devices of each **platform**.
+Platforms are data — `windows` and `android` to begin with, more from the
+*Platforms* tab — and each is a count of its own, 0 to 10. Whoever asks says how
+many of each they want; the reviewer can change those numbers when approving,
+and later while the subscription runs.
+
+Nobody registers a device. The first time one checks in (below) and a place is
+free, it takes one and keeps it; places are held in the order devices arrived,
+per account and platform. So a subscription allowing two Windows devices is
+valid on the account's first two. Lowering a count removes no device — the
+later ones simply stop being valid — and a platform created later starts at 0
+on subscriptions already running, until a reviewer raises it.
+
+A reviewer opens an account's devices from the *Subscribers* tab: what has
+signed in, with a note of their own on each; **block** (never valid, and its
+place passes to the next device) or **remove** (its place is free — and the
+same device may take one again, so block to keep one out); and every check
+that was turned away, with the reason. Subscribers see their own devices and
+how many places are used, to look at only.
+
+**Checking from outside the app.** One endpoint takes an email and password,
+and the device the call is made from, and says for every subscription there is
+whether that account's is valid on that device now:
 
 ```bash
 curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
   -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"..."}'
+  -d '{"email":"user@example.com","password":"...","deviceId":"458c70e0bd45dc3676dc6d83c5ccec4e","platform":"windows"}'
 ```
 
 ```json
@@ -326,6 +348,16 @@ curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
 ```
 
 - It opens no session and returns no tokens or dates.
+- `deviceId` is the caller's own stable id for the installation — 4 to 128
+  letters, digits and `. _ : -` — and `platform` is a platform's value. Send
+  the same id every time: a new id is a new device.
+- **A device that is not let in is told only `valid: false`.** The limit
+  reached, the device blocked, an unknown or switched-off platform, a missing
+  or malformed `deviceId` — each is the same `200` in the same shape, with no
+  reason. The reason is kept for staff: on the account's devices (*Subscribers
+  → Devices → Turned away*), one row per device and reason with a count, the
+  newest hundred per account for ninety days — and in the audit log as
+  `subscription.device_refuse`, when the audit log is configured.
 - **It answers from any origin** — a page on any other site may call it. The
   rest of the API stays limited to `CORS_ORIGINS`. That is safe here because
   nothing of the browser's own goes with the call: the caller sends the email

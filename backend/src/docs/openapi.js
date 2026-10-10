@@ -559,6 +559,68 @@ module.exports = {
         lastDay: { ...str("The last calendar day it is valid, in Dhaka (YYYY-MM-DD)"), nullable: true },
         endedAt: { type: "string", format: "date-time", nullable: true },
         endReason: { ...str(), nullable: true },
+        devices: arr(
+          obj({
+            platformId: int(),
+            value: str("What a caller sends as `platform`"),
+            name: str(),
+            isActive: bool(),
+            limit: int("How many devices of this platform it allows; 0 for none"),
+          })
+        ),
+      }),
+
+      DeviceCounts: {
+        type: "object",
+        description:
+          "How many devices of each platform, keyed by the platform's value. 0 to 10 each, at least one in " +
+          "total; a platform left out is 0.",
+        additionalProperties: { type: "integer", minimum: 0, maximum: 10 },
+        example: { windows: 2, android: 1 },
+      },
+
+      SubscriptionPlatform: obj({
+        id: int(),
+        value: str("What a caller sends as `platform`. Set when it is created and never changed"),
+        name: str("What it is called on screen"),
+        isActive: bool("Switched off, nobody can ask for devices on it and no check from it is valid"),
+      }),
+
+      UserDevice: obj({
+        id: int(),
+        userId: int(),
+        platformId: int(),
+        platform: obj({ id: int(), value: str(), name: str() }),
+        deviceId: str("As the device sent it"),
+        note: { ...str("Staff's own words about it. Only staff are sent it"), nullable: true },
+        isBlocked: bool("Blocked, it is never valid and holds no place"),
+        firstSeenAt: { type: "string", format: "date-time" },
+        lastSeenAt: { type: "string", format: "date-time" },
+        checks: int("How many times it has checked in"),
+      }),
+
+      DeviceUsage: obj({
+        platformId: int(),
+        value: str(),
+        name: str(),
+        isActive: bool(),
+        used: int("Devices holding a place"),
+        allowed: int("The most any running subscription allows — what a new device is measured against"),
+      }),
+
+      DeviceRefusal: obj({
+        id: int(),
+        userId: int(),
+        platform: { ...str("As sent, cut to fit"), nullable: true },
+        deviceId: { ...str("As sent, cut to fit"), nullable: true },
+        reason: {
+          type: "string",
+          enum: ["no_device", "bad_device", "unknown_platform", "platform_off", "blocked", "limit_reached", "beyond_limit"],
+          description: "Why the check was answered `valid: false`. Never returned to the caller of the check",
+        },
+        attempts: int("How many times this device was turned away for this reason"),
+        firstAt: { type: "string", format: "date-time" },
+        lastAt: { type: "string", format: "date-time" },
       }),
 
       NotificationSummary: obj({
@@ -2619,14 +2681,32 @@ module.exports = {
     "/subscriptions/check": {
       post: {
         tags: ["Subscriptions"],
-        summary: "Which subscriptions an email and password hold — for callers outside the app",
+        summary: "Which subscriptions an email and password hold on this device — for callers outside the app",
         description:
           "Needs no session and opens none, and answers from any origin. The password is checked exactly as " +
           "sign-in checks it, and shares its pause: after too many wrong passwords in a row the account answers " +
           "429 here and at sign-in until the pause is over. A wrong password and an unknown email are the same " +
           "401. `subscriptions` lists every subscription there is, each with whether this account's is valid " +
-          "now; no dates.",
-        requestBody: body(obj({ email: str(), password: str() }, ["email", "password"])),
+          "now on the device the call came from; no dates.\n\n" +
+          "A subscription allows so many devices of each platform. The first time a device checks in and a " +
+          "place is free it takes one, and keeps it; places are held in the order devices arrived. A device " +
+          "with no place — the limit is reached, it is blocked, the platform is unknown or switched off, or " +
+          "`deviceId` or `platform` is missing or malformed — is answered `valid: false` and nothing else: " +
+          "still a 200, in the same shape, with no reason. Staff can read the reason on the account's devices.",
+        requestBody: body(
+          obj(
+            {
+              email: str(),
+              password: str(),
+              deviceId: str(
+                "The caller's own stable id for this installation: 4 to 128 letters, digits and . _ : -. Send the " +
+                  "same one every time; a new id is a new device"
+              ),
+              platform: str("A platform's value, such as windows or android"),
+            },
+            ["email", "password"]
+          )
+        ),
         responses: {
           200: response(
             "The account, and yes or no for each subscription",
@@ -2731,11 +2811,19 @@ module.exports = {
     "/subscriptions/{id}/requests": {
       post: {
         tags: ["Subscriptions"],
-        summary: "Ask to be subscribed",
-        description: "Refused while you already have a request waiting or a subscription running for it.",
+        summary: "Ask to be subscribed, saying on how many devices",
+        description:
+          "Refused while you already have a request waiting or a subscription running for it. Without " +
+          "`devices` it asks for one of each platform.",
         security: [{ bearerAuth: [] }],
         parameters: [pathParam("id", "Subscription id")],
-        responses: { 201: response("Waiting for a reviewer", obj({ subscription: ref("UserSubscription") })), 404: errors[404], 409: errors[409] },
+        requestBody: body(obj({ devices: ref("DeviceCounts") }), false),
+        responses: {
+          201: response("Waiting for a reviewer", obj({ subscription: ref("UserSubscription") })),
+          400: errors[400],
+          404: errors[404],
+          409: errors[409],
+        },
       },
     },
 
@@ -2783,6 +2871,7 @@ module.exports = {
           obj({
             days: int("Days from today in Dhaka"),
             lastDay: str("Or the last day it is valid, YYYY-MM-DD. It runs through the end of that day in Dhaka"),
+            devices: { ...ref("DeviceCounts"), description: "Replaces the counts that were asked for. Left out, it is approved as asked" },
             note: str(),
           })
         ),
@@ -2816,16 +2905,148 @@ module.exports = {
     "/subscriptions/members/{id}": {
       patch: {
         tags: ["Subscriptions"],
-        summary: "Change when a running subscription ends",
+        summary: "Change when a running subscription ends, how many devices it allows, or both",
+        description:
+          "Lowering a count takes no device off the account: the ones that arrived first keep their places, " +
+          "and the later ones are no longer valid for this subscription.",
         ...secured("subscription:approve"),
         parameters: [pathParam("id", "Request id")],
         requestBody: body(
           obj({
             days: int("Days from today in Dhaka"),
             lastDay: str("Or the last day it is valid, YYYY-MM-DD"),
+            devices: ref("DeviceCounts"),
           })
         ),
         responses: { 200: response("Changed", obj({ subscription: ref("UserSubscription") })), 400: errors[400], 404: errors[404], 409: errors[409] },
+      },
+    },
+
+    "/subscriptions/platforms": {
+      get: {
+        tags: ["Subscriptions"],
+        summary: "The platforms a subscription can be used on",
+        description: "Everyone signed in sees the ones switched on. Whoever manages or approves sees all of them.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: response(
+            "The platforms, oldest first",
+            obj({ platforms: arr(ref("SubscriptionPlatform")), maxDevices: int("The most of one platform that can be asked for") })
+          ),
+          401: errors[401],
+        },
+      },
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Create a platform",
+        description:
+          "Subscriptions already running allow no devices on a new platform until a reviewer raises their count.",
+        ...secured("subscription:manage"),
+        requestBody: body(
+          obj(
+            {
+              value: str("Lowercase letters and digits, with single - _ or . between them, up to 40 characters"),
+              name: str(),
+            },
+            ["value", "name"]
+          )
+        ),
+        responses: {
+          201: response("Created", obj({ platform: ref("SubscriptionPlatform") })),
+          400: errors[400],
+          403: errors[403],
+          409: errors[409],
+        },
+      },
+    },
+
+    "/subscriptions/platforms/{id}": {
+      patch: {
+        tags: ["Subscriptions"],
+        summary: "Rename a platform, or switch it on or off",
+        description: "The value never changes.",
+        ...secured("subscription:manage"),
+        parameters: [pathParam("id", "Platform id")],
+        requestBody: body(obj({ name: str(), isActive: bool() })),
+        responses: {
+          200: response("Updated", obj({ platform: ref("SubscriptionPlatform") })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+      delete: {
+        tags: ["Subscriptions"],
+        summary: "Delete a platform nothing uses",
+        description: "Refused while any device is on it or any subscription allows devices on it — switch it off instead.",
+        ...secured("subscription:manage"),
+        parameters: [pathParam("id", "Platform id")],
+        responses: { 200: response("Deleted", obj({ deleted: bool() })), 403: errors[403], 404: errors[404], 409: errors[409] },
+      },
+    },
+
+    "/subscriptions/devices/mine": {
+      get: {
+        tags: ["Subscriptions"],
+        summary: "Your devices, and how many places are used",
+        description: "To look at, not to change. Without staff's notes, and without the checks that were turned away.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: response("Your devices", obj({ devices: arr(ref("UserDevice")), usage: arr(ref("DeviceUsage")) })),
+          401: errors[401],
+        },
+      },
+    },
+
+    "/subscriptions/users/{userId}/devices": {
+      get: {
+        tags: ["Subscriptions"],
+        summary: "An account's devices, and the checks that were turned away",
+        description: "`refusals` holds the newest 100, each with why — which the caller of the check was never told.",
+        ...secured("subscription:approve"),
+        parameters: [pathParam("userId", "Account id")],
+        responses: {
+          200: response(
+            "The account and its devices",
+            obj({
+              user: obj({ id: int(), fullName: str(), email: str() }),
+              devices: arr(ref("UserDevice")),
+              usage: arr(ref("DeviceUsage")),
+              refusals: arr(ref("DeviceRefusal")),
+            })
+          ),
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+    },
+
+    "/subscriptions/devices/{id}": {
+      patch: {
+        tags: ["Subscriptions"],
+        summary: "Note what a device is, or block or unblock it",
+        description:
+          "A blocked device is never valid and holds no place, so the next one moves up. Unblocked, it has its " +
+          "place in the order back.",
+        ...secured("subscription:approve"),
+        parameters: [pathParam("id", "Device id")],
+        requestBody: body(obj({ note: str("Up to 200 characters; empty clears it"), isBlocked: bool() })),
+        responses: {
+          200: response("Updated", obj({ device: ref("UserDevice") })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+      delete: {
+        tags: ["Subscriptions"],
+        summary: "Remove a device from an account",
+        description:
+          "Its place is free at once — and the same device may take one again the next time it checks in, if " +
+          "there is room. To keep a device out, block it.",
+        ...secured("subscription:approve"),
+        parameters: [pathParam("id", "Device id")],
+        responses: { 200: response("Removed", obj({ deleted: bool() })), 403: errors[403], 404: errors[404] },
       },
     },
 

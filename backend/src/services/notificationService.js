@@ -414,9 +414,11 @@ async function approvalDecided({ userId, request, approved, note: decisionNote, 
  *
  * The one moment in a subscription's life that gets an email as well as a
  * notification: the person asked, and is waiting on somebody else's answer.
- * `until` is the last day it is valid, already written out ("9 Nov 2026").
+ * `until` is the last day it is valid, already written out ("9 Nov 2026"), and
+ * `devices` what it may be used on ("2 Windows, 1 Android") — which may not be
+ * what was asked for, so it is said.
  */
-async function subscriptionDecided({ userId, subscription, membershipId, approved, until, note: decisionNote, decidedBy }) {
+async function subscriptionDecided({ userId, subscription, membershipId, approved, until, devices, note: decisionNote, decidedBy }) {
   const title = approved
     ? `You are subscribed to ${subscription.name} until ${until}`
     : `Your request for ${subscription.name} was not approved`;
@@ -429,7 +431,9 @@ async function subscriptionDecided({ userId, subscription, membershipId, approve
       category: CATEGORY.SUBSCRIPTION,
       tone: approved ? "success" : "warning",
       title,
-      body: [decisionNote && `“${decisionNote}”`, decidedBy && `Decided by ${decidedBy}`].filter(Boolean).join(" · "),
+      body: [approved && devices && `On ${devices}`, decisionNote && `“${decisionNote}”`, decidedBy && `Decided by ${decidedBy}`]
+        .filter(Boolean)
+        .join(" · "),
       link: "/dashboard/subscriptions",
       key: `subscription:${membershipId}:decided`,
     },
@@ -444,6 +448,7 @@ async function subscriptionDecided({ userId, subscription, membershipId, approve
           ["Subscription", subscription.name],
           ["Decision", approved ? "Approved" : "Not approved"],
           ["Valid through", approved ? until : null],
+          ["Devices", approved ? devices || null : null],
           ["Decided by", decidedBy || null],
         ]) +
         (decisionNote ? ui.callout(decisionNote, { tone: approved ? "success" : "warning", title: "Note from the reviewer" }) : "") +
