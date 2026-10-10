@@ -10,18 +10,23 @@ import SubscriptionList from "@/components/subscriptions/SubscriptionList";
 import SubscriptionEditor from "@/components/subscriptions/SubscriptionEditor";
 import RequestsQueue from "@/components/subscriptions/RequestsQueue";
 import Subscribers from "@/components/subscriptions/Subscribers";
-import { fetchMySubscriptions, fetchPendingCount, fetchSubscriptions } from "@/lib/subscriptions";
+import Platforms from "@/components/subscriptions/Platforms";
+import {
+  fetchMyDevices,
+  fetchMySubscriptions,
+  fetchPendingCount,
+  fetchPlatforms,
+  fetchSubscriptions,
+} from "@/lib/subscriptions";
 import "@/components/subscriptions/subscriptions.css";
-
-const TABS = ["subscriptions", "requests", "subscribers"];
 
 /**
  * Subscriptions.
  *
  * Everyone signed in sees what there is and where they stand with each. The
- * two reviewer tabs — who is waiting, and who is subscribed — appear only for
- * someone who can act on them; without that permission there are no tabs at
- * all, just the list.
+ * two reviewer tabs — who is waiting, and who is subscribed — and the
+ * manager's tab for platforms appear only for someone who can act on them;
+ * with neither permission there are no tabs at all, just the list.
  *
  * `?tab=requests` opens on the queue, which is where the "someone asked"
  * notification points.
@@ -38,6 +43,8 @@ export default function SubscriptionsPage() {
   const [subscriptions, setSubscriptions] = useState([]);
   const [history, setHistory] = useState([]);
   const [pending, setPending] = useState(0);
+  const [offered, setOffered] = useState({ platforms: [], maxDevices: 10 });
+  const [myDevices, setMyDevices] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
 
@@ -49,14 +56,18 @@ export default function SubscriptionsPage() {
 
   const load = useCallback(async () => {
     try {
-      const [list, mine, waiting] = await Promise.all([
+      const [list, mine, waiting, platforms, devices] = await Promise.all([
         fetchSubscriptions(),
         fetchMySubscriptions(),
         canReview ? fetchPendingCount() : 0,
+        fetchPlatforms(),
+        fetchMyDevices(),
       ]);
       setSubscriptions(list);
       setHistory(mine);
       setPending(waiting);
+      setOffered(platforms);
+      setMyDevices(devices);
     } catch (err) {
       notify("error", "Could not load subscriptions", err.message);
     } finally {
@@ -72,8 +83,17 @@ export default function SubscriptionsPage() {
   // queue must not strand someone who cannot see it on an empty page.
   useEffect(() => {
     const wanted = new URLSearchParams(window.location.search).get("tab");
-    if (canReview && TABS.includes(wanted)) setTab(wanted);
-  }, [canReview]);
+    if ((canReview && ["requests", "subscribers"].includes(wanted)) || (canManage && wanted === "platforms")) setTab(wanted);
+  }, [canReview, canManage]);
+
+  // Staff are sent the switched-off platforms too; only the others can be asked for.
+  const askable = offered.platforms.filter((p) => p.isActive);
+  const tabs = [
+    { key: "subscriptions", label: "Subscriptions", icon: "pi pi-id-card" },
+    canReview && { key: "requests", label: "Requests", icon: "pi pi-inbox", count: pending },
+    canReview && { key: "subscribers", label: "Subscribers", icon: "pi pi-users" },
+    canManage && { key: "platforms", label: "Platforms", icon: "pi pi-desktop" },
+  ].filter(Boolean);
 
   const show = (next) => {
     setTab(next);
@@ -99,13 +119,9 @@ export default function SubscriptionsPage() {
         {canManage && <Button label="New subscription" icon="pi pi-plus" onClick={() => setEditing({})} />}
       </div>
 
-      {canReview && (
+      {staff && (
         <div className="sub-tabs" role="tablist" aria-label="Subscriptions">
-          {[
-            { key: "subscriptions", label: "Subscriptions", icon: "pi pi-id-card" },
-            { key: "requests", label: "Requests", icon: "pi pi-inbox", count: pending },
-            { key: "subscribers", label: "Subscribers", icon: "pi pi-users" },
-          ].map((t) => (
+          {tabs.map((t) => (
             <button
               key={t.key}
               type="button"
@@ -131,13 +147,24 @@ export default function SubscriptionsPage() {
           <ProgressSpinner style={{ width: 36, height: 36 }} />
         </div>
       ) : tab === "requests" && canReview ? (
-        <RequestsQueue onDecided={load} notify={notify} />
+        <RequestsQueue platforms={askable} maxDevices={offered.maxDevices} onDecided={load} notify={notify} />
       ) : tab === "subscribers" && canReview ? (
-        <Subscribers subscriptions={subscriptions} onChanged={load} notify={notify} />
+        <Subscribers
+          subscriptions={subscriptions}
+          platforms={askable}
+          maxDevices={offered.maxDevices}
+          onChanged={load}
+          notify={notify}
+        />
+      ) : tab === "platforms" && canManage ? (
+        <Platforms platforms={offered.platforms} onChanged={load} notify={notify} />
       ) : (
         <SubscriptionList
           subscriptions={subscriptions}
           history={history}
+          platforms={askable}
+          maxDevices={offered.maxDevices}
+          myDevices={myDevices}
           canManage={canManage}
           staff={staff}
           onEdit={setEditing}

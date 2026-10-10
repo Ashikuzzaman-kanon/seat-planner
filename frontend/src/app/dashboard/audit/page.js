@@ -41,6 +41,14 @@ const ACTION_SEVERITY = {
   "subscription.cancel": "warning",
   "subscription.extend": "info",
   "subscription.expire": "secondary",
+  "subscription.limits": "info",
+  "subscription.platform_create": "success",
+  "subscription.platform_update": "info",
+  "subscription.platform_delete": "danger",
+  "subscription.device_add": "success",
+  "subscription.device_refuse": "warning",
+  "subscription.device_update": "info",
+  "subscription.device_delete": "danger",
 };
 
 export default function AuditPage() {
