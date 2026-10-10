@@ -10,9 +10,17 @@ import SearchBox from "@/components/ui/SearchBox";
 import Select from "@/components/ui/Select";
 import { tip } from "@/components/ui/tip";
 import Chips from "./Chips";
+import DevicesDialog from "./DevicesDialog";
 import PeriodPicker, { isChosen, lastDayOf } from "./PeriodPicker";
 import ReasonDialog from "./ReasonDialog";
-import { cancelSubscription, extendSubscription, fetchMembers, longDate, statusMeta } from "@/lib/subscriptions";
+import {
+  amendSubscription,
+  cancelSubscription,
+  describeDevices,
+  fetchMembers,
+  longDate,
+  statusMeta,
+} from "@/lib/subscriptions";
 
 const STATUSES = [
   { label: "Running", value: "active" },
@@ -28,9 +36,11 @@ const PAGE_SIZE = 25;
  * Who is subscribed to what, and who was.
  *
  * "Running" is the default because it is the list a reviewer acts on: each
- * row can be cancelled, or have its last day moved.
+ * row can be cancelled, or have its last day moved. Every row opens that
+ * person's devices — what the subscription allows, what has signed in, and
+ * what was turned away.
  */
-export default function Subscribers({ subscriptions, onChanged, notify }) {
+export default function Subscribers({ subscriptions, platforms, maxDevices, onChanged, notify }) {
   const [status, setStatus] = useState("active");
   const [subscriptionId, setSubscriptionId] = useState(null);
   const [typed, setTyped] = useState("");
@@ -40,6 +50,7 @@ export default function Subscribers({ subscriptions, onChanged, notify }) {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(null); // { kind, member }
   const [period, setPeriod] = useState(null);
+  const [showing, setShowing] = useState(null); // the row whose devices are open
 
   // Search as the typing settles, not on every key.
   useEffect(() => {
@@ -77,7 +88,7 @@ export default function Subscribers({ subscriptions, onChanged, notify }) {
         await cancelSubscription(member.id, { reason });
         notify("info", "Cancelled", `${member.user.fullName} — ${member.subscription.name}`);
       } else {
-        const done = await extendSubscription(member.id, period);
+        const done = await amendSubscription(member.id, period);
         notify("success", "Last day changed", `${member.user.fullName} — now until ${longDate(done.lastDay)}`);
       }
       setActing(null);
@@ -136,6 +147,7 @@ export default function Subscribers({ subscriptions, onChanged, notify }) {
             )}
           />
           <Column header="Subscription" body={(m) => m.subscription.name} />
+          <Column header="Devices" body={(m) => <span className="sub-table__devices">{describeDevices(m.devices)}</span>} />
           <Column
             header="Status"
             body={(m) => {
@@ -182,32 +194,42 @@ export default function Subscribers({ subscriptions, onChanged, notify }) {
           <Column
             header=""
             className="sub-table__actions"
-            body={(m) =>
-              m.valid ? (
-                <>
-                  <Button
-                    icon="pi pi-calendar-plus"
-                    size="small"
-                    text
-                    rounded
-                    onClick={() => {
-                      setPeriod({ lastDay: m.lastDay });
-                      setActing({ kind: "extend", member: m });
-                    }}
-                    {...tip("Change the last day")}
-                  />
-                  <Button
-                    icon="pi pi-times"
-                    size="small"
-                    text
-                    rounded
-                    severity="danger"
-                    onClick={() => setActing({ kind: "cancel", member: m })}
-                    {...tip("Cancel this subscription")}
-                  />
-                </>
-              ) : null
-            }
+            body={(m) => (
+              <>
+                <Button
+                  icon="pi pi-desktop"
+                  size="small"
+                  text
+                  rounded
+                  onClick={() => setShowing(m)}
+                  {...tip("Devices")}
+                />
+                {m.valid && (
+                  <>
+                    <Button
+                      icon="pi pi-calendar-plus"
+                      size="small"
+                      text
+                      rounded
+                      onClick={() => {
+                        setPeriod({ lastDay: m.lastDay });
+                        setActing({ kind: "extend", member: m });
+                      }}
+                      {...tip("Change the last day")}
+                    />
+                    <Button
+                      icon="pi pi-times"
+                      size="small"
+                      text
+                      rounded
+                      severity="danger"
+                      onClick={() => setActing({ kind: "cancel", member: m })}
+                      {...tip("Cancel this subscription")}
+                    />
+                  </>
+                )}
+              </>
+            )}
           />
         </DataTable>
 
@@ -220,6 +242,15 @@ export default function Subscribers({ subscriptions, onChanged, notify }) {
           />
         )}
       </div>
+
+      <DevicesDialog
+        member={showing}
+        platforms={platforms}
+        maxDevices={maxDevices}
+        onHide={() => setShowing(null)}
+        onChanged={() => Promise.all([load(), onChanged?.()])}
+        notify={notify}
+      />
 
       <ReasonDialog
         visible={acting?.kind === "cancel"}

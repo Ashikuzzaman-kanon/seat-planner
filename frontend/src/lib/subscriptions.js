@@ -2,7 +2,8 @@ import api from "@/lib/api";
 
 /**
  * Subscriptions: what can be subscribed to, your own standing with each, and —
- * for whoever reviews them — everyone's requests and subscriptions.
+ * for whoever reviews them — everyone's requests and subscriptions, and the
+ * devices each is used on.
  */
 
 export async function fetchSubscriptions() {
@@ -29,9 +30,9 @@ export async function deleteSubscription(id) {
   await api.delete(`/subscriptions/${id}`);
 }
 
-/** Ask to be subscribed. */
-export async function requestSubscription(id) {
-  const { data } = await api.post(`/subscriptions/${id}/requests`);
+/** Ask to be subscribed, on so many devices of each platform: `{ windows: 2, android: 1 }`. */
+export async function requestSubscription(id, devices) {
+  const { data } = await api.post(`/subscriptions/${id}/requests`, { devices });
   return data.subscription;
 }
 
@@ -49,9 +50,16 @@ export async function fetchPendingCount() {
   return data.pending;
 }
 
-/** `period` is `{ days }` or `{ lastDay }` — see PeriodPicker. */
-export async function approveRequest(id, { period, note }) {
-  const { data } = await api.post(`/subscriptions/members/${id}/approve`, { ...period, note: note || undefined });
+/**
+ * `period` is `{ days }` or `{ lastDay }` — see PeriodPicker. `devices` only
+ * when the reviewer changed the counts; left out, it is approved as asked.
+ */
+export async function approveRequest(id, { period, note, devices }) {
+  const { data } = await api.post(`/subscriptions/members/${id}/approve`, {
+    ...period,
+    note: note || undefined,
+    devices: devices || undefined,
+  });
   return data.subscription;
 }
 
@@ -66,9 +74,54 @@ export async function cancelSubscription(id, { reason } = {}) {
   return data.subscription;
 }
 
-export async function extendSubscription(id, period) {
-  const { data } = await api.patch(`/subscriptions/members/${id}`, period);
+/** Change a running subscription: `{ days }` or `{ lastDay }`, `{ devices }`, or both. */
+export async function amendSubscription(id, changes) {
+  const { data } = await api.patch(`/subscriptions/members/${id}`, changes);
   return data.subscription;
+}
+
+/* ---------------- Platforms and devices ---------------- */
+
+/** `{ platforms, maxDevices }`. Staff are sent the switched-off platforms too. */
+export async function fetchPlatforms() {
+  const { data } = await api.get("/subscriptions/platforms");
+  return data;
+}
+
+export async function createPlatform({ value, name }) {
+  const { data } = await api.post("/subscriptions/platforms", { value, name });
+  return data.platform;
+}
+
+export async function updatePlatform(id, changes) {
+  const { data } = await api.patch(`/subscriptions/platforms/${id}`, changes);
+  return data.platform;
+}
+
+export async function deletePlatform(id) {
+  await api.delete(`/subscriptions/platforms/${id}`);
+}
+
+/** Your own devices and how many places are used: `{ devices, usage }`. */
+export async function fetchMyDevices() {
+  const { data } = await api.get("/subscriptions/devices/mine");
+  return data;
+}
+
+/** An account's devices, for staff: `{ user, devices, usage, refusals }`. */
+export async function fetchUserDevices(userId) {
+  const { data } = await api.get(`/subscriptions/users/${userId}/devices`);
+  return data;
+}
+
+/** `{ note }`, `{ isBlocked }`, or both. */
+export async function updateDevice(id, changes) {
+  const { data } = await api.patch(`/subscriptions/devices/${id}`, changes);
+  return data.device;
+}
+
+export async function deleteDevice(id) {
+  await api.delete(`/subscriptions/devices/${id}`);
 }
 
 /* ---------------- Dates ----------------
@@ -112,6 +165,44 @@ export function dayOfPicked(date) {
 
 /** A YYYY-MM-DD day as the local Date a calendar widget shows. */
 export const pickedOfDay = (day) => (day ? new Date(`${day}T00:00:00`) : null);
+
+/* ---------------- Device counts ----------------
+ *
+ * The API takes counts keyed by a platform's value — `{ windows: 2, android: 1 }`
+ * — and gives a subscription's back as a list with each platform's name.
+ */
+
+/** "2 Windows, 1 Android" from a subscription's `devices`. */
+export function describeDevices(devices) {
+  const parts = (devices || []).filter((d) => d.limit > 0).map((d) => `${d.limit} ${d.name}`);
+  return parts.length ? parts.join(", ") : "no devices";
+}
+
+/** A subscription's `devices` as the counts the API takes, for these platforms. */
+export const countsOf = (devices, platforms) =>
+  Object.fromEntries(platforms.map((p) => [p.value, (devices || []).find((d) => d.value === p.value)?.limit ?? 0]));
+
+/** One of each: what asking starts on. */
+export const startingCounts = (platforms) => Object.fromEntries(platforms.map((p) => [p.value, 1]));
+
+export const totalOf = (counts) => Object.values(counts || {}).reduce((sum, n) => sum + (Number(n) || 0), 0);
+
+export const sameCounts = (a, b, platforms) =>
+  platforms.every((p) => (Number(a?.[p.value]) || 0) === (Number(b?.[p.value]) || 0));
+
+/**
+ * Why a check was answered "not valid", in words. Staff read these; the caller
+ * of the check is never told.
+ */
+export const REFUSAL_WORDS = {
+  no_device: "No device id was sent",
+  bad_device: "The device id sent is not a usable one",
+  unknown_platform: "The platform sent does not exist",
+  platform_off: "The platform is switched off",
+  blocked: "The device is blocked",
+  limit_reached: "A new device, and every place was taken",
+  beyond_limit: "It has a place, but beyond what the subscription allows",
+};
 
 /* ---------------- Words ---------------- */
 

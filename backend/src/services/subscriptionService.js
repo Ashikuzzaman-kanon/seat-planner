@@ -5,11 +5,13 @@ const ApiError = require("../utils/ApiError");
 const { AUDIT_ACTIONS } = require("../constants/auditActions");
 const { PERMISSIONS } = require("../constants/permissions");
 const { resolvePeriod, lastDayOf, expiryOf } = require("../utils/subscriptionPeriod");
+const { cleanLimits, describeLimits, overlayLimits } = require("../utils/subscriptionDevices");
 const { todayInDhaka, addDays } = require("../utils/dhakaTime");
 const settings = require("./settingService");
 const audit = require("./auditService");
 const inbox = require("./inboxService");
 const notify = require("./notificationService");
+const devices = require("./deviceService");
 
 /**
  * Subscriptions: what can be subscribed to, and each person's subscription.
@@ -30,6 +32,10 @@ const notify = require("./notificationService");
  *   - **A decision happens once.** Approving, declining, cancelling and
  *     extending all lock the row first, so two reviewers acting at the same
  *     moment cannot both act on it.
+ *
+ * Each person's subscription also says how many devices of each platform it
+ * may be used on — asked for when subscribing, settled by whoever approves.
+ * Which device is which, and whether one is let in, is deviceService's.
  */
 
 const PAGE = "/dashboard/subscriptions";
@@ -62,10 +68,15 @@ const memberEntity = (row, subscription, user) => ({
   label: `${user?.email || `user ${row.userId}`} — ${subscription?.name || `subscription ${row.subscriptionId}`}`,
 });
 
+/** A person's subscription with its device limits spelled out per platform. */
+function shape(row, platformRows, now = new Date()) {
+  return { ...row.toPublicJSON(now), devices: devices.limitsOut(row.deviceLimits, platformRows) };
+}
+
 /** A person's subscription as the pages show it, with whoever is attached. */
-function present(row, now = new Date()) {
+function present(row, platformRows, now = new Date()) {
   return {
-    ...row.toPublicJSON(now),
+    ...shape(row, platformRows, now),
     subscription: row.subscription
       ? { id: row.subscription.id, code: row.subscription.code, name: row.subscription.name }
       : undefined,
@@ -241,9 +252,10 @@ async function remove(id) {
  */
 async function list(userId, { staff = false } = {}) {
   const now = new Date();
-  const [subscriptions, own] = await Promise.all([
+  const [subscriptions, own, platformRows] = await Promise.all([
     Subscription.findAll({ order: [["name", "ASC"]] }),
     UserSubscription.findAll({ where: { userId }, order: [["id", "DESC"]] }),
+    devices.allPlatforms(),
   ]);
 
   // The row that says where the caller stands: the live one, else the latest.
@@ -276,7 +288,7 @@ async function list(userId, { staff = false } = {}) {
       .filter((s) => staff || s.isOpen || mine.has(s.id))
       .map((s) => ({
         ...s.toPublicJSON(),
-        mine: mine.has(s.id) ? mine.get(s.id).row.toPublicJSON(now) : null,
+        mine: mine.has(s.id) ? shape(mine.get(s.id).row, platformRows, now) : null,
         ...(staff ? { counts: counts.get(s.id) || { pending: 0, active: 0 } } : {}),
       })),
   };
@@ -309,10 +321,17 @@ async function expire(row, subscription) {
   return true;
 }
 
-/** Ask to be subscribed. */
-async function request(subscriptionId, user) {
+/**
+ * Ask to be subscribed, saying how many devices of each platform it is for:
+ * `requested` is `{ "<platform value>": count }`, or nothing for one of each.
+ */
+async function request(subscriptionId, user, requested) {
   const subscription = await findOr404(subscriptionId);
   if (!subscription.isOpen) throw ApiError.conflict("This subscription is not taking new requests");
+
+  const offered = await devices.activePlatforms();
+  const asked = cleanLimits(requested, offered);
+  if (asked.error) throw ApiError.badRequest(asked.error);
 
   // One that ran out since the last sweep must not block asking again.
   const held = await UserSubscription.findOne({ where: { liveKey: liveKey(user.id, subscription.id) } });
@@ -332,6 +351,7 @@ async function request(subscriptionId, user) {
       userId: user.id,
       status: STATUS.PENDING,
       liveKey: liveKey(user.id, subscription.id),
+      deviceLimits: asked.limits,
     });
   } catch (err) {
     // Two requests at once: the unique key let one through.
@@ -348,7 +368,7 @@ async function request(subscriptionId, user) {
       category: inbox.CATEGORY.SUBSCRIPTION,
       tone: "info",
       title: `${user.fullName} asked to subscribe to ${subscription.name}`,
-      body: `${user.email} · waiting for someone to approve or decline it`,
+      body: `${user.email} · for ${describeLimits(asked.limits, offered)} · waiting for someone to approve or decline it`,
       link: LINK.requests,
       key: `subscription:${row.id}:requested`,
     },
@@ -358,10 +378,10 @@ async function request(subscriptionId, user) {
   await audit.record({
     action: AUDIT_ACTIONS.SUBSCRIPTION_REQUEST,
     entity: memberEntity(row, subscription, user),
-    after: { status: row.status },
-    message: `asked to subscribe to "${subscription.name}"`,
+    after: { status: row.status, devices: describeLimits(asked.limits, offered) },
+    message: `asked to subscribe to "${subscription.name}" on ${describeLimits(asked.limits, offered)}`,
   });
-  return row.toPublicJSON();
+  return shape(row, offered);
 }
 
 /**
@@ -377,7 +397,7 @@ async function change(id, { from, apply }) {
       Subscription.findByPk(row.subscriptionId, { transaction }),
       User.findByPk(row.userId, { attributes: PERSON, transaction }),
     ]);
-    const before = row.toPublicJSON();
+    const before = { ...row.toPublicJSON(), deviceLimits: row.deviceLimits };
     from(row, { subscription, user });
     await apply(row, { transaction, subscription, user });
     return { row, before, subscription, user };
@@ -390,12 +410,25 @@ const mustBePending = (row) => {
   }
 };
 
-/** Approve a request for `days` from today, or through `lastDay`. */
-async function approve(id, { days, lastDay, note }, actor) {
+/**
+ * Approve a request for `days` from today, or through `lastDay`.
+ *
+ * `devices` — `{ "<platform value>": count }` — replaces the counts that were
+ * asked for; left out, the request is approved as asked.
+ */
+async function approve(id, { days, lastDay, note, devices: granted }, actor) {
   const period = resolvePeriod({ days, lastDay });
   if (period.error) throw ApiError.badRequest(period.error);
 
-  const { row, subscription, user } = await change(id, {
+  const platformRows = await devices.allPlatforms();
+  let limits;
+  if (granted !== undefined && granted !== null) {
+    const settled = cleanLimits(granted, platformRows.filter((p) => p.isActive));
+    if (settled.error) throw ApiError.badRequest(settled.error);
+    limits = settled.limits;
+  }
+
+  const { row, before, subscription, user } = await change(id, {
     from: mustBePending,
     apply: (found, { transaction }) =>
       found.update(
@@ -407,10 +440,12 @@ async function approve(id, { days, lastDay, note }, actor) {
           decidedById: actor.id,
           decidedAt: new Date(),
           decisionNote: clean(note),
+          ...(limits ? { deviceLimits: overlayLimits(found.deviceLimits, limits, platformRows) } : {}),
         },
         { transaction }
       ),
   });
+  const allowed = describeLimits(row.deviceLimits, platformRows);
 
   await notify.subscriptionDecided({
     userId: row.userId,
@@ -418,17 +453,18 @@ async function approve(id, { days, lastDay, note }, actor) {
     membershipId: row.id,
     approved: true,
     until: longDate(period.lastDay),
+    devices: allowed,
     note: row.decisionNote,
     decidedBy: actor.fullName,
   });
   await audit.record({
     action: AUDIT_ACTIONS.SUBSCRIPTION_APPROVE,
     entity: memberEntity(row, subscription, user),
-    before: { status: STATUS.PENDING },
-    after: { status: row.status, lastDay: period.lastDay, note: row.decisionNote },
-    message: `subscription to "${subscription.name}" approved through ${period.lastDay}`,
+    before: { status: STATUS.PENDING, devices: describeLimits(before.deviceLimits, platformRows) },
+    after: { status: row.status, lastDay: period.lastDay, devices: allowed, note: row.decisionNote },
+    message: `subscription to "${subscription.name}" approved through ${period.lastDay}, on ${allowed}`,
   });
-  return row.toPublicJSON();
+  return shape(row, platformRows);
 }
 
 async function decline(id, { note }, actor) {
@@ -462,7 +498,7 @@ async function decline(id, { note }, actor) {
     after: { status: row.status, note: row.decisionNote },
     message: `request to subscribe to "${subscription.name}" declined`,
   });
-  return row.toPublicJSON();
+  return shape(row, await devices.allPlatforms());
 }
 
 /**
@@ -522,44 +558,97 @@ async function cancel(id, { reason }, actor, { staff = false } = {}) {
         ? `request to subscribe to "${subscription.name}" withdrawn`
         : `subscription to "${subscription.name}" cancelled by ${byOwner ? "the subscriber" : "a reviewer"}`,
   });
-  return row.toPublicJSON();
+  return shape(row, await devices.allPlatforms());
 }
 
-/** Change when a running subscription ends — later, or sooner, but not in the past. */
-async function extend(id, { days, lastDay }, actor) {
-  const period = resolvePeriod({ days, lastDay });
-  if (period.error) throw ApiError.badRequest(period.error);
+const sameLimits = (a, b, platformRows) => describeLimits(a, platformRows) === describeLimits(b, platformRows);
 
+/**
+ * Change a running subscription: when it ends, how many devices it allows, or
+ * both.
+ *
+ * The end may move later or sooner, but not into the past. Lowering a device
+ * count takes nothing off the account — the devices that arrived first keep
+ * their places, and the later ones are simply no longer valid for this
+ * subscription.
+ */
+async function amend(id, { days, lastDay, devices: granted }, actor) {
+  const wantsPeriod = (days !== undefined && days !== null) || Boolean(lastDay);
+  const wantsLimits = granted !== undefined && granted !== null;
+  if (!wantsPeriod && !wantsLimits) throw ApiError.badRequest("Give a new last day, new device counts, or both");
+
+  const period = wantsPeriod ? resolvePeriod({ days, lastDay }) : null;
+  if (period?.error) throw ApiError.badRequest(period.error);
+
+  const platformRows = await devices.allPlatforms();
+  let limits = null;
+  if (wantsLimits) {
+    const settled = cleanLimits(granted, platformRows.filter((p) => p.isActive));
+    if (settled.error) throw ApiError.badRequest(settled.error);
+    limits = settled.limits;
+  }
+
+  const changed = { period: false, limits: false };
   const { row, before, subscription, user } = await change(id, {
     from: (found) => {
       if (found.status !== STATUS.ACTIVE || !found.isValid()) {
-        throw ApiError.conflict("Only a running subscription can have its end changed — an ended one is asked for again");
+        throw ApiError.conflict("Only a running subscription can be changed — an ended one is asked for again");
       }
-      if (found.expiresAt.getTime() === period.expiresAt.getTime()) {
-        throw ApiError.badRequest("That is already its last day");
-      }
+      changed.period = Boolean(period) && found.expiresAt.getTime() !== period.expiresAt.getTime();
+      if (limits) limits = overlayLimits(found.deviceLimits, limits, platformRows);
+      changed.limits = Boolean(limits) && !sameLimits(found.deviceLimits, limits, platformRows);
+      if (!changed.period && !changed.limits) throw ApiError.badRequest("Nothing would change — it is already like that");
     },
     apply: (found, { transaction }) =>
-      found.update({ expiresAt: period.expiresAt, remindedAt: null }, { transaction }),
+      found.update(
+        {
+          ...(changed.period ? { expiresAt: period.expiresAt, remindedAt: null } : {}),
+          ...(changed.limits ? { deviceLimits: limits } : {}),
+        },
+        { transaction }
+      ),
   });
 
-  await inbox.tryAdd(row.userId, {
-    type: "subscription.extended",
-    category: inbox.CATEGORY.SUBSCRIPTION,
-    tone: "info",
-    title: `Your ${subscription.name} subscription now runs until ${longDate(period.lastDay)}`,
-    body: `It was until ${longDate(before.lastDay)}. Changed by ${actor.fullName}.`,
-    link: LINK.mine,
-    key: `subscription:${row.id}:until:${period.lastDay}`,
-  });
-  await audit.record({
-    action: AUDIT_ACTIONS.SUBSCRIPTION_EXTEND,
-    entity: memberEntity(row, subscription, user),
-    before: { lastDay: before.lastDay },
-    after: { lastDay: period.lastDay },
-    message: `subscription to "${subscription.name}" now ends ${period.lastDay} (was ${before.lastDay})`,
-  });
-  return row.toPublicJSON();
+  if (changed.period) {
+    await inbox.tryAdd(row.userId, {
+      type: "subscription.extended",
+      category: inbox.CATEGORY.SUBSCRIPTION,
+      tone: "info",
+      title: `Your ${subscription.name} subscription now runs until ${longDate(period.lastDay)}`,
+      body: `It was until ${longDate(before.lastDay)}. Changed by ${actor.fullName}.`,
+      link: LINK.mine,
+      key: `subscription:${row.id}:until:${period.lastDay}`,
+    });
+    await audit.record({
+      action: AUDIT_ACTIONS.SUBSCRIPTION_EXTEND,
+      entity: memberEntity(row, subscription, user),
+      before: { lastDay: before.lastDay },
+      after: { lastDay: period.lastDay },
+      message: `subscription to "${subscription.name}" now ends ${period.lastDay} (was ${before.lastDay})`,
+    });
+  }
+
+  if (changed.limits) {
+    const was = describeLimits(before.deviceLimits, platformRows);
+    const now = describeLimits(row.deviceLimits, platformRows);
+    await inbox.tryAdd(row.userId, {
+      type: "subscription.limits",
+      category: inbox.CATEGORY.SUBSCRIPTION,
+      tone: "info",
+      title: `Your ${subscription.name} subscription now allows ${now}`,
+      body: `It was ${was}. Changed by ${actor.fullName}.`,
+      link: LINK.mine,
+      // No key: the counts can go back and forth, and each change is news.
+    });
+    await audit.record({
+      action: AUDIT_ACTIONS.SUBSCRIPTION_LIMITS,
+      entity: memberEntity(row, subscription, user),
+      before: { devices: was },
+      after: { devices: now },
+      message: `subscription to "${subscription.name}" now allows ${now} (was ${was})`,
+    });
+  }
+  return shape(row, platformRows);
 }
 
 /* ------------------------------------------------------------------ *
@@ -593,18 +682,21 @@ async function members({ status, subscriptionId, search, page = 1, limit = 25 } 
     };
   }
 
-  const { rows, count } = await UserSubscription.findAndCountAll({
-    where,
-    include,
-    // A queue is worked oldest first; everything else reads newest first.
-    order: [["id", status === STATUS.PENDING ? "ASC" : "DESC"]],
-    limit,
-    offset: (page - 1) * limit,
-    distinct: true,
-  });
+  const [{ rows, count }, platformRows] = await Promise.all([
+    UserSubscription.findAndCountAll({
+      where,
+      include,
+      // A queue is worked oldest first; everything else reads newest first.
+      order: [["id", status === STATUS.PENDING ? "ASC" : "DESC"]],
+      limit,
+      offset: (page - 1) * limit,
+      distinct: true,
+    }),
+    devices.allPlatforms(),
+  ]);
 
   return {
-    members: rows.map((row) => present(row, now)),
+    members: rows.map((row) => present(row, platformRows, now)),
     pagination: { page, limit, total: count, pages: Math.ceil(count / limit) },
   };
 }
@@ -612,13 +704,16 @@ async function members({ status, subscriptionId, search, page = 1, limit = 25 } 
 /** Everything the caller has asked for, newest first. */
 async function mine(userId) {
   const now = new Date();
-  const rows = await UserSubscription.findAll({
-    where: { userId },
-    include: [WITH_EVERYONE[0], WITH_EVERYONE[2], WITH_EVERYONE[3]],
-    order: [["id", "DESC"]],
-    limit: 200,
-  });
-  return { subscriptions: rows.map((row) => present(row, now)) };
+  const [rows, platformRows] = await Promise.all([
+    UserSubscription.findAll({
+      where: { userId },
+      include: [WITH_EVERYONE[0], WITH_EVERYONE[2], WITH_EVERYONE[3]],
+      order: [["id", "DESC"]],
+      limit: 200,
+    }),
+    devices.allPlatforms(),
+  ]);
+  return { subscriptions: rows.map((row) => present(row, platformRows, now)) };
 }
 
 async function pendingCount() {
@@ -627,17 +722,21 @@ async function pendingCount() {
 
 /**
  * For POST /subscriptions/check: every subscription there is, and whether this
- * person's is valid right now. No dates — the caller is told yes or no.
+ * person's is valid right now **on the device the check came from**.
+ *
+ * `sent` is `{ deviceId, platform }` as the caller gave them. A subscription
+ * is valid when it is running and the device has a place it allows; the device
+ * takes a place here if it is new and one is free (deviceService `admit`).
+ *
+ * No dates, and no reasons: a device turned away for any cause is simply
+ * `valid: false` — why is written down for staff, not returned.
  */
-async function validityFor(userId, now = new Date()) {
+async function validityFor(user, sent = {}, now = new Date()) {
   const [subscriptions, held] = await Promise.all([
     Subscription.findAll({ attributes: ["id", "code"], order: [["code", "ASC"]] }),
-    UserSubscription.findAll({
-      where: { userId, status: STATUS.ACTIVE, expiresAt: { [Op.gt]: now } },
-      attributes: ["subscriptionId"],
-    }),
+    UserSubscription.findAll({ where: { userId: user.id, status: STATUS.ACTIVE, expiresAt: { [Op.gt]: now } } }),
   ]);
-  const valid = new Set(held.map((row) => row.subscriptionId));
+  const valid = await devices.admit(user, sent, held, now);
   return subscriptions.map((s) => ({ code: s.code, valid: valid.has(s.id) }));
 }
 
@@ -703,7 +802,10 @@ async function sweep({ now = new Date() } = {}) {
       message: `${expired} subscription(s) reached the end of their period`,
     });
   }
-  return { expired, reminded };
+
+  // While here: forget the turned-away device checks that are too old to matter.
+  const refusalsPruned = await devices.pruneRefusals(now);
+  return { expired, reminded, refusalsPruned };
 }
 
 module.exports = {
@@ -715,7 +817,7 @@ module.exports = {
   approve,
   decline,
   cancel,
-  extend,
+  amend,
   members,
   mine,
   pendingCount,

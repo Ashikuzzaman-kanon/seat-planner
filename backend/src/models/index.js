@@ -41,6 +41,9 @@ const DemoRecord = require("./DemoRecord");
 const Notification = require("./Notification");
 const Subscription = require("./Subscription");
 const UserSubscription = require("./UserSubscription");
+const SubscriptionPlatform = require("./SubscriptionPlatform");
+const UserDevice = require("./UserDevice");
+const UserDeviceRefusal = require("./UserDeviceRefusal");
 const demoCapture = require("../utils/demoCapture");
 
 const models = {
@@ -86,6 +89,9 @@ const models = {
   Notification,
   Subscription,
   UserSubscription,
+  SubscriptionPlatform,
+  UserDevice,
+  UserDeviceRefusal,
 };
 
 // Wire up associations for any model that declares them.

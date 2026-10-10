@@ -51,8 +51,11 @@ const emailsTo = (address) => {
   }
 };
 
+// Every check names the device it came from; without one nothing is valid
+// (subscription-devices.js is where the device rules themselves are tested).
+const DEVICE = { deviceId: "suite-device-0001", platform: "windows" };
 const checkApi = (email, password = PASSWORD, headers) =>
-  call("POST", "/subscriptions/check", { body: { email, password }, headers });
+  call("POST", "/subscriptions/check", { body: { email, password, ...DEVICE }, headers });
 const validOf = (response, code) => response.body?.subscriptions?.find((s) => s.code === code)?.valid;
 
 (async () => {

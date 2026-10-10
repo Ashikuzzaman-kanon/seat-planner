@@ -458,15 +458,18 @@ const PERMISSION_CATALOGUE = Object.freeze([
     label: "Manage subscriptions",
     description:
       "Create the subscriptions people can ask for, rename them, close them to new requests and reopen " +
-      "them, and delete one nobody has ever asked for.",
+      "them, and delete one nobody has ever asked for. Also create the platforms a subscription is used " +
+      "on (Windows, Android…), rename them and switch them off.",
   },
   {
     key: PERMISSIONS.SUBSCRIPTION_APPROVE,
     group: "Subscriptions",
     label: "Approve and end subscriptions",
     description:
-      "See who has asked to subscribe, approve a request for a chosen period or decline it, change when a " +
-      "running subscription ends, and cancel anyone's subscription.",
+      "See who has asked to subscribe, approve a request for a chosen period and number of devices or " +
+      "decline it, change when a running subscription ends or how many devices it allows, and cancel " +
+      "anyone's subscription. Also see the devices on a subscriber's account and why any were turned " +
+      "away, and note, block or remove a device.",
   },
 ]);
 

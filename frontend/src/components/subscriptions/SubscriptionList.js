@@ -3,15 +3,20 @@
 import { useState } from "react";
 import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
+import DeviceCounts from "./DeviceCounts";
+import MyDevices from "./MyDevices";
 import ReasonDialog from "./ReasonDialog";
 import { tip } from "@/components/ui/tip";
 import {
   cancelSubscription,
   deleteSubscription,
+  describeDevices,
   longDate,
   requestSubscription,
   standing,
+  startingCounts,
   statusMeta,
+  totalOf,
   updateSubscription,
 } from "@/lib/subscriptions";
 
@@ -24,31 +29,42 @@ const when = (value) =>
  * Every subscription, with where you stand with it and the one thing you can
  * do about that: ask, withdraw the request, or cancel.
  *
+ * Asking takes one answer — on how many devices of each platform — because a
+ * subscription is approved for a number of devices as well as a period.
+ *
  * Whoever manages subscriptions gets the edit, close and delete controls on
  * the same cards, and whoever reviews them sees how many people are waiting
  * and subscribed — one list, not a second "admin" copy of it to drift apart.
  */
-export default function SubscriptionList({ subscriptions, history, canManage, staff, onEdit, onOpenRequests, reload, notify }) {
+export default function SubscriptionList({
+  subscriptions,
+  history,
+  platforms,
+  maxDevices,
+  myDevices,
+  canManage,
+  staff,
+  onEdit,
+  onOpenRequests,
+  reload,
+  notify,
+}) {
   const [busyId, setBusyId] = useState(null);
   const [asking, setAsking] = useState(null); // { kind, subscription }
+  const [counts, setCounts] = useState({});
 
-  const subscribe = async (subscription) => {
-    setBusyId(subscription.id);
-    try {
-      await requestSubscription(subscription.id);
-      notify("success", "Request sent", `Someone will review your request for ${subscription.name}.`);
-      await reload();
-    } catch (err) {
-      notify("error", "Could not ask for it", err.message);
-    } finally {
-      setBusyId(null);
-    }
+  const subscribe = (subscription) => {
+    setCounts(startingCounts(platforms));
+    setAsking({ kind: "subscribe", subscription });
   };
 
   const confirm = async (reason) => {
     const { kind, subscription } = asking;
     try {
-      if (kind === "cancel") {
+      if (kind === "subscribe") {
+        await requestSubscription(subscription.id, counts);
+        notify("success", "Request sent", `Someone will review your request for ${subscription.name}.`);
+      } else if (kind === "cancel") {
         await cancelSubscription(subscription.mine.id, { reason });
         notify(
           "info",
@@ -163,6 +179,14 @@ export default function SubscriptionList({ subscriptions, history, canManage, st
                 <p className="sub-card__note">“{mine.decisionNote}”</p>
               )}
               {mine?.status === "cancelled" && mine.endReason && <p className="sub-card__note">“{mine.endReason}”</p>}
+              {live && mine.devices?.length > 0 && (
+                <p className="sub-card__devices">
+                  <i className="pi pi-desktop" aria-hidden="true" />
+                  <span>
+                    {mine.status === "pending" ? "Asked for" : "On"} {describeDevices(mine.devices)}
+                  </span>
+                </p>
+              )}
 
               {staff && (
                 <button type="button" className="sub-counts" onClick={onOpenRequests} disabled={!onOpenRequests}>
@@ -181,7 +205,6 @@ export default function SubscriptionList({ subscriptions, history, canManage, st
                     label={mine ? "Subscribe again" : "Subscribe"}
                     icon="pi pi-plus"
                     size="small"
-                    loading={busyId === subscription.id}
                     onClick={() => subscribe(subscription)}
                   />
                 )}
@@ -211,6 +234,8 @@ export default function SubscriptionList({ subscriptions, history, canManage, st
         })}
       </div>
 
+      <MyDevices data={myDevices} />
+
       {past.length > 0 && (
         <section className="card sub-history" aria-labelledby="sub-history-title">
           <h2 id="sub-history-title">Your earlier requests</h2>
@@ -238,6 +263,21 @@ export default function SubscriptionList({ subscriptions, history, canManage, st
           </ul>
         </section>
       )}
+
+      <ReasonDialog
+        visible={asking?.kind === "subscribe"}
+        header={`Subscribe to ${asking?.subscription.name || ""}`}
+        message="On how many devices will you use it? Whoever reviews your request sees these numbers, and may change them."
+        confirmLabel="Send request"
+        confirmIcon="pi pi-send"
+        canConfirm={platforms.length > 0 && totalOf(counts) > 0}
+        onConfirm={confirm}
+        onHide={() => setAsking(null)}
+      >
+        {asking?.kind === "subscribe" && (
+          <DeviceCounts platforms={platforms} value={counts} onChange={setCounts} max={maxDevices} id="subscribe-devices" />
+        )}
+      </ReasonDialog>
 
       <ReasonDialog
         visible={asking?.kind === "cancel"}

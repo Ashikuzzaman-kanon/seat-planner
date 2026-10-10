@@ -4,9 +4,19 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "primereact/button";
 import { Paginator } from "primereact/paginator";
 import { ProgressSpinner } from "primereact/progressspinner";
+import DeviceCounts from "./DeviceCounts";
 import PeriodPicker, { isChosen, lastDayOf } from "./PeriodPicker";
 import ReasonDialog from "./ReasonDialog";
-import { approveRequest, declineRequest, fetchMembers, longDate } from "@/lib/subscriptions";
+import {
+  approveRequest,
+  countsOf,
+  declineRequest,
+  describeDevices,
+  fetchMembers,
+  longDate,
+  sameCounts,
+  totalOf,
+} from "@/lib/subscriptions";
 import { timeAgo } from "@/lib/notifications";
 
 const DEFAULT_PERIOD = { days: 30 };
@@ -14,15 +24,17 @@ const DEFAULT_PERIOD = { days: 30 };
 /**
  * The people waiting to be subscribed, oldest first.
  *
- * Approving asks for one thing — how long — and says the day that comes to
- * before anything is confirmed.
+ * Approving asks how long, and says the day that comes to before anything is
+ * confirmed. The device counts start on what the person asked for; the
+ * reviewer may leave them or change them.
  */
-export default function RequestsQueue({ onDecided, notify }) {
+export default function RequestsQueue({ platforms, maxDevices, onDecided, notify }) {
   const [data, setData] = useState(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [deciding, setDeciding] = useState(null); // { intent, request }
   const [period, setPeriod] = useState(DEFAULT_PERIOD);
+  const [counts, setCounts] = useState({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,6 +53,7 @@ export default function RequestsQueue({ onDecided, notify }) {
 
   const start = (intent, request) => {
     setPeriod(DEFAULT_PERIOD);
+    setCounts(countsOf(request.devices, platforms));
     setDeciding({ intent, request });
   };
 
@@ -48,8 +61,18 @@ export default function RequestsQueue({ onDecided, notify }) {
     const { intent, request } = deciding;
     try {
       if (intent === "approve") {
-        const done = await approveRequest(request.id, { period, note });
-        notify("success", "Approved", `${request.user.fullName} — ${request.subscription.name} until ${longDate(done.lastDay)}`);
+        // Sent only when changed, so an untouched approval is "as asked".
+        const asked = countsOf(request.devices, platforms);
+        const done = await approveRequest(request.id, {
+          period,
+          note,
+          devices: sameCounts(counts, asked, platforms) ? undefined : counts,
+        });
+        notify(
+          "success",
+          "Approved",
+          `${request.user.fullName} — ${request.subscription.name} until ${longDate(done.lastDay)}, on ${describeDevices(done.devices)}`
+        );
       } else {
         await declineRequest(request.id, { note });
         notify("info", "Declined", `${request.user.fullName} — ${request.subscription.name}`);
@@ -92,6 +115,7 @@ export default function RequestsQueue({ onDecided, notify }) {
               <div className="sub-request__what">
                 <span className="sub-request__label">asked for</span>
                 <strong>{request.subscription.name}</strong>
+                <span className="sub-request__devices">on {describeDevices(request.devices)}</span>
                 <small title={new Date(request.requestedAt).toLocaleString("en-GB")}>{timeAgo(request.requestedAt)}</small>
               </div>
               <div className="sub-request__actions">
@@ -136,11 +160,21 @@ export default function RequestsQueue({ onDecided, notify }) {
         severity={approving ? undefined : "danger"}
         reasonLabel="Note to them"
         reasonPlaceholder={approving ? "Optional — sent with the approval" : "Optional — why, so they are not left guessing"}
-        canConfirm={!approving || isChosen(period)}
+        canConfirm={!approving || (isChosen(period) && totalOf(counts) > 0)}
         onConfirm={decide}
         onHide={() => setDeciding(null)}
       >
-        {approving && <PeriodPicker value={period} onChange={setPeriod} id="approve-period" />}
+        {approving && (
+          <>
+            <PeriodPicker value={period} onChange={setPeriod} id="approve-period" />
+            <div className="sub-field">
+              <span className="sub-field__label">
+                Devices <span className="sub-field__optional">as asked — change them if you need to</span>
+              </span>
+              <DeviceCounts platforms={platforms} value={counts} onChange={setCounts} max={maxDevices} id="approve-devices" />
+            </div>
+          </>
+        )}
       </ReasonDialog>
     </>
   );

@@ -84,6 +84,13 @@ UserSubscription.init(
     /** When the "ends soon" notification went out, so it goes out once. */
     remindedAt: { type: DataTypes.DATE, allowNull: true },
 
+    /**
+     * How many devices of each platform it allows: { "<platform id>": count }.
+     * Asked for when subscribing; whoever approves may change it, then and
+     * later. A platform it does not mention allows none.
+     */
+    deviceLimits: { type: DataTypes.JSON, allowNull: true },
+
     /** Who cancelled it; null when it simply expired or was declined. */
     endedById: { type: DataTypes.INTEGER, allowNull: true },
     endedAt: { type: DataTypes.DATE, allowNull: true },
