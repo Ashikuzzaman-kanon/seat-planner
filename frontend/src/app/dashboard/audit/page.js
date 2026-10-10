@@ -31,6 +31,16 @@ const ACTION_SEVERITY = {
   "demo.clear": "warning",
   "railway.load": "info",
   "trip.seats_cleared": "info",
+  "auth.locked": "danger",
+  "subscription.create": "success",
+  "subscription.update": "info",
+  "subscription.delete": "danger",
+  "subscription.request": "info",
+  "subscription.approve": "success",
+  "subscription.decline": "warning",
+  "subscription.cancel": "warning",
+  "subscription.extend": "info",
+  "subscription.expire": "secondary",
 };
 
 export default function AuditPage() {
