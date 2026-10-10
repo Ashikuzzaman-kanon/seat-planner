@@ -92,6 +92,10 @@ const PERMISSIONS = Object.freeze({
 
   // Real railway data
   RAILWAY_MANAGE: "railway:manage",
+
+  // Subscriptions. Asking for one needs no permission — everyone signed in can.
+  SUBSCRIPTION_MANAGE: "subscription:manage",
+  SUBSCRIPTION_APPROVE: "subscription:approve",
 });
 
 /**
@@ -446,6 +450,23 @@ const PERMISSION_CATALOGUE = Object.freeze([
       "Load Bangladesh Railway's published stations, trains and routes, and the seat plans transcribed " +
       "for them, and make the trains that have plans ready for departures. Adds what is missing and " +
       "leaves anything already there as it is.",
+  },
+
+  {
+    key: PERMISSIONS.SUBSCRIPTION_MANAGE,
+    group: "Subscriptions",
+    label: "Manage subscriptions",
+    description:
+      "Create the subscriptions people can ask for, rename them, close them to new requests and reopen " +
+      "them, and delete one nobody has ever asked for.",
+  },
+  {
+    key: PERMISSIONS.SUBSCRIPTION_APPROVE,
+    group: "Subscriptions",
+    label: "Approve and end subscriptions",
+    description:
+      "See who has asked to subscribe, approve a request for a chosen period or decline it, change when a " +
+      "running subscription ends, and cancel anyone's subscription.",
   },
 ]);
 

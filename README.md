@@ -40,6 +40,11 @@ defined as data.
   the camera for checking tickets and the tickets PDF in the phone's viewer. It
   loads every page from the live site, so a web deploy needs no app update. See
   *The Android app*.
+- **Subscriptions**: ask for a subscription and a reviewer approves it for a
+  period they choose, or declines it. It runs through the end of its last day
+  and then ends by itself; the subscriber can cancel it at any time, and so can
+  a reviewer. A caller outside the app can ask whether an account holds one —
+  see *Subscriptions and the check API*.
 
 **For staff on the train**
 - *Check Tickets*: scan a QR with the phone camera or type the number; eight
@@ -62,9 +67,12 @@ defined as data.
 - Seat plans: a grid designer for coach layouts, with an approval workflow.
 
 **For administrators**
-- Roles and permissions are data: create roles, grant any of 50 permissions,
+- Roles and permissions are data: create roles, grant any of 52 permissions,
   assign several roles to a user. An escalation guard stops anyone granting
   what they do not hold.
+- Sign-in pauses for an account after five wrong passwords in a row (both
+  numbers are settings), so a password cannot be guessed at speed. Resetting
+  the password ends the pause; anyone already signed in stays signed in.
 - A settings store for every tunable rule (timeouts, deductions, abuse weights,
   job retries) — changes take effect without a restart.
 - An audit log of every privileged action.
@@ -278,6 +286,62 @@ Frontend: `NEXT_PUBLIC_API_BASE_URL` (use `/api`) and, in production,
 Business rules (hold timeouts, refund slabs, waitlist windows, abuse weights,
 job retries…) live in the settings store and are edited on the *Settings*
 screen, not in environment variables.
+
+## Subscriptions and the check API
+
+Two permissions run subscriptions, and a role can hold either or both (the
+super admin holds every permission):
+
+| Permission | Allows |
+|---|---|
+| `subscription:manage` | Create a subscription, rename it, close it to new requests, reopen it, delete one nobody has asked for |
+| `subscription:approve` | See the requests, approve one for a period or decline it, change a running subscription's last day, cancel anyone's |
+
+Everyone signed in sees the *Subscriptions* page and can ask for one. A
+subscription is valid from approval **through the end of its last day in
+Dhaka**; an hourly job then marks it ended and tells the subscriber, and warns
+them a few days before (*Settings → Subscriptions*). Every request is kept, so
+who decided what stays on record.
+
+Each subscription has a **code** — made from its name when it is created, or
+chosen then — which never changes, even if the subscription is renamed.
+
+**Checking from outside the app.** One endpoint takes an email and password and
+says, for every subscription there is, whether that account's is valid now:
+
+```bash
+curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"..."}'
+```
+
+```json
+{
+  "user": { "name": "Rahim Uddin", "email": "user@example.com" },
+  "subscriptions": [
+    { "code": "basic", "valid": false },
+    { "code": "premium", "valid": true }
+  ]
+}
+```
+
+- It opens no session and returns no tokens or dates.
+- **It answers from any origin** — a page on any other site may call it. The
+  rest of the API stays limited to `CORS_ORIGINS`. That is safe here because
+  nothing of the browser's own goes with the call: the caller sends the email
+  and password itself.
+- A wrong password and an unknown email are the same `401`. An email not yet
+  verified is a `403`, as at sign-in.
+- The password is checked exactly as sign-in checks it, **and shares its
+  pause**: after five wrong passwords in a row the account answers `429` here
+  and at sign-in for fifteen minutes, with `Retry-After` saying how long is
+  left.
+- **Call the API's own address, as above — not the website's.** The API sleeps
+  after fifteen idle minutes. A call straight to it wakes it and is held while
+  it starts, so allow up to a minute. The same path on the website's address
+  also works while the API is awake, but while it sleeps that route answers a
+  bare `429` (no JSON body) and does not wake it. A `429` that *does* carry a
+  JSON `error` is the pause after wrong passwords.
 
 ## Tests
 

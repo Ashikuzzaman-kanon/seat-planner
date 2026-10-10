@@ -20,6 +20,7 @@ const NOTIFICATION_CATEGORIES = Object.freeze({
   ACCOUNT: "account",
   APPROVAL: "approval",
   PLAN: "plan",
+  SUBSCRIPTION: "subscription",
   SYSTEM: "system",
 });
 

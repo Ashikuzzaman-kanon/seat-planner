@@ -115,6 +115,20 @@ const AUDIT_ACTIONS = Object.freeze({
 
   // The daily sweep deleting long-departed trains' unsold seats.
   SEATS_CLEARED: "trip.seats_cleared",
+
+  // Subscriptions: what can be subscribed to, and each person's subscription.
+  SUBSCRIPTION_CREATE: "subscription.create",
+  SUBSCRIPTION_UPDATE: "subscription.update",
+  SUBSCRIPTION_DELETE: "subscription.delete",
+  SUBSCRIPTION_REQUEST: "subscription.request",
+  SUBSCRIPTION_APPROVE: "subscription.approve",
+  SUBSCRIPTION_DECLINE: "subscription.decline",
+  SUBSCRIPTION_CANCEL: "subscription.cancel",
+  SUBSCRIPTION_EXTEND: "subscription.extend",
+  SUBSCRIPTION_EXPIRE: "subscription.expire",
+
+  // Sign-in paused on an account after too many wrong passwords in a row.
+  AUTH_LOCKED: "auth.locked",
 });
 
 module.exports = { AUDIT_ACTIONS };
