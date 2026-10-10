@@ -56,6 +56,13 @@ export const NAV_GROUPS = [
         blurb: "Transfers and withdrawals",
       },
       {
+        // No permission: anyone signed in can ask for one; reviewers get the queue too.
+        href: "/dashboard/subscriptions",
+        label: "Subscriptions",
+        icon: "pi pi-id-card",
+        blurb: "Ask for one, and see how long yours runs",
+      },
+      {
         // Everyone has an inbox.
         href: "/dashboard/notifications",
         label: "Notifications",

@@ -63,6 +63,30 @@ const SETTING_DEFINITIONS = Object.freeze([
     max: 1440,
   },
   {
+    key: "auth.max_failed_sign_ins",
+    group: "Authentication",
+    label: "Wrong passwords before sign-in is paused",
+    description:
+      "After this many wrong passwords in a row, the account accepts no password — at sign-in or the " +
+      "subscription check — until the pause below is over. A correct password before then starts the count again.",
+    type: SETTING_TYPES.INTEGER,
+    default: 5,
+    min: 3,
+    max: 50,
+  },
+  {
+    key: "auth.lockout_minutes",
+    group: "Authentication",
+    label: "Sign-in pause (minutes)",
+    description:
+      "How long that pause lasts, and how long a run of wrong passwords is remembered. Resetting the " +
+      "password ends the pause at once; anyone already signed in stays signed in.",
+    type: SETTING_TYPES.INTEGER,
+    default: 15,
+    min: 1,
+    max: 1440,
+  },
+  {
     key: "trip.horizon_days",
     group: "Departures",
     label: "Rolling horizon (days)",
@@ -454,6 +478,18 @@ const SETTING_DEFINITIONS = Object.freeze([
     default: 90,
     min: 7,
     max: 730,
+  },
+  {
+    key: "subscription.reminder_days",
+    group: "Subscriptions",
+    label: "Days before the end to remind a subscriber",
+    description:
+      "A subscriber is told once, this many days before their subscription's last day, that it is about " +
+      "to end. Set to 0 to send no reminder.",
+    type: SETTING_TYPES.INTEGER,
+    default: 3,
+    min: 0,
+    max: 60,
   },
 ]);
 

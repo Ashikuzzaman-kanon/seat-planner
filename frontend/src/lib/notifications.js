@@ -43,6 +43,7 @@ export const CATEGORY_META = {
   account: { label: "Your account", icon: "pi pi-user" },
   approval: { label: "Requests", icon: "pi pi-inbox" },
   plan: { label: "Seat plans", icon: "pi pi-th-large" },
+  subscription: { label: "Subscriptions", icon: "pi pi-id-card" },
   system: { label: "System", icon: "pi pi-server" },
 };
 

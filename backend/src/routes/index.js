@@ -21,6 +21,7 @@ const jobRoutes = require("./jobRoutes");
 const demoRoutes = require("./demoRoutes");
 const railwayRoutes = require("./railwayRoutes");
 const notificationRoutes = require("./notificationRoutes");
+const subscriptionRoutes = require("./subscriptionRoutes");
 const { PERMISSION_CATALOGUE } = require("../constants/permissions");
 const openapi = require("../docs/openapi");
 
@@ -102,6 +103,10 @@ router.use("/railway-data", railwayRoutes);
 
 // Each person's in-app notifications.
 router.use("/notifications", notificationRoutes);
+
+// Subscriptions people ask for and reviewers approve for a period — and the
+// one endpoint an outside caller uses to ask whether an account holds one.
+router.use("/subscriptions", subscriptionRoutes);
 
 // After the sale: returning a ticket, moving it to another passenger, and the
 // queue of decisions a person has to make about both.

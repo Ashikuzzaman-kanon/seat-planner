@@ -39,6 +39,8 @@ const AccountHold = require("./AccountHold");
 const Job = require("./Job");
 const DemoRecord = require("./DemoRecord");
 const Notification = require("./Notification");
+const Subscription = require("./Subscription");
+const UserSubscription = require("./UserSubscription");
 const demoCapture = require("../utils/demoCapture");
 
 const models = {
@@ -82,6 +84,8 @@ const models = {
   Job,
   DemoRecord,
   Notification,
+  Subscription,
+  UserSubscription,
 };
 
 // Wire up associations for any model that declares them.

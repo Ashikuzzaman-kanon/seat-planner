@@ -407,6 +407,56 @@ async function approvalDecided({ userId, request, approved, note: decisionNote, 
   });
 }
 
+/* ---------------- Subscriptions ---------------- */
+
+/**
+ * A request to subscribe was approved or declined.
+ *
+ * The one moment in a subscription's life that gets an email as well as a
+ * notification: the person asked, and is waiting on somebody else's answer.
+ * `until` is the last day it is valid, already written out ("9 Nov 2026").
+ */
+async function subscriptionDecided({ userId, subscription, membershipId, approved, until, note: decisionNote, decidedBy }) {
+  const title = approved
+    ? `You are subscribed to ${subscription.name} until ${until}`
+    : `Your request for ${subscription.name} was not approved`;
+  const subject = `${subscription.name} subscription ${approved ? "approved" : "not approved"}`;
+
+  return deliver(userId, {
+    subject,
+    inApp: {
+      type: approved ? "subscription.approved" : "subscription.declined",
+      category: CATEGORY.SUBSCRIPTION,
+      tone: approved ? "success" : "warning",
+      title,
+      body: [decisionNote && `“${decisionNote}”`, decidedBy && `Decided by ${decidedBy}`].filter(Boolean).join(" · "),
+      link: "/dashboard/subscriptions",
+      key: `subscription:${membershipId}:decided`,
+    },
+    html: ui.page({
+      subject,
+      preheader: approved ? `Valid through ${until}.` : decisionNote || "Not approved.",
+      eyebrow: approved ? "Subscription approved" : "Subscription not approved",
+      tone: approved ? "success" : "warning",
+      title,
+      body:
+        ui.details([
+          ["Subscription", subscription.name],
+          ["Decision", approved ? "Approved" : "Not approved"],
+          ["Valid through", approved ? until : null],
+          ["Decided by", decidedBy || null],
+        ]) +
+        (decisionNote ? ui.callout(decisionNote, { tone: approved ? "success" : "warning", title: "Note from the reviewer" }) : "") +
+        ui.paragraph(
+          approved
+            ? "It runs through the end of that day. You can cancel it whenever you like from the Subscriptions page."
+            : "You can ask again from the Subscriptions page."
+        ) +
+        ui.button("See your subscriptions", ui.appUrl("/dashboard/subscriptions"), { tone: approved ? "success" : "brand" }),
+    }),
+  });
+}
+
 /* ---------------- Access ---------------- */
 
 /** "super_admin" → "Super Admin"; the default role reads as what it is. */
@@ -642,6 +692,7 @@ module.exports = {
   departureCancelled,
   departureCancelledMessage,
   approvalDecided,
+  subscriptionDecided,
   waitlistOfferExpired,
   // Exported so a new message can be added without reaching past the shell.
   deliver,

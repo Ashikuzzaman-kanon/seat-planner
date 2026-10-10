@@ -95,6 +95,16 @@ User.init(
      */
     nid: { type: DataTypes.STRING(17), allowNull: true },
     dateOfBirth: { type: DataTypes.DATEONLY, allowNull: true },
+
+    /**
+     * Wrong passwords in a row, and the pause they earn (see authService
+     * `checkCredentials`). Kept on the account, not against the caller's
+     * address: the site's traffic all arrives through its hosting proxy, so
+     * one caller's address cannot be told from another's.
+     */
+    failedSignIns: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    lastFailedSignInAt: { type: DataTypes.DATE, allowNull: true },
+    lockedUntil: { type: DataTypes.DATE, allowNull: true },
   },
   {
     sequelize,

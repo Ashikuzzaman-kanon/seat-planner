@@ -10,6 +10,7 @@ widths, and check what a person would see.
 | `dialogs.js` | Every dialog opens, fits on a phone, and closes. |
 | `flow.js`, `flow2.js` | The booking flow from search to tickets. |
 | `demo-ui.js` | Administration → Demo Data: populate, watch it run, read the result, delete. |
+| `subscriptions-ui.js` | Subscriptions as three people: a manager creates one, a passenger asks for it, a reviewer approves it for a week, the passenger cancels. Not part of `npm run all` — see below. |
 | `test-wake.js` | A sleeping API (simulated): the "Starting the server…" notice, one wake-up for many refused requests, staying signed in when it cannot be woken. |
 | `test-phase2-ui.js`, `test-proxy.js` | The network screens; the web app's `/api` proxy. |
 | `shoot.js` | Screenshots of chosen pages: `node shoot.js <label> /dashboard /dashboard/book`. |
@@ -33,3 +34,8 @@ Settings, all optional (see `config.js`):
 
 `demo-ui.js` steps aside if demo data is populated on purpose, and leaves the
 database as it found it.
+
+`subscriptions-ui.js` creates a subscription with a name of its own on every
+run and closes it at the end. A subscription somebody has asked for cannot be
+deleted, so each run leaves a closed one behind — which is why it is run by
+name (`npm run subscriptions`) and is not in `npm run all`.

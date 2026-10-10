@@ -15,6 +15,7 @@ const { getAccess, invalidateUser } = require("./permissionService");
 const { sendVerificationEmail, sendPasswordResetEmail } = require("./emailService");
 const settings = require("./settingService");
 const audit = require("./auditService");
+const inbox = require("./inboxService");
 const { AUDIT_ACTIONS } = require("../constants/auditActions");
 
 const SALT_ROUNDS = 10;
@@ -168,33 +169,160 @@ async function resendVerification({ email }) {
   await sendVerificationEmail(user.email, user.verificationCode, verificationTtlMinutes());
 }
 
+/*
+ * A hash nobody's password matches, compared against when no account does —
+ * so "no such account" takes as long to answer as "wrong password", and the
+ * time an answer takes does not say which it was.
+ */
+const NOBODYS_HASH = bcrypt.hashSync("no account has this password", SALT_ROUNDS);
+
+/*
+ * Password attempts for one address are checked one at a time. Without this, a
+ * guesser sending fifty at once would have all fifty compared before the first
+ * wrong one was counted, and the pause below would limit nothing. A queue in
+ * memory is enough because the API runs as a single process; no database
+ * connection is held while an attempt waits its turn.
+ */
+const attempts = new Map();
+
+function oneAtATime(key, work) {
+  const turn = (attempts.get(key) || Promise.resolve()).catch(() => {}).then(work);
+  attempts.set(key, turn);
+  turn
+    .catch(() => {})
+    .finally(() => {
+      if (attempts.get(key) === turn) attempts.delete(key);
+    });
+  return turn;
+}
+
+/** The 429 for an account whose sign-in is paused. */
+function paused(until, now) {
+  const seconds = Math.max(1, Math.ceil((until - now) / 1000));
+  const minutes = Math.ceil(seconds / 60);
+  return ApiError.tooManyRequests(
+    `Too many wrong passwords. Try again in ${minutes} minute${minutes === 1 ? "" : "s"}, or reset your password.`,
+    seconds
+  );
+}
+
+/**
+ * Count a wrong password, and pause the account when it completes a run of
+ * them. Returns when the pause ends, or null if this one did not cause one.
+ *
+ * A run only counts while the wrong passwords keep coming: four mistakes last
+ * week and one today is one, not five.
+ */
+async function noteWrongPassword(user, now) {
+  const limit = settings.get("auth.max_failed_sign_ins");
+  const minutes = settings.get("auth.lockout_minutes");
+  const stale = !user.lastFailedSignInAt || now - user.lastFailedSignInAt > minutes * 60_000;
+  const run = (stale ? 0 : user.failedSignIns) + 1;
+
+  if (run < limit) {
+    await user.update({ failedSignIns: run, lastFailedSignInAt: now });
+    return null;
+  }
+
+  const lockedUntil = new Date(now.getTime() + minutes * 60_000);
+  await user.update({ failedSignIns: 0, lastFailedSignInAt: now, lockedUntil });
+
+  await audit.record({
+    action: AUDIT_ACTIONS.AUTH_LOCKED,
+    actor: who(user),
+    entity: account(user),
+    after: { wrongPasswords: limit, lockedUntil },
+    outcome: "failure",
+    message: `sign-in paused for ${minutes} minutes after ${limit} wrong passwords in a row`,
+  });
+  // Told in the app, where the account's owner — still signed in, if they
+  // were — will see it whether or not the guesses were theirs.
+  await inbox.tryAdd(user.id, {
+    type: "account.sign_in_paused",
+    category: inbox.CATEGORY.ACCOUNT,
+    tone: "warning",
+    title: "Sign-in paused after wrong passwords",
+    body:
+      `The wrong password was entered ${limit} times in a row, so signing in is paused for ${minutes} ` +
+      "minutes. If that was not you, nobody got in — but consider changing your password.",
+    link: "/dashboard/profile",
+    key: `account:${user.id}:sign-in-paused:${lockedUntil.toISOString()}`,
+  });
+  return lockedUntil;
+}
+
+/**
+ * Check an email and password, without signing anyone in. Returns the account.
+ *
+ * Sign-in and the subscription check API both come through here, so the two
+ * cannot differ in what they accept — and a guesser does not get a second,
+ * softer door to try.
+ *
+ * ## The pause
+ *
+ * After `auth.max_failed_sign_ins` wrong passwords in a row the account takes
+ * no password at all for `auth.lockout_minutes` — a correct one included, or
+ * the pause would only slow a guesser down. It answers 429 with Retry-After.
+ * Resetting the password ends it, and sessions already open are untouched, so
+ * the owner of an account someone else is guessing at is not signed out.
+ *
+ * It is per account rather than per caller address: the site's traffic reaches
+ * the API through its hosting proxy, so callers' addresses cannot be told
+ * apart, and a limit on that one shared address would let a single person
+ * stop everybody signing in.
+ */
+function checkCredentials({ email, password }, { purpose = "sign-in" } = {}) {
+  const typed = email.toLowerCase().trim();
+
+  return oneAtATime(typed, async () => {
+    const user = await User.findOne({ where: { email: typed } });
+
+    // The caller is told only "invalid credentials" either way; the log says
+    // which, because telling a typo from someone guessing is what it is for.
+    const refuse = async (reason, error) => {
+      await audit.record({
+        action: AUDIT_ACTIONS.AUTH_LOGIN_FAILED,
+        actor: who(user, typed),
+        entity: account(user, typed),
+        after: { reason },
+        outcome: "failure",
+        message: `${purpose} refused: ${reason}`,
+      });
+      throw error;
+    };
+
+    if (!user) {
+      await bcrypt.compare(password, NOBODYS_HASH);
+      return refuse("no account with that email", ApiError.unauthorized("Invalid credentials"));
+    }
+
+    const now = new Date();
+    if (user.lockedUntil && user.lockedUntil > now) {
+      return refuse("paused after wrong passwords", paused(user.lockedUntil, now));
+    }
+
+    if (!(await user.verifyPassword(password))) {
+      const lockedUntil = await noteWrongPassword(user, now);
+      return refuse(
+        "wrong password",
+        lockedUntil ? paused(lockedUntil, now) : ApiError.unauthorized("Invalid credentials")
+      );
+    }
+
+    if (user.failedSignIns || user.lockedUntil) {
+      await user.update({ failedSignIns: 0, lastFailedSignInAt: null, lockedUntil: null });
+    }
+
+    if (!user.isVerified) {
+      return refuse("email not verified yet", ApiError.forbidden("Please verify your email before logging in"));
+    }
+    return user;
+  });
+}
+
 /** Authenticate with email + password, opening a session. */
 async function login({ email, password }, context) {
-  const typed = email.toLowerCase().trim();
-  const user = await User.findOne({ where: { email: typed } });
-
-  // The caller is told only "invalid credentials" either way; the log says
-  // which, because telling a typo from someone guessing is what it is for.
-  const refuse = async (reason, error) => {
-    await audit.record({
-      action: AUDIT_ACTIONS.AUTH_LOGIN_FAILED,
-      actor: who(user, typed),
-      entity: account(user, typed),
-      after: { reason },
-      outcome: "failure",
-      message: `sign-in refused: ${reason}`,
-    });
-    throw error;
-  };
-
-  if (!user) return refuse("no account with that email", ApiError.unauthorized("Invalid credentials"));
-
-  const match = await user.verifyPassword(password);
-  if (!match) return refuse("wrong password", ApiError.unauthorized("Invalid credentials"));
-
-  if (!user.isVerified) {
-    return refuse("email not verified yet", ApiError.forbidden("Please verify your email before logging in"));
-  }
+  const user = await checkCredentials({ email, password });
 
   const session = await buildSession(user, context);
   await audit.record({
@@ -300,6 +428,10 @@ async function resetPassword({ email, code, newPassword }) {
   user.verificationCodeExpires = null;
   // Resetting a password also confirms ownership of the email.
   user.isVerified = true;
+  // And ends any pause wrong passwords had earned: the owner is plainly here.
+  user.failedSignIns = 0;
+  user.lastFailedSignInAt = null;
+  user.lockedUntil = null;
   await user.save();
 
   // Whoever knew the old password no longer has a way in.
@@ -370,6 +502,7 @@ module.exports = {
   register,
   verifyEmail,
   resendVerification,
+  checkCredentials,
   login,
   refresh,
   logout,

@@ -140,6 +140,13 @@ register("notifications.prune", {
   handler: async () => require("../services/inboxService").prune(),
 });
 
+register("subscription.sweep", {
+  describe: "Marks subscriptions whose period is over as expired, and warns subscribers whose end is near",
+  everyMinutes: 60,
+  runOnBoot: true,
+  handler: async () => require("../services/subscriptionService").sweep(),
+});
+
 register("jobs.prune", {
   describe: "Deletes background jobs that succeeded longer ago than the configured number of days",
   everyMinutes: 24 * 60,

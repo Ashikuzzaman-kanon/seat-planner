@@ -108,6 +108,10 @@ module.exports = {
     { name: "Demo data", description: "Filling the system with demonstration data, and removing exactly that again" },
     { name: "Railway data", description: "Loading Bangladesh Railway's timetable and the seat plans transcribed for it" },
     { name: "Notifications", description: "Each person's in-app inbox: what happened, and what is waiting on them" },
+    {
+      name: "Subscriptions",
+      description: "What can be subscribed to, each person's subscription, and checking for one from outside the app",
+    },
     { name: "Meta", description: "Service metadata" },
   ],
 
@@ -518,7 +522,7 @@ module.exports = {
       Notification: obj({
         id: int(),
         type: str("What happened, e.g. booking.confirmed, refund.paid, plan.submitted, job.failed"),
-        category: { type: "string", enum: ["booking", "refund", "waitlist", "account", "approval", "plan", "system"] },
+        category: { type: "string", enum: ["booking", "refund", "waitlist", "account", "approval", "plan", "subscription", "system"] },
         tone: { type: "string", enum: ["info", "success", "warning", "danger", "neutral"] },
         title: str(),
         body: { ...str("One or two sentences, written when it happened"), nullable: true },
@@ -526,6 +530,35 @@ module.exports = {
         read: bool(),
         readAt: { type: "string", format: "date-time", nullable: true },
         createdAt: { type: "string", format: "date-time" },
+      }),
+
+      Subscription: obj({
+        id: int(),
+        code: str("How callers name it. Set when it is created and never changed, even if it is renamed"),
+        name: str(),
+        description: { ...str(), nullable: true },
+        isOpen: bool("Whether it takes new requests. Closing leaves running subscriptions alone"),
+        createdAt: { type: "string", format: "date-time" },
+      }),
+
+      UserSubscription: obj({
+        id: int(),
+        subscriptionId: int(),
+        userId: int(),
+        status: {
+          type: "string",
+          enum: ["pending", "active", "declined", "cancelled", "expired"],
+          description: "An active one whose time is up reads as expired at once, before the hourly sweep marks it",
+        },
+        valid: bool("Active and not yet run out, right now"),
+        requestedAt: { type: "string", format: "date-time" },
+        decidedAt: { type: "string", format: "date-time", nullable: true },
+        decisionNote: { ...str(), nullable: true },
+        startsAt: { type: "string", format: "date-time", nullable: true },
+        expiresAt: { ...str("The first instant it is no longer valid"), format: "date-time", nullable: true },
+        lastDay: { ...str("The last calendar day it is valid, in Dhaka (YYYY-MM-DD)"), nullable: true },
+        endedAt: { type: "string", format: "date-time", nullable: true },
+        endReason: { ...str(), nullable: true },
       }),
 
       NotificationSummary: obj({
@@ -1036,6 +1069,10 @@ module.exports = {
           200: response("Signed in", ref("Session")),
           401: errors[401],
           403: response("Email not yet verified", ref("Error")),
+          429: response(
+            "Sign-in is paused for this account after too many wrong passwords in a row. Retry-After says for how long",
+            ref("Error")
+          ),
         },
       },
     },
@@ -2576,6 +2613,219 @@ module.exports = {
         security: [{ bearerAuth: [] }],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" } }],
         responses: { 200: response("New summary", ref("NotificationSummary")), 404: errors[404] },
+      },
+    },
+
+    "/subscriptions/check": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Which subscriptions an email and password hold — for callers outside the app",
+        description:
+          "Needs no session and opens none, and answers from any origin. The password is checked exactly as " +
+          "sign-in checks it, and shares its pause: after too many wrong passwords in a row the account answers " +
+          "429 here and at sign-in until the pause is over. A wrong password and an unknown email are the same " +
+          "401. `subscriptions` lists every subscription there is, each with whether this account's is valid " +
+          "now; no dates.",
+        requestBody: body(obj({ email: str(), password: str() }, ["email", "password"])),
+        responses: {
+          200: response(
+            "The account, and yes or no for each subscription",
+            obj({
+              user: obj({ name: str(), email: str() }),
+              subscriptions: arr(obj({ code: str("The subscription's fixed code"), valid: bool() })),
+            })
+          ),
+          400: errors[400],
+          401: errors[401],
+          403: response("Email not yet verified", ref("Error")),
+          429: response("Paused after too many wrong passwords; see Retry-After", ref("Error")),
+        },
+      },
+    },
+
+    "/subscriptions": {
+      get: {
+        tags: ["Subscriptions"],
+        summary: "The subscriptions, each with your own standing",
+        description:
+          "Everyone signed in sees the open ones, and any closed one they have a history with. Whoever manages " +
+          "or approves sees all of them, with how many people are waiting or subscribed.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: response(
+            "The list",
+            obj({
+              subscriptions: arr({
+                allOf: [
+                  ref("Subscription"),
+                  obj({
+                    mine: { ...ref("UserSubscription"), nullable: true },
+                    counts: obj({ pending: int(), active: int() }),
+                  }),
+                ],
+              }),
+            })
+          ),
+          401: errors[401],
+        },
+      },
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Create a subscription",
+        ...secured("subscription:manage"),
+        requestBody: body(
+          obj(
+            {
+              name: str(),
+              description: str(),
+              code: str("Optional; made from the name when left out. Lowercase letters, digits and hyphens"),
+            },
+            ["name"]
+          )
+        ),
+        responses: {
+          201: response("Created", obj({ subscription: ref("Subscription") })),
+          400: errors[400],
+          403: errors[403],
+          409: errors[409],
+        },
+      },
+    },
+
+    "/subscriptions/mine": {
+      get: {
+        tags: ["Subscriptions"],
+        summary: "Everything you have asked for, newest first",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: response("Your history", obj({ subscriptions: arr(ref("UserSubscription")) })),
+          401: errors[401],
+        },
+      },
+    },
+
+    "/subscriptions/{id}": {
+      patch: {
+        tags: ["Subscriptions"],
+        summary: "Rename, re-describe, close or reopen",
+        description: "Closing declines whatever requests are still waiting. The code never changes.",
+        ...secured("subscription:manage"),
+        parameters: [pathParam("id", "Subscription id")],
+        requestBody: body(obj({ name: str(), description: str(), isOpen: bool() })),
+        responses: {
+          200: response("Updated", obj({ subscription: ref("Subscription") })),
+          400: errors[400],
+          404: errors[404],
+          409: errors[409],
+        },
+      },
+      delete: {
+        tags: ["Subscriptions"],
+        summary: "Delete one nobody has ever asked for",
+        ...secured("subscription:manage"),
+        parameters: [pathParam("id", "Subscription id")],
+        responses: { 200: response("Deleted", obj({ deleted: bool() })), 404: errors[404], 409: errors[409] },
+      },
+    },
+
+    "/subscriptions/{id}/requests": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Ask to be subscribed",
+        description: "Refused while you already have a request waiting or a subscription running for it.",
+        security: [{ bearerAuth: [] }],
+        parameters: [pathParam("id", "Subscription id")],
+        responses: { 201: response("Waiting for a reviewer", obj({ subscription: ref("UserSubscription") })), 404: errors[404], 409: errors[409] },
+      },
+    },
+
+    "/subscriptions/members": {
+      get: {
+        tags: ["Subscriptions"],
+        summary: "Requests and subscriptions across everyone",
+        ...secured("subscription:approve"),
+        parameters: [
+          queryParam("status", "pending, active, declined, cancelled or expired"),
+          queryParam("subscriptionId", "Only this subscription", "integer"),
+          queryParam("search", "Part of a name or email"),
+          queryParam("page", "Page number", "integer"),
+          queryParam("limit", "Page size, up to 100", "integer"),
+        ],
+        responses: {
+          200: response(
+            "A page",
+            obj({
+              members: arr(ref("UserSubscription")),
+              pagination: obj({ page: int(), limit: int(), total: int(), pages: int() }),
+            })
+          ),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/subscriptions/members/pending-count": {
+      get: {
+        tags: ["Subscriptions"],
+        summary: "How many requests are waiting",
+        ...secured("subscription:approve"),
+        responses: { 200: response("The count", obj({ pending: int() })), 403: errors[403] },
+      },
+    },
+
+    "/subscriptions/members/{id}/approve": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Approve a request for a period",
+        ...secured("subscription:approve"),
+        parameters: [pathParam("id", "Request id")],
+        requestBody: body(
+          obj({
+            days: int("Days from today in Dhaka"),
+            lastDay: str("Or the last day it is valid, YYYY-MM-DD. It runs through the end of that day in Dhaka"),
+            note: str(),
+          })
+        ),
+        responses: { 200: response("Now running", obj({ subscription: ref("UserSubscription") })), 400: errors[400], 404: errors[404], 409: errors[409] },
+      },
+    },
+
+    "/subscriptions/members/{id}/decline": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Decline a request",
+        ...secured("subscription:approve"),
+        parameters: [pathParam("id", "Request id")],
+        requestBody: body(obj({ note: str() }), false),
+        responses: { 200: response("Declined", obj({ subscription: ref("UserSubscription") })), 404: errors[404], 409: errors[409] },
+      },
+    },
+
+    "/subscriptions/members/{id}/cancel": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "End a subscription now, or withdraw a waiting request",
+        description: "Your own, always. Anyone's, with subscription:approve — without it, somebody else's is a 404.",
+        security: [{ bearerAuth: [] }],
+        parameters: [pathParam("id", "Request id")],
+        requestBody: body(obj({ reason: str() }), false),
+        responses: { 200: response("Cancelled", obj({ subscription: ref("UserSubscription") })), 404: errors[404], 409: errors[409] },
+      },
+    },
+
+    "/subscriptions/members/{id}": {
+      patch: {
+        tags: ["Subscriptions"],
+        summary: "Change when a running subscription ends",
+        ...secured("subscription:approve"),
+        parameters: [pathParam("id", "Request id")],
+        requestBody: body(
+          obj({
+            days: int("Days from today in Dhaka"),
+            lastDay: str("Or the last day it is valid, YYYY-MM-DD"),
+          })
+        ),
+        responses: { 200: response("Changed", obj({ subscription: ref("UserSubscription") })), 400: errors[400], 404: errors[404], 409: errors[409] },
       },
     },
 

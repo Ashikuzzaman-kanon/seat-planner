@@ -70,4 +70,7 @@ export const PERMISSIONS = {
   DEMO_MANAGE: "demo:manage",
 
   RAILWAY_MANAGE: "railway:manage",
+
+  SUBSCRIPTION_MANAGE: "subscription:manage",
+  SUBSCRIPTION_APPROVE: "subscription:approve",
 };
