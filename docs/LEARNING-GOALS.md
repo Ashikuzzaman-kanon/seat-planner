@@ -13,15 +13,15 @@ Code links open the file at the line where the feature lives — on GitHub, or i
 | ORM — Sequelize | 11 | 1 | 0 |
 | NoSQL — MongoDB | 1 | 0 | 0 |
 | Logging | 2 | 2 | 1 |
-| Unit testing | 2 | 0 | 1 |
+| Unit testing | 3 | 0 | 0 |
 | Application deployment — Docker | 2 | 0 | 0 |
 | Application deployment — cloud | 2 | 2 | 1 |
 | Also exercised | 2 | 0 | 0 |
-| **Total** | **26** | **5** | **4** |
+| **Total** | **27** | **5** | **3** |
 
 Not covered by this codebase: *Debugging Techniques (Advanced)* and *Operating System (Advanced)* —
 skills practised while building it, but with no code of their own to point to; and *Jenkins*, as CI
-here is planned on GitHub Actions.
+here runs on GitHub Actions.
 
 ## Database — SQL
 
@@ -29,17 +29,17 @@ here is planned on GitHub Actions.
 
 **Topic.** A transaction makes several statements succeed or fail together; a row lock stops another transaction changing a row until this one finishes.
 
-**In Seat Planner.** A purchase writes the booking, tickets, seat segments, wallet debit and payment in one transaction, re-reading the hold with `SELECT … FOR UPDATE` in case it expired meanwhile. Wallet rows are locked the same way, so five simultaneous purchases on one wallet cannot overspend it.
+**In Seat Planner.** A purchase writes the booking, tickets, seat segments, wallet debit and payment in one transaction, re-reading the hold with `SELECT … FOR UPDATE` in case it expired meanwhile. Wallet rows are locked the same way, so five simultaneous purchases on one wallet cannot overspend it. Deciding a subscription request locks its row first too, so two reviewers cannot both act on it.
 
-**Code.** [booking transaction](../backend/src/services/bookingService.js#L213) · [hold locked FOR UPDATE](../backend/src/services/bookingService.js#L216) · [wallet row lock](../backend/src/services/walletService.js#L57)
+**Code.** [booking transaction](../backend/src/services/bookingService.js#L214) · [hold locked FOR UPDATE](../backend/src/services/bookingService.js#L217) · [wallet row lock](../backend/src/services/walletService.js#L57) · [subscription decision lock](../backend/src/services/subscriptionService.js#L393)
 
 ### 2. ✅ Constraints and referential integrity
 
 **Topic.** Foreign keys with the right delete rule (restrict, cascade, set null) and unique keys keep the data consistent whatever the code does.
 
-**In Seat Planner.** A booking can never lose its departure (RESTRICT); a departure's coaches and seats go with it (CASCADE); a train cannot run twice on one date, nor have two coaches in one position (UNIQUE). Above all, a seat can be sold only once per leg: the unique key on (seat, segment) is the last guard against double-selling, even when two purchases race.
+**In Seat Planner.** A booking can never lose its departure (RESTRICT); a departure's coaches and seats go with it (CASCADE); a train cannot run twice on one date, nor have two coaches in one position (UNIQUE). Above all, a seat can be sold only once per leg: the unique key on (seat, segment) is the last guard against double-selling, even when two purchases race. The same idea stops a person holding two live requests for one subscription: a key that is unique while the request is live and NULL once it has ended.
 
-**Code.** [foreign-key helper](../backend/migrations/20260104000000-composition-and-trips.js#L21) · [one departure per train per date](../backend/migrations/20260104000000-composition-and-trips.js#L80) · [one coach per position](../backend/migrations/20260104000000-composition-and-trips.js#L39) · [one sale per seat per leg](../backend/migrations/20260105000000-segment-inventory.js#L51) · [booking tables](../backend/migrations/20260106000000-booking-and-payment.js)
+**Code.** [foreign-key helper](../backend/migrations/20260104000000-composition-and-trips.js#L21) · [one departure per train per date](../backend/migrations/20260104000000-composition-and-trips.js#L80) · [one coach per position](../backend/migrations/20260104000000-composition-and-trips.js#L39) · [one sale per seat per leg](../backend/migrations/20260105000000-segment-inventory.js#L51) · [booking tables](../backend/migrations/20260106000000-booking-and-payment.js) · [one live request each](../backend/migrations/20260122000000-subscriptions.js#L75)
 
 ### 3. ✅ Indexing
 
@@ -55,7 +55,7 @@ here is planned on GitHub Actions.
 
 **In Seat Planner.** Workers read due jobs without locks, then claim one with `UPDATE … WHERE status = 'queued'`; whoever's update matches first owns it. A lease that is not renewed lets another worker take over a job whose worker died.
 
-**Code.** [jobService.claimNext](../backend/src/services/jobService.js#L152) · [lease heartbeat](../backend/src/services/jobService.js#L191)
+**Code.** [jobService.claimNext](../backend/src/services/jobService.js#L206) · [lease heartbeat](../backend/src/services/jobService.js#L245)
 
 ### 5. ⏳ Partitioning
 
@@ -81,13 +81,13 @@ here is planned on GitHub Actions.
 
 **In Seat Planner.** Deleting demo data is one managed transaction — any refusal rolls every delete back. A job queued inside a transaction is only started after that transaction commits (`afterCommit`), so a job never runs for a change that was rolled back.
 
-**Code.** [afterCommit](../backend/src/services/jobService.js#L127) · [all-or-nothing delete](../backend/src/services/demoService.js#L889) · [tripService.cancel](../backend/src/services/tripService.js#L481)
+**Code.** [afterCommit](../backend/src/services/jobService.js#L181) · [all-or-nothing delete](../backend/src/services/demoService.js#L889) · [tripService.cancel](../backend/src/services/tripService.js#L486)
 
 ### 8. ✅ Understanding the generated SQL
 
 **Topic.** Seeing the SQL the ORM actually sends, to catch inefficient or surprising queries.
 
-**In Seat Planner.** In development every statement Sequelize runs is printed to the console; production turns it off.
+**In Seat Planner.** In development every statement Sequelize runs is printed to the console; production and the test run turn it off.
 
 **Code.** [logging option](../backend/src/config/database.js#L17)
 
@@ -95,15 +95,15 @@ here is planned on GitHub Actions.
 
 **Topic.** Loading reference and sample data repeatably.
 
-**In Seat Planner.** Command-line seeders build users, seat plans, the network and departures, idempotently. The in-app Demo Data button builds the same data through the normal services.
+**In Seat Planner.** Command-line seeders build users, seat plans, the network and departures, idempotently. The in-app Demo Data button builds the same data through the normal services, and *Railway Data* loads the real railway's published timetable from a snapshot in the repository — adding what is missing, never changing what is there, so it too can run twice.
 
-**Code.** [importSeatPlans.js](../backend/src/seeders/importSeatPlans.js) · [seedNetwork.js](../backend/src/seeders/seedNetwork.js) · [seedDepartures.js](../backend/src/seeders/seedDepartures.js) · [demoService.populate](../backend/src/services/demoService.js#L814)
+**Code.** [importSeatPlans.js](../backend/src/seeders/importSeatPlans.js) · [seedNetwork.js](../backend/src/seeders/seedNetwork.js) · [seedDepartures.js](../backend/src/seeders/seedDepartures.js) · [demoService.populate](../backend/src/services/demoService.js#L814) · [railwayService.load](../backend/src/services/railwayService.js#L380) · [the timetable snapshot](../backend/src/data/railway/timetable.json)
 
 ### 10. ✅ Migrations, and debugging a migration
 
 **Topic.** Versioned schema changes, and getting a risky one right against real data.
 
-**In Seat Planner.** 19 migrations run on every deploy. One converted the first release's single `users.role` column into roles-as-data on the live database; it was rehearsed against a copy of the old schema before it ran.
+**In Seat Planner.** 25 migrations run on every deploy. One converted the first release's single `users.role` column into roles-as-data on the live database; it was rehearsed against a copy of the old schema before it ran.
 
 **Code.** [role-column migration](../backend/migrations/20260101000001-rbac-from-role-column.js) · [migration folder](../backend/migrations)
 
@@ -129,15 +129,15 @@ here is planned on GitHub Actions.
 
 **In Seat Planner.** Global `afterCreate` / `afterBulkCreate` hooks note every row created while demo data is being built, in the same transaction as the row, so the demo can later be removed exactly.
 
-**Code.** [demoCapture.install](../backend/src/utils/demoCapture.js#L50) · [registered here](../backend/src/models/index.js#L93)
+**Code.** [demoCapture.install](../backend/src/utils/demoCapture.js#L50) · [registered here](../backend/src/models/index.js#L105)
 
 ### 14. ✅ Duplicate entries
 
 **Topic.** Avoiding, and reporting well, rows that already exist.
 
-**In Seat Planner.** Seeding uses `findOrCreate` so it can run twice; a unique-constraint violation anywhere is answered with a clear 409 instead of a crash.
+**In Seat Planner.** Seeding uses `findOrCreate` so it can run twice; a unique-constraint violation anywhere is answered with a clear 409 instead of a crash. A notification carries a key per event under a unique index, so a job that is retried cannot tell someone twice; a device turned away again and again is one row whose count goes up (`INSERT … ON DUPLICATE KEY UPDATE`), not a row per attempt.
 
-**Code.** [findOrCreate](../backend/src/services/demoService.js#L420) · [unique violation → 409](../backend/src/middleware/errorHandler.js#L13)
+**Code.** [findOrCreate](../backend/src/services/demoService.js#L420) · [unique violation → 409](../backend/src/middleware/errorHandler.js#L13) · [a notification told once](../backend/src/services/inboxService.js#L56) · [one row per refusal, counted](../backend/src/services/deviceService.js#L183)
 
 ### 15. ✅ Caching
 
@@ -145,7 +145,7 @@ here is planned on GitHub Actions.
 
 **In Seat Planner.** Settings are loaded into memory at start and read synchronously. Each user's permissions are cached for 60 seconds and dropped the moment their roles change. The Gmail access token is reused until shortly before it expires. (Caching hot availability reads is Phase 9.)
 
-**Code.** [settingService.get](../backend/src/services/settingService.js#L43) · [permissionService.getAccess](../backend/src/services/permissionService.js#L95) · [invalidateUser](../backend/src/services/permissionService.js#L105) · [gmailAccessToken](../backend/src/services/emailService.js#L111)
+**Code.** [settingService.get](../backend/src/services/settingService.js#L43) · [permissionService.getAccess](../backend/src/services/permissionService.js#L95) · [invalidateUser](../backend/src/services/permissionService.js#L105) · [gmailAccessToken](../backend/src/services/emailService.js#L117)
 
 ### 16. 🟡 Repository pattern
 
@@ -197,15 +197,15 @@ here is planned on GitHub Actions.
 
 **In Seat Planner.** Partly: the server uses `console.info` / `warn` / `error` with a prefix per area (`[email]`, `[jobs]`). A real logger with levels and JSON output is Phase 9.
 
-**Code.** [email route logged at start](../backend/src/services/emailService.js#L33) · [job worker errors](../backend/src/services/jobService.js#L312)
+**Code.** [email route logged at start](../backend/src/services/emailService.js#L38) · [job worker errors](../backend/src/services/jobService.js#L368)
 
 ### 22. 🟡 Retention
 
 **Topic.** Keeping records only as long as they are useful.
 
-**In Seat Planner.** Partly: finished job records are pruned after a configurable number of days. Log rotation is Phase 9.
+**In Seat Planner.** Partly: finished job records and old notifications are pruned after a configurable number of days, the record of subscription checks that were turned away is capped per account and dropped after ninety, and the unsold seats of trains long gone are cleared daily while everything with money or a journey behind it is kept. Log rotation is Phase 9.
 
-**Code.** [jobService.prune](../backend/src/services/jobService.js#L501)
+**Code.** [jobService.prune](../backend/src/services/jobService.js#L557) · [inboxService.prune](../backend/src/services/inboxService.js#L160) · [deviceService.pruneRefusals](../backend/src/services/deviceService.js#L400) · [seatRetentionService.clearDeparted](../backend/src/services/seatRetentionService.js#L68)
 
 ### 23. ⏳ Asynchronous logging, frameworks, rotation, distributed logging
 
@@ -221,9 +221,9 @@ here is planned on GitHub Actions.
 
 **Topic.** Writing tests for business rules as small pure functions, independent of the database.
 
-**In Seat Planner.** 205 unit tests cover money arithmetic, refund percentages, segment overlap, seat auto-selection, standing capacity, ticket signing and job retry timing.
+**In Seat Planner.** 265 unit tests cover money arithmetic, refund percentages, segment overlap, seat auto-selection, standing capacity, ticket signing, job retry timing, timetable arithmetic, subscription periods and device limits.
 
-**Code.** [refundPolicy tests](../backend/tests/refundPolicy.test.js) · [autoSelect tests](../backend/tests/autoSelect.test.js) · [money tests](../backend/tests/money.test.js) · [availability tests](../backend/tests/availability.test.js)
+**Code.** [refundPolicy tests](../backend/tests/unit/refundPolicy.test.js) · [autoSelect tests](../backend/tests/unit/autoSelect.test.js) · [money tests](../backend/tests/unit/money.test.js) · [availability tests](../backend/tests/unit/availability.test.js) · [timetable tests](../backend/tests/unit/timetable.test.js) · [device-limit tests](../backend/tests/unit/subscriptionDevices.test.js)
 
 ### 25. ✅ Testing asynchronous code
 
@@ -231,15 +231,15 @@ here is planned on GitHub Actions.
 
 **In Seat Planner.** Email delivery is tested against local HTTP servers standing in for Google and Brevo — including a server that never answers (the send gives up in time) and a rejected token (refreshed and retried once).
 
-**Code.** [Gmail tests](../backend/tests/emailGmail.test.js) · [Brevo tests](../backend/tests/emailBrevo.test.js)
+**Code.** [Gmail tests](../backend/tests/unit/emailGmail.test.js) · [Brevo tests](../backend/tests/unit/emailBrevo.test.js)
 
-### 26. ⏳ Code coverage and CI
+### 26. ✅ Code coverage and CI
 
 **Topic.** Measuring how much code the tests exercise, and running them automatically on every change.
 
-**In Seat Planner.** Phase 9, step 1: move the 39 integration suites into the repository, measure coverage, and run everything on GitHub Actions against a MySQL service on every push.
+**In Seat Planner.** 44 integration suites live in the repository beside the unit tests. They build a database of their own, snapshot it and restore it before every suite, and talk to the API over HTTP. Coverage is measured across the unit and integration runs together, and the build fails below 90% of lines and functions or 70% of branches. GitHub Actions runs all of it on every pull request and every push to `master`, against MySQL and MongoDB services, with a production build of the web app.
 
-**Code.** [build plan, Phase 9](../REQUIREMENTS.md)
+**Code.** [ci.yml](../.github/workflows/ci.yml) · [integration runner](../backend/tests/integration/run.js) · [snapshot and restore](../backend/tests/integration/run.js#L138) · [coverage floors](../backend/package.json#L24) · [what is measured](../backend/.c8rc.json)
 
 ## Application deployment — Docker
 
@@ -267,23 +267,23 @@ here is planned on GitHub Actions.
 
 **In Seat Planner.** Web on Vercel, API on Render (Docker), MySQL on Aiven, audit log on MongoDB Atlas. The web app proxies `/api` to the API, so the browser only ever talks to one origin.
 
-**Code.** [API proxy](../frontend/next.config.mjs#L18) · [README: Deployment](../README.md)
+**Code.** [API proxy](../frontend/next.config.mjs#L29) · [README: Deployment](../README.md)
 
 ### 30. ✅ Security in deployment
 
 **Topic.** Keeping secrets and traffic safe once the system is public.
 
-**In Seat Planner.** TLS to the database; a CORS allow-list; secrets only in environment variables; mail sent over HTTPS because the host blocks SMTP.
+**In Seat Planner.** TLS to the database; a CORS allow-list that admits the project's own preview deployments by pattern, with one endpoint deliberately open to any origin because nothing of the browser's own goes with a call to it; secrets only in environment variables, and the Android app's signing key only in repository secrets; mail sent over HTTPS because the host blocks SMTP.
 
-**Code.** [database TLS](../backend/src/config/database.js#L9) · [CORS allow-list](../backend/src/app.js#L47) · [email over HTTPS](../backend/src/services/emailService.js#L154)
+**Code.** [database TLS](../backend/src/config/database.js#L9) · [CORS allow-list](../backend/src/utils/allowedOrigin.js#L66) · [the one open route](../backend/src/app.js#L34) · [email over HTTPS](../backend/src/services/emailService.js#L161)
 
 ### 31. 🟡 CI/CD
 
 **Topic.** Building, testing and deploying automatically from the repository.
 
-**In Seat Planner.** Partly: Vercel deploys the web app on every push; the API deploy is started by hand. An automated test gate is Phase 9.
+**In Seat Planner.** Partly: GitHub Actions runs the tests, the coverage floors and a production build of the web app on every pull request and every push to `master`, and a tag builds, tests, signs and publishes the Android app. Vercel deploys the web app on every push; the API deploy is started by hand. Nothing yet makes a deploy wait for the checks to pass.
 
-**Code.** [README: Deployment](../README.md)
+**Code.** [ci.yml](../.github/workflows/ci.yml) · [android.yml](../.github/workflows/android.yml) · [README: Deployment](../README.md)
 
 ### 32. 🟡 Rollback and disaster recovery
 
@@ -307,14 +307,14 @@ here is planned on GitHub Actions.
 
 **Topic.** Many people acting on the same seats and money at the same moment.
 
-**In Seat Planner.** Seat holds claim segments atomically — the unique key on (seat, segment) makes the loser of a race fail cleanly — wallet rows are locked, background jobs use leases with heartbeats, and de-duplication keys stop two clicks queueing two mass refunds.
+**In Seat Planner.** Seat holds claim segments atomically — the unique key on (seat, segment) makes the loser of a race fail cleanly — wallet rows are locked, background jobs use leases with heartbeats, and de-duplication keys stop two clicks queueing two mass refunds. A device takes a place on a subscription with the account's row locked, so of six new devices arriving together exactly one gets the last place; password checks for one email run one at a time, so a burst of guesses is counted in order.
 
-**Code.** [holdService.create](../backend/src/services/holdService.js#L60) · [seat-segment unique key](../backend/migrations/20260105000000-segment-inventory.js#L51) · [job de-duplication](../backend/src/services/jobService.js#L102) · [lease heartbeat](../backend/src/services/jobService.js#L191)
+**Code.** [holdService.create](../backend/src/services/holdService.js#L62) · [seat-segment unique key](../backend/migrations/20260105000000-segment-inventory.js#L51) · [job de-duplication](../backend/src/services/jobService.js#L156) · [lease heartbeat](../backend/src/services/jobService.js#L245) · [a place taken under a lock](../backend/src/services/deviceService.js#L241) · [one password check at a time](../backend/src/services/authService.js#L188)
 
 ### 35. ✅ Authentication and authorization
 
 **Topic.** Proving who someone is, and deciding what they may do.
 
-**In Seat Planner.** Hashed passwords, short-lived JWTs with rotating refresh tokens, and permissions as data with an escalation guard.
+**In Seat Planner.** Hashed passwords, short-lived JWTs with rotating refresh tokens, and permissions as data with an escalation guard. Sign-in pauses for an account after a run of wrong passwords. A caller outside the app can check a subscription with an email and password — through the same check as sign-in, pause included — and is given no session.
 
-**Code.** [tokenService.rotateRefreshToken](../backend/src/services/tokenService.js#L74) · [escalation guard](../backend/src/services/roleService.js#L24)
+**Code.** [tokenService.rotateRefreshToken](../backend/src/services/tokenService.js#L74) · [escalation guard](../backend/src/services/roleService.js#L24) · [the pause after wrong passwords](../backend/src/services/authService.js#L216) · [one check for sign-in and outside callers](../backend/src/services/authService.js#L274)
