@@ -29,6 +29,11 @@ const REASON = Object.freeze({
   LIMIT_REACHED: "limit_reached",
   /** A device with a place, but beyond what the subscription allows now. */
   BEYOND_LIMIT: "beyond_limit",
+  /**
+   * Not about the device at all: the account has no subscription running. It
+   * is the reason on the record of a check, never a row among the refusals.
+   */
+  NO_SUBSCRIPTION: "no_subscription",
 });
 
 const PLATFORM_VALUE = /^[a-z0-9]+(?:[-_.][a-z0-9]+)*$/;

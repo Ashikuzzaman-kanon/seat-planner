@@ -270,8 +270,12 @@ async function noteWrongPassword(user, now) {
  * the API through its hosting proxy, so callers' addresses cannot be told
  * apart, and a limit on that one shared address would let a single person
  * stop everybody signing in.
+ *
+ * `detail` goes on the record of a refusal beside its reason — the device a
+ * subscription check said it came from, so a run of wrong passwords can be
+ * traced to where it was tried.
  */
-function checkCredentials({ email, password }, { purpose = "sign-in" } = {}) {
+function checkCredentials({ email, password }, { purpose = "sign-in", detail = {} } = {}) {
   const typed = email.toLowerCase().trim();
 
   return oneAtATime(typed, async () => {
@@ -284,7 +288,7 @@ function checkCredentials({ email, password }, { purpose = "sign-in" } = {}) {
         action: AUDIT_ACTIONS.AUTH_LOGIN_FAILED,
         actor: who(user, typed),
         entity: account(user, typed),
-        after: { reason },
+        after: { reason, ...detail },
         outcome: "failure",
         message: `${purpose} refused: ${reason}`,
       });

@@ -356,8 +356,15 @@ curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
   or malformed `deviceId` — each is the same `200` in the same shape, with no
   reason. The reason is kept for staff: on the account's devices (*Subscribers
   → Devices → Turned away*), one row per device and reason with a count, the
-  newest hundred per account for ninety days — and in the audit log as
-  `subscription.device_refuse`, when the audit log is configured.
+  newest hundred per account for ninety days — and in the audit log.
+- **Every call is in the audit log**, when the audit log is configured — a
+  device's hundredth check as much as its first. A call that is answered is a
+  `subscription.check` entry: the account, the `deviceId` and `platform` sent,
+  which subscriptions came back valid, and when none did, why. A call refused
+  at the password is `auth.login_failed`, with the same device details. A
+  device taking a place adds a `subscription.device_add` entry of its own.
+  That is one entry per call with nothing clearing them out, so a caller that
+  checks often is what will fill the audit store first.
 - **It answers from any origin** — a page on any other site may call it. The
   rest of the API stays limited to `CORS_ORIGINS`. That is safe here because
   nothing of the browser's own goes with the call: the caller sends the email

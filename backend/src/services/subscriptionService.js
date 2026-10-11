@@ -730,14 +730,19 @@ async function pendingCount() {
  *
  * No dates, and no reasons: a device turned away for any cause is simply
  * `valid: false` — why is written down for staff, not returned.
+ *
+ * Every call is put in the audit log with what it was answered (deviceService
+ * `noteCheck`) — a device's hundredth check as much as its first.
  */
 async function validityFor(user, sent = {}, now = new Date()) {
   const [subscriptions, held] = await Promise.all([
     Subscription.findAll({ attributes: ["id", "code"], order: [["code", "ASC"]] }),
     UserSubscription.findAll({ where: { userId: user.id, status: STATUS.ACTIVE, expiresAt: { [Op.gt]: now } } }),
   ]);
-  const valid = await devices.admit(user, sent, held, now);
-  return subscriptions.map((s) => ({ code: s.code, valid: valid.has(s.id) }));
+  const verdict = await devices.admit(user, sent, held, now);
+  const answer = subscriptions.map((s) => ({ code: s.code, valid: verdict.allowed.has(s.id) }));
+  await devices.noteCheck(user, sent, verdict, answer.filter((a) => a.valid).map((a) => a.code));
+  return answer;
 }
 
 /* ------------------------------------------------------------------ *

@@ -29,11 +29,28 @@ const { REASON } = rules;
  * device screen, and in the audit log when there is one — and none of them is
  * returned. Telling a caller "limit reached" or "blocked" is telling it what
  * to change next.
+ *
+ * ## What is written down
+ *
+ * Every check, not only the remarkable ones: `noteCheck` puts one entry in the
+ * audit log for each check that is answered, whether it came from a device on
+ * its first call or its thousandth, and whether the answer was yes or no. A
+ * device taking a place is a second entry of its own, because that is a
+ * change to the account and not only a question asked of it.
  */
 
 const person = (user) => ({ id: user.id, email: user.email });
 const account = (user) => ({ type: "user", id: user.id, label: user.email });
 const clean = (text) => (typeof text === "string" && text.trim() ? text.trim() : null);
+
+/**
+ * The device a check says it came from, as it goes on record: whatever was
+ * sent, cut to fit, or null where nothing was.
+ */
+const asRecorded = (sent = {}) => ({
+  platform: rules.asSent(sent.platform, 40).toLowerCase() || null,
+  deviceId: rules.asSent(sent.deviceId, 128) || null,
+});
 
 /* ------------------------------------------------------------------ *
  * Platforms
@@ -163,13 +180,15 @@ const REASON_WORDS = Object.freeze({
   [REASON.BLOCKED]: "the device is blocked",
   [REASON.LIMIT_REACHED]: "every place on that platform is taken",
   [REASON.BEYOND_LIMIT]: "the device has a place, but beyond what the subscription allows now",
+  [REASON.NO_SUBSCRIPTION]: "the account has no subscription running",
 });
 
 /**
- * Write down that a check was turned away, and why. Never throws: failing to
- * record a refusal must not turn into a different answer for the caller.
+ * Keep the row staff read on the account's device screen: that this device
+ * was turned away, why, and how many times. Never throws: failing to keep it
+ * must not turn into a different answer for the caller.
  */
-async function noteRefusal(user, sent, reason, detail = {}) {
+async function keepRefusal(user, sent, reason) {
   const platformValue = rules.asSent(sent.platform, 40).toLowerCase();
   const deviceId = rules.asSent(sent.deviceId, 128);
 
@@ -197,31 +216,28 @@ async function noteRefusal(user, sent, reason, detail = {}) {
   } catch (err) {
     console.error(`[devices] could not record a refusal for user ${user.id}: ${err.message}`);
   }
-
-  await audit.record({
-    action: AUDIT_ACTIONS.SUBSCRIPTION_DEVICE_REFUSE,
-    actor: person(user),
-    entity: account(user),
-    after: { reason, platform: platformValue || null, deviceId: deviceId || null, ...detail },
-    outcome: "failure",
-    message: `subscription check answered "not valid": ${REASON_WORDS[reason] || reason}`,
-  });
 }
 
 /**
  * Decide which of an account's running subscriptions the device in this check
- * may use. Returns the ids of those subscriptions — empty when it may use none.
+ * may use.
+ *
+ * Returns `{ allowed, reason, detail, added }`: `allowed` is the ids of those
+ * subscriptions, empty when it may use none — and then `reason` says why.
+ * `added` is true when the device took a place just now, and `detail` is what
+ * the numbers were, for the record.
  *
  * `memberships` are the account's valid UserSubscription rows. With none there
- * is nothing to use a device on, so nothing is recorded either way.
+ * is nothing to use a device on: that is its own reason, and not a device
+ * being turned away, so no refusal row is kept for it.
  */
 async function admit(user, sent, memberships, now = new Date()) {
-  const nothing = new Set();
-  if (!memberships.length) return nothing;
+  const verdict = (found = {}) => ({ allowed: new Set(), reason: null, detail: {}, added: false, ...found });
+  if (!memberships.length) return verdict({ reason: REASON.NO_SUBSCRIPTION });
 
-  const refuse = async (reason, detail) => {
-    await noteRefusal(user, sent, reason, detail);
-    return nothing;
+  const refuse = async (reason, detail = {}) => {
+    await keepRefusal(user, sent, reason);
+    return verdict({ reason, detail });
   };
 
   const device = rules.cleanDeviceId(sent.deviceId);
@@ -277,7 +293,39 @@ async function admit(user, sent, memberships, now = new Date()) {
 
   const allowed = memberships.filter((m) => outcome.place <= rules.limitFor(m.deviceLimits, platform.id));
   if (!allowed.length) return refuse(REASON.BEYOND_LIMIT, { place: outcome.place, mostAllowed: most });
-  return new Set(allowed.map((m) => m.subscriptionId));
+  return verdict({
+    allowed: new Set(allowed.map((m) => m.subscriptionId)),
+    added: Boolean(outcome.added),
+    detail: { place: outcome.place, mostAllowed: most },
+  });
+}
+
+/**
+ * Put a check that was answered in the audit log — every one: from a device
+ * on its first call or one seen a thousand times, answered yes or no.
+ *
+ * `verdict` is what `admit` decided and `validCodes` the subscriptions that came
+ * back valid. With none, the entry carries the reason — which is the only
+ * place a caller's "not valid" is explained.
+ */
+async function noteCheck(user, sent, verdict, validCodes) {
+  const valid = validCodes.length > 0;
+  await audit.record({
+    action: AUDIT_ACTIONS.SUBSCRIPTION_CHECK,
+    actor: person(user),
+    entity: account(user),
+    after: {
+      ...asRecorded(sent),
+      valid: validCodes,
+      ...(valid ? {} : { reason: verdict.reason }),
+      ...(verdict.added ? { newDevice: true } : {}),
+      ...verdict.detail,
+    },
+    outcome: valid ? "success" : "failure",
+    message: valid
+      ? `subscription check answered "valid" for ${validCodes.join(", ")}${verdict.added ? " — from a new device, which took a place" : ""}`
+      : `subscription check answered "not valid": ${REASON_WORDS[verdict.reason] || verdict.reason}`,
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -411,7 +459,9 @@ module.exports = {
   updatePlatform,
   removePlatform,
   limitsOut,
+  asRecorded,
   admit,
+  noteCheck,
   devicesOf,
   devicesOfUser,
   updateDevice,
