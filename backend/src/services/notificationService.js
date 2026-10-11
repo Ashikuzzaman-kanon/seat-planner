@@ -1,6 +1,8 @@
 const { User } = require("../models");
 const email = require("./emailService");
-const money = require("../utils/money");
+const inbox = require("./inboxService");
+
+const { CATEGORY } = inbox;
 
 /**
  * Telling passengers what happened to their money and their seats.
@@ -31,59 +33,33 @@ const money = require("../utils/money");
  * back. Callers collect what to say, commit, and then say it.
  */
 
-/* ---------------- The shell every message shares ---------------- */
+/* ---------------- The look every message shares ---------------- */
 
-const BRAND = "#1d4ed8";
+// Built from the shared email layout (src/emails/layout.js), so every message
+// — these, the codes, the tickets — looks like it came from the same place.
+const ui = require("../emails/layout");
 
-function shell({ title, accent = BRAND, lead, body = "", footer }) {
-  return `
-    <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#1f2937;max-width:560px;">
-      <h2 style="color:${accent};margin:0 0 4px;">${title}</h2>
-      ${lead ? `<p style="margin:0 0 20px;color:#6b7280;">${lead}</p>` : ""}
-      ${body}
-      ${
-        footer
-          ? `<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">${footer}</p>`
-          : ""
-      }
-    </div>`;
-}
-
-const rows = (pairs) => `
-  <table style="border-collapse:collapse;margin-bottom:20px;">
-    ${pairs
-      .filter(([, value]) => value !== null && value !== undefined && value !== "")
-      .map(
-        ([label, value]) => `
-      <tr>
-        <td style="padding:6px 16px 6px 0;color:#6b7280;font-size:13px;">${label}</td>
-        <td style="padding:6px 0;color:#111827;font-size:14px;font-weight:600;">${value}</td>
-      </tr>`
-      )
-      .join("")}
-  </table>`;
-
-const note = (text, colour = "#b45309") =>
-  `<p style="margin:0 0 16px;color:${colour};font-size:14px;">${text}</p>`;
+const reference = (label, value) => ui.trusted(`${ui.esc(label)} ${ui.esc(ui.strong(value))}`);
 
 /**
- * One way out.
+ * Tell one account, in the app and by email.
  *
- * Takes a user id rather than an address so no caller has to do the lookup, and
- * swallows everything: see the note above about why a failed send must never
- * become a failed operation.
- */
-/**
- * Send one message to one account.
+ * Takes a user id rather than an address so no caller has to do the lookup.
  *
- * Ordinarily a failure is logged and swallowed — a message is a courtesy laid
- * on top of state that is already durable, and must never fail the operation
- * that caused it. `strict` is for a caller that *wants* to know: a queued job
- * sending the message, which retries it on failure instead of losing it.
- * Having no email address is not a failure in either mode; there is nothing to
- * retry.
+ * The in-app notification is written first and on its own: it reaches a
+ * person with no email address, and survives a mail server that is down. It
+ * never throws, and carries a key where a retry could repeat it, so a queued
+ * job that tries the email again leaves one notification, not several.
+ *
+ * Ordinarily an email failure is logged and swallowed — a message is a
+ * courtesy laid on top of state that is already durable, and must never fail
+ * the operation that caused it. `strict` is for a caller that *wants* to know:
+ * a queued job sending the message, which retries it on failure instead of
+ * losing it. Having no email address is not a failure in either mode; there is
+ * nothing to retry.
  */
-async function deliver(userId, { subject, html }, { strict = false } = {}) {
+async function deliver(userId, { subject, html, inApp }, { strict = false } = {}) {
+  if (userId && inApp) await inbox.tryAdd(userId, inApp);
   try {
     if (!userId) return false;
     const user = await User.findByPk(userId, { attributes: ["email"] });
@@ -111,40 +87,85 @@ async function deliver(userId, { subject, html }, { strict = false } = {}) {
  * they have been robbed in a fortnight.
  */
 async function ticketReturned({ userId, refund, ticket, journey, immediate, segments = 0 }) {
+  const subject = immediate
+    ? `Ticket returned — ${ui.taka(refund.refundedMinor)} credited (${refund.reference})`
+    : `Ticket returned — waiting on resale (${refund.reference})`;
 
-  const body = immediate
-    ? rows([
-        ["Ticket", ticket?.ticketNumber],
-        ["Journey", journey],
-        ["Fare paid", money.format(refund.fareMinor)],
-        ["Deduction", `${refund.deductionPercent}%`],
-        ["Credited to your wallet", money.format(refund.refundedMinor)],
-      ]) + note("The money is in your wallet now and can be spent or withdrawn.", "#15803d")
-    : rows([
-        ["Ticket", ticket?.ticketNumber],
-        ["Journey", journey],
-        ["Fare paid", money.format(refund.fareMinor)],
-        ["Most you can receive", money.format(refund.maximumMinor)],
-        ["Segments waiting to resell", segments],
-      ]) +
-      note(
-        "Nothing has been paid yet. A demand-based return pays only as the seat is bought " +
-          "again, segment by segment — you will be emailed each time part of it sells. " +
-          "Anything still unsold when the train leaves refunds nothing, which is the trade " +
-          "you took for the larger amount."
-      );
+  const html = immediate
+    ? ui.page({
+        subject,
+        preheader: `${ui.taka(refund.refundedMinor)} is in your wallet now.`,
+        eyebrow: "Ticket returned",
+        tone: "success",
+        title: "Your return is paid",
+        intro: reference("Return reference", refund.reference),
+        body:
+          ui.amount({
+            label: "Credited to your wallet",
+            value: ui.taka(refund.refundedMinor),
+            caption: "The money is in your wallet now and can be spent or withdrawn.",
+            tone: "success",
+          }) +
+          ui.details([
+            ["Ticket", ticket?.ticketNumber],
+            ["Journey", journey],
+            ["Fare paid", ui.taka(refund.fareMinor)],
+            ["Deduction", `${refund.deductionPercent}%`],
+          ]) +
+          ui.button("See your returns", ui.appUrl("/dashboard/refunds"), { tone: "success" }),
+      })
+    : ui.page({
+        subject,
+        preheader: "Nothing is paid until the seat sells again — here is how it works.",
+        eyebrow: "Ticket returned",
+        tone: "brand",
+        title: "Your return is open",
+        intro: reference("Return reference", refund.reference),
+        body:
+          ui.amount({
+            label: "Most you can receive",
+            value: ui.taka(refund.maximumMinor),
+            caption: "Paid stretch by stretch, as the seat is bought again.",
+            tone: "brand",
+          }) +
+          ui.details([
+            ["Ticket", ticket?.ticketNumber],
+            ["Journey", journey],
+            ["Fare paid", ui.taka(refund.fareMinor)],
+            ["Segments waiting to resell", segments],
+          ]) +
+          ui.callout(
+            "Nothing has been paid yet. A demand-based return pays only as the seat is bought " +
+              "again, segment by segment — you will be emailed each time part of it sells. " +
+              "Anything still unsold when the train leaves refunds nothing, which is the trade " +
+              "you took for the larger amount.",
+            { tone: "warning", title: "How a demand-based return pays" }
+          ) +
+          ui.button("Follow this return", ui.appUrl("/dashboard/refunds")),
+      });
+
+  const inApp = immediate
+    ? {
+        type: "refund.paid",
+        tone: "success",
+        title: `Return paid — ${ui.taka(refund.refundedMinor)} credited`,
+        body: [ticket?.ticketNumber && `Ticket ${ticket.ticketNumber}`, journey, "The money is in your wallet now."]
+          .filter(Boolean)
+          .join(" · "),
+      }
+    : {
+        type: "refund.opened",
+        tone: "info",
+        title: "Return open — waiting for the seat to resell",
+        body:
+          `Up to ${ui.taka(refund.maximumMinor)}, paid stretch by stretch as the seat sells again. ` +
+          "Nothing is paid for a stretch that has not resold when the train leaves.",
+      };
 
   return deliver(userId, {
-    subject: immediate
-      ? `Ticket returned — ${money.format(refund.refundedMinor)} credited (${refund.reference})`
-      : `Ticket returned — waiting on resale (${refund.reference})`,
-    html: shell({
-      title: immediate ? "Your return is paid" : "Your return is open",
-      accent: immediate ? "#15803d" : BRAND,
-      lead: `Return reference <strong style="color:#111827;">${refund.reference}</strong>`,
-      body,
-      footer: "You can follow this return at any time under Returns in your account.",
-    }),
+    subject,
+    html,
+    inApp: { ...inApp, category: CATEGORY.REFUND, link: "/dashboard/refunds", key: `refund:${refund.reference}:opened` },
   });
 }
 
@@ -159,28 +180,48 @@ async function ticketReturned({ userId, refund, ticket, journey, immediate, segm
  */
 async function refundSegmentSettled({ userId, refund, paidMinor, remaining }) {
   const finished = remaining === 0;
+  const subject = finished
+    ? `Return complete — ${ui.taka(paidMinor)} credited (${refund.reference})`
+    : `Part of your return has paid — ${ui.taka(paidMinor)} (${refund.reference})`;
 
   return deliver(userId, {
-    subject: finished
-      ? `Return complete — ${money.format(paidMinor)} credited (${refund.reference})`
-      : `Part of your return has paid — ${money.format(paidMinor)} (${refund.reference})`,
-    html: shell({
+    subject,
+    inApp: {
+      type: finished ? "refund.completed" : "refund.part_paid",
+      category: CATEGORY.REFUND,
+      tone: "success",
+      title: finished ? `Return complete — ${ui.taka(paidMinor)} credited` : `Part of your return paid — ${ui.taka(paidMinor)}`,
+      body: finished
+        ? `Every part of the seat resold. ${ui.taka(refund.refundedMinor)} paid in all on ${refund.reference}.`
+        : `More of your seat sold. ${remaining} stretch${remaining === 1 ? "" : "es"} still waiting on ${refund.reference}.`,
+      link: "/dashboard/wallet",
+      key: `refund:${refund.reference}:paid:${refund.refundedMinor}`,
+    },
+    html: ui.page({
+      subject,
+      preheader: `${ui.taka(paidMinor)} credited to your wallet.`,
+      eyebrow: finished ? "Return complete" : "Return paying out",
+      tone: "success",
       title: finished ? "Your return is complete" : "Your seat sold — part of your return is paid",
-      accent: "#15803d",
-      lead: `Return reference <strong style="color:#111827;">${refund.reference}</strong>`,
+      intro: reference("Return reference", refund.reference),
       body:
-        rows([
-          ["Credited now", money.format(paidMinor)],
-          ["Paid on this return so far", money.format(refund.refundedMinor)],
-          ["Most you can receive", money.format(refund.maximumMinor)],
+        ui.amount({
+          label: "Credited now",
+          value: ui.taka(paidMinor),
+          caption: "The money is in your wallet now and can be spent or withdrawn.",
+          tone: "success",
+        }) +
+        ui.details([
+          ["Paid on this return so far", ui.taka(refund.refundedMinor)],
+          ["Most you can receive", ui.taka(refund.maximumMinor)],
           ["Segments still waiting", finished ? "None" : remaining],
         ]) +
         (finished
-          ? note("Every part of the seat resold, so this return is now closed.", "#15803d")
-          : note(
-              "The rest of the seat has not been bought yet. You will be emailed again if it is."
-            )),
-      footer: "The money is in your wallet now and can be spent or withdrawn.",
+          ? ui.callout("Every part of the seat resold, so this return is now closed.", { tone: "success" })
+          : ui.callout("The rest of the seat has not been bought yet. You will be emailed again if it is.", {
+              tone: "brand",
+            })) +
+        ui.button("Open your wallet", ui.appUrl("/dashboard/wallet"), { tone: "success" }),
     }),
   });
 }
@@ -193,25 +234,43 @@ async function refundSegmentSettled({ userId, refund, paidMinor, remaining }) {
  * one is worse.
  */
 async function refundClosedUnsold({ userId, refund, unsoldSegments }) {
+  const subject = `Return closed — ${refund.reference}`;
   return deliver(userId, {
-    subject: `Return closed — ${refund.reference}`,
-    html: shell({
-      title: "Your return has closed",
-      accent: "#6b7280",
-      lead: `Return reference <strong style="color:#111827;">${refund.reference}</strong>`,
+    subject,
+    inApp: {
+      type: "refund.closed",
+      category: CATEGORY.REFUND,
+      tone: "neutral",
+      title: `Return closed — ${refund.reference}`,
       body:
-        rows([
-          ["Paid to your wallet", money.format(refund.refundedMinor)],
+        refund.refundedMinor > 0
+          ? `The train has left. ${ui.taka(refund.refundedMinor)} was paid; ${unsoldSegments} stretch${unsoldSegments === 1 ? "" : "es"} did not resell.`
+          : "The train has left before the seat resold, so this demand-based return pays nothing.",
+      link: "/dashboard/refunds",
+      key: `refund:${refund.reference}:closed`,
+    },
+    html: ui.page({
+      subject,
+      preheader: "The train has left, so this return will not pay any further.",
+      eyebrow: "Return closed",
+      tone: "neutral",
+      title: "Your return has closed",
+      intro: reference("Return reference", refund.reference),
+      body:
+        ui.details([
+          ["Paid to your wallet", ui.taka(refund.refundedMinor)],
           ["Segments that did not resell", unsoldSegments],
         ]) +
-        note(
+        ui.callout(
           refund.refundedMinor > 0
             ? "The train has now left, so the remaining segments can no longer sell and this " +
                 "return will not pay any further."
             : "The seat did not resell before the train left, so this demand-based return pays " +
                 "nothing. A convenient return would have paid a smaller amount regardless — " +
-                "worth knowing for next time."
-        ),
+                "worth knowing for next time.",
+          { tone: "neutral" }
+        ) +
+        ui.button("See your returns", ui.appUrl("/dashboard/refunds"), { tone: "neutral" }),
     }),
   });
 }
@@ -233,29 +292,49 @@ async function refundClosedUnsold({ userId, refund, unsoldSegments }) {
  * be the process that happened to send it.
  */
 function departureCancelledMessage({ ticket, refundMinor, reason, train, journey, date }) {
+  const subject = `Service cancelled — ${train || "your train"}${date ? `, ${date}` : ""}`;
+  const [from, to] = String(journey || "").split(/\s*→\s*/);
   return {
-    subject: `Service cancelled — ${train || "your train"}${date ? `, ${date}` : ""}`,
-    html: shell({
+    subject,
+    inApp: {
+      type: "booking.cancelled_by_railway",
+      category: CATEGORY.BOOKING,
+      tone: "danger",
+      title: `${train || "Your train"} was cancelled — ${ui.taka(refundMinor)} refunded`,
+      body: [journey, date, reason && `Reason: ${reason}`, "Your fare is back in your wallet in full."]
+        .filter(Boolean)
+        .join(" · "),
+      link: "/dashboard/bookings",
+      key: ticket ? `ticket:${ticket}:cancelled` : null,
+    },
+    html: ui.page({
+      subject,
+      preheader: `Your fare of ${ui.taka(refundMinor)} is back in your wallet, in full.`,
+      eyebrow: "Service cancelled",
+      tone: "danger",
       title: "Your train has been cancelled",
-      accent: "#b91c1c",
-      lead: "We are sorry. This was our decision, not yours, so your fare is refunded in full.",
+      intro: "We are sorry. This was our decision, not yours, so your fare is refunded in full.",
       body:
-        rows([
-          ["Train", train],
-          ["Journey", journey],
-          ["Date", date],
+        (journey ? ui.journey({ from: from || journey, to: to || "", train, date }) : "") +
+        ui.amount({
+          label: "Refunded in full",
+          value: ui.taka(refundMinor),
+          caption: "Nothing has been deducted.",
+          tone: "success",
+        }) +
+        ui.details([
           ["Ticket", ticket],
-          ["Refunded in full", money.format(refundMinor)],
           ["Reason", reason],
+          ...(journey ? [] : [["Train", train], ["Date", date]]),
         ]) +
-        note(
-          "Nothing has been deducted. A deduction prices the cost of someone changing their " +
-            "mind, and you did not change yours.",
-          "#15803d"
-        ),
-      footer:
-        "The money is in your wallet now — you can book another service with it straight away, " +
-        "or withdraw it.",
+        ui.callout(
+          "A deduction prices the cost of someone changing their mind, and you did not change yours.",
+          { tone: "success", title: "Why nothing was deducted" }
+        ) +
+        ui.paragraph(
+          "The money is in your wallet now — you can book another service with it straight away, or withdraw it."
+        ) +
+        ui.button("Book another service", ui.appUrl("/dashboard/book")),
     }),
   };
 }
@@ -291,28 +370,185 @@ async function approvalDecided({ userId, request, approved, note: decisionNote, 
     rejected: "Your request was not approved",
   };
   const label = request.type.replace(/_/g, " ");
+  const subject = `${label} ${approved ? "approved" : "not approved"} — ${request.reference}`;
 
   return deliver(userId, {
-    subject: `${label} ${approved ? "approved" : "not approved"} — ${request.reference}`,
-    html: shell({
+    subject,
+    inApp: {
+      type: approved ? "approval.approved" : "approval.rejected",
+      category: CATEGORY.APPROVAL,
+      tone: approved ? "success" : "warning",
       title: approved ? titles.approved : titles.rejected,
-      accent: approved ? "#15803d" : "#b45309",
-      lead: `Reference <strong style="color:#111827;">${request.reference}</strong>`,
+      body: [`Reference ${request.reference}`, decisionNote && `“${decisionNote}”`, decidedBy && `Decided by ${decidedBy}`]
+        .filter(Boolean)
+        .join(" · "),
+      link: "/dashboard/requests",
+      key: `approval:${request.reference}:decided`,
+    },
+    html: ui.page({
+      subject,
+      preheader: decisionNote || (approved ? "Approved." : "Not approved."),
+      eyebrow: approved ? "Request approved" : "Request not approved",
+      tone: approved ? "success" : "warning",
+      title: approved ? titles.approved : titles.rejected,
+      intro: reference("Reference", request.reference),
       body:
-        rows([
-          ["Request", label],
+        ui.details([
+          ["Request", label.charAt(0).toUpperCase() + label.slice(1)],
           ["Decision", approved ? "Approved" : "Not approved"],
           ["Decided by", decidedBy || null],
-          ["Note", decisionNote || null],
         ]) +
+        (decisionNote ? ui.callout(decisionNote, { tone: approved ? "success" : "warning", title: "Note from the reviewer" }) : "") +
         (approved
           ? ""
-          : note(
-              "If this was not what you expected, you can raise the request again with more " +
-                "detail."
-            )),
+          : ui.paragraph("If this was not what you expected, you can raise the request again with more detail.")) +
+        ui.button("See your requests", ui.appUrl("/dashboard/requests"), { tone: approved ? "success" : "brand" }),
     }),
   });
+}
+
+/* ---------------- Subscriptions ---------------- */
+
+/**
+ * A request to subscribe was approved or declined.
+ *
+ * The one moment in a subscription's life that gets an email as well as a
+ * notification: the person asked, and is waiting on somebody else's answer.
+ * `until` is the last day it is valid, already written out ("9 Nov 2026"), and
+ * `devices` what it may be used on ("2 Windows, 1 Android") — which may not be
+ * what was asked for, so it is said.
+ */
+async function subscriptionDecided({ userId, subscription, membershipId, approved, until, devices, note: decisionNote, decidedBy }) {
+  const title = approved
+    ? `You are subscribed to ${subscription.name} until ${until}`
+    : `Your request for ${subscription.name} was not approved`;
+  const subject = `${subscription.name} subscription ${approved ? "approved" : "not approved"}`;
+
+  return deliver(userId, {
+    subject,
+    inApp: {
+      type: approved ? "subscription.approved" : "subscription.declined",
+      category: CATEGORY.SUBSCRIPTION,
+      tone: approved ? "success" : "warning",
+      title,
+      body: [approved && devices && `On ${devices}`, decisionNote && `“${decisionNote}”`, decidedBy && `Decided by ${decidedBy}`]
+        .filter(Boolean)
+        .join(" · "),
+      link: "/dashboard/subscriptions",
+      key: `subscription:${membershipId}:decided`,
+    },
+    html: ui.page({
+      subject,
+      preheader: approved ? `Valid through ${until}.` : decisionNote || "Not approved.",
+      eyebrow: approved ? "Subscription approved" : "Subscription not approved",
+      tone: approved ? "success" : "warning",
+      title,
+      body:
+        ui.details([
+          ["Subscription", subscription.name],
+          ["Decision", approved ? "Approved" : "Not approved"],
+          ["Valid through", approved ? until : null],
+          ["Devices", approved ? devices || null : null],
+          ["Decided by", decidedBy || null],
+        ]) +
+        (decisionNote ? ui.callout(decisionNote, { tone: approved ? "success" : "warning", title: "Note from the reviewer" }) : "") +
+        ui.paragraph(
+          approved
+            ? "It runs through the end of that day. You can cancel it whenever you like from the Subscriptions page."
+            : "You can ask again from the Subscriptions page."
+        ) +
+        ui.button("See your subscriptions", ui.appUrl("/dashboard/subscriptions"), { tone: approved ? "success" : "brand" }),
+    }),
+  });
+}
+
+/* ---------------- Access ---------------- */
+
+/** "super_admin" → "Super Admin"; the default role reads as what it is. */
+const roleName = (name) =>
+  name === "user"
+    ? "Passenger"
+    : String(name || "")
+        .split(/[_\s-]+/)
+        .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
+        .join(" ");
+
+/**
+ * Someone changed what this account can do.
+ *
+ * Sent to the account itself, every time. A role is the key to money and other
+ * people's data; being granted one unexpectedly is worth knowing about, and
+ * losing one without being told is how someone finds a screen gone mid-shift.
+ * So it says what changed, who changed it, and what the account can do now —
+ * and how to raise it if it was not expected.
+ */
+function rolesChangedMessage({ granted = [], revoked = [], changedBy, abilities = [], everything = false }) {
+  const subject =
+    granted.length && !revoked.length
+      ? `You have been given the ${granted.map((r) => roleName(r.name)).join(" and ")} role${granted.length === 1 ? "" : "s"}`
+      : "Your access to Seat Planner has changed";
+
+  const section = (title, roles, toneName, prefix) =>
+    roles.length
+      ? ui.sectionTitle(title) +
+        ui.chips(roles.map((r) => roleName(r.name)), { tone: toneName, prefix }) +
+        roles
+          .filter((r) => r.description)
+          .map((r) => ui.paragraph(ui.trusted(`${ui.esc(ui.strong(roleName(r.name)))} — ${ui.esc(r.description)}`), { size: 14 }))
+          .join("")
+      : "";
+
+  return {
+    subject,
+    inApp: {
+      type: "account.roles_changed",
+      category: CATEGORY.ACCOUNT,
+      tone: revoked.length && !granted.length ? "warning" : "info",
+      title: granted.length && !revoked.length ? subject : "Your access has changed",
+      body: [
+        granted.length && `Added: ${granted.map((r) => roleName(r.name)).join(", ")}`,
+        revoked.length && `Removed: ${revoked.map((r) => roleName(r.name)).join(", ")}`,
+        changedBy && `Changed by ${changedBy}`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      link: "/dashboard/profile",
+    },
+    html: ui.page({
+      subject,
+      preheader: [
+        granted.length ? `Added: ${granted.map((r) => roleName(r.name)).join(", ")}.` : "",
+        revoked.length ? `Removed: ${revoked.map((r) => roleName(r.name)).join(", ")}.` : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      eyebrow: "Your account",
+      tone: "brand",
+      title: "Your access has changed",
+      intro: changedBy
+        ? ui.trusted(`${ui.esc(ui.strong(changedBy))} changed the roles on your account. It takes effect straight away.`)
+        : "The roles on your account were changed. It takes effect straight away.",
+      body:
+        section("Added", granted, "success", "+ ") +
+        section("Removed", revoked, "danger", "− ") +
+        ui.sectionTitle("What you can do now") +
+        (everything
+          ? ui.callout("Everything — this account is a super admin.", { tone: "brand" })
+          : abilities.length
+            ? ui.details(abilities.map(({ group, labels }) => [group, labels.join(", ")]))
+            : ui.paragraph("Nothing beyond signing in.", { muted: true })) +
+        ui.button("Open Seat Planner", ui.appUrl("/dashboard")) +
+        ui.callout(
+          "If you did not expect this, tell an administrator. Every change to someone's roles is recorded, " +
+            "with who made it and when.",
+          { tone: "warning", title: "Not expecting this?" }
+        ),
+    }),
+  };
+}
+
+async function rolesChanged({ userId, ...details }) {
+  return deliver(userId, rolesChangedMessage(details));
 }
 
 /* ---------------- Standing ---------------- */
@@ -331,40 +567,68 @@ async function approvalDecided({ userId, request, approved, note: decisionNote, 
  * that.
  */
 async function accountHeld({ userId, detail, automatic }) {
+  const subject = "Your account cannot book at the moment";
   return deliver(userId, {
-    subject: "Your account cannot book at the moment",
-    html: shell({
+    subject,
+    inApp: {
+      type: "account.held",
+      category: CATEGORY.ACCOUNT,
+      tone: "warning",
       title: "Your account is on hold",
-      accent: "#b45309",
-      lead: "Existing tickets are unaffected. You can still travel on anything already booked.",
+      body: `${detail ? `${detail} ` : ""}Tickets you already hold are unaffected. A hold can be lifted — ask for a review if it looks wrong.`,
+      link: "/dashboard/bookings",
+    },
+    html: ui.page({
+      subject,
+      preheader: "Existing tickets are unaffected — you can still travel on anything already booked.",
+      eyebrow: "Your account",
+      tone: "warning",
+      title: "Your account is on hold",
+      intro: "Existing tickets are unaffected. You can still travel on anything already booked.",
       body:
-        rows([
+        ui.details([
           ["What happened", detail],
           ["Placed by", automatic ? "An automatic check" : "A member of staff"],
         ]) +
-        (automatic
-          ? note(
-              "This was placed by an automatic check rather than a person. If it looks wrong, it " +
+        ui.callout(
+          automatic
+            ? "This was placed by an automatic check rather than a person. If it looks wrong, it " +
                 "may well be — reply to this message and someone will review it."
-            )
-          : note("If you think this is a mistake, reply to this message and it will be reviewed.")),
-      footer:
-        "A hold can always be lifted. It stops new bookings; it does not cancel anything you " +
-        "have already paid for.",
+            : "If you think this is a mistake, reply to this message and it will be reviewed.",
+          { tone: "warning" }
+        ) +
+        ui.paragraph(
+          "A hold can always be lifted. It stops new bookings; it does not cancel anything you have already paid for.",
+          { muted: true, size: 14 }
+        ) +
+        ui.button("See your bookings", ui.appUrl("/dashboard/bookings")),
     }),
   });
 }
 
 /** And it has been lifted. */
 async function accountReleased({ userId, note: reason }) {
+  const subject = "Your account can book again";
   return deliver(userId, {
-    subject: "Your account can book again",
-    html: shell({
+    subject,
+    inApp: {
+      type: "account.released",
+      category: CATEGORY.ACCOUNT,
+      tone: "success",
+      title: "Your account can book again",
+      body: reason ? `The hold was lifted: ${reason}` : "The hold on your account was lifted.",
+      link: "/dashboard/book",
+    },
+    html: ui.page({
+      subject,
+      preheader: "The hold on your account has been lifted.",
+      eyebrow: "Your account",
+      tone: "success",
       title: "The hold on your account has been lifted",
-      accent: "#15803d",
-      lead: "You can book as normal again.",
-      body: rows([["Reason given", reason]]),
-      footer: "Sorry for the interruption.",
+      intro: "You can book as normal again. Sorry for the interruption.",
+      body:
+        (reason ? ui.callout(reason, { tone: "success", title: "Reason given" }) : "") +
+        ui.button("Book a ticket", ui.appUrl("/dashboard/book"), { tone: "success" }),
     }),
   });
 }
@@ -380,36 +644,51 @@ async function accountReleased({ userId, note: reason }) {
  * first case would mean the people who most need to know hear nothing.
  */
 async function waitlistOfferExpired({ userId, entry, stillQueued, offersMade, limit }) {
+  const subject = stillQueued
+    ? `You missed a seat — still in the queue (${entry.reference})`
+    : `You have left the queue (${entry.reference})`;
+  const [from, to] = String(entry.journey || "").split(/\s*→\s*/);
+
   return deliver(userId, {
-    subject: stillQueued
-      ? `You missed a seat — still in the queue (${entry.reference})`
-      : `You have left the queue (${entry.reference})`,
-    html: shell({
+    subject,
+    inApp: {
+      type: stillQueued ? "waitlist.offer_missed" : "waitlist.left",
+      category: CATEGORY.WAITLIST,
+      tone: stillQueued ? "warning" : "neutral",
+      title: stillQueued ? "You missed a seat — you are still in the queue" : "You have left the queue",
+      body: [entry.train, entry.journey, `${offersMade} of ${limit} offers missed`].filter(Boolean).join(" · "),
+      link: stillQueued ? "/dashboard/bookings" : "/dashboard/book",
+      key: `waitlist:${entry.reference}:missed:${offersMade}`,
+    },
+    html: ui.page({
+      subject,
+      preheader: stillQueued ? "You kept your place for the next seat returned." : "Your allowance of offers is used up.",
+      eyebrow: "Waitlist",
+      tone: stillQueued ? "warning" : "neutral",
       title: stillQueued ? "That seat went back on sale" : "You have left the queue",
-      accent: stillQueued ? "#b45309" : "#6b7280",
-      lead: `Queue reference <strong style="color:#111827;">${entry.reference}</strong>`,
+      intro: reference("Queue reference", entry.reference),
       body:
-        rows([
-          ["Train", entry.train],
-          ["Journey", entry.journey],
-          ["Date", entry.departureDate],
-          ["Offers missed", `${offersMade} of ${limit}`],
-        ]) +
-        (stillQueued
-          ? note(
-              "You kept your original place in the queue, so you are still in line for the next " +
+        (entry.journey
+          ? ui.journey({ from: from || entry.journey, to: to || "", train: entry.train, date: entry.departureDate })
+          : "") +
+        ui.details([["Offers missed", `${offersMade} of ${limit}`]]) +
+        ui.callout(
+          stillQueued
+            ? "You kept your original place in the queue, so you are still in line for the next " +
                 "seat returned. Each unanswered offer holds a seat out of sale for everyone, " +
                 `so after ${limit} the place is passed on.`
-            )
-          : note(
-              "The offer was not answered in time, and with it your allowance is used up. You " +
-                "are welcome to join the queue again."
-            )),
+            : "The offer was not answered in time, and with it your allowance is used up. You " +
+                "are welcome to join the queue again.",
+          { tone: stillQueued ? "warning" : "neutral" }
+        ) +
+        ui.button(stillQueued ? "See your queue" : "Find a seat", ui.appUrl(stillQueued ? "/dashboard/bookings" : "/dashboard/book")),
     }),
   });
 }
 
 module.exports = {
+  rolesChanged,
+  rolesChangedMessage,
   ticketReturned,
   accountHeld,
   accountReleased,
@@ -418,6 +697,7 @@ module.exports = {
   departureCancelled,
   departureCancelledMessage,
   approvalDecided,
+  subscriptionDecided,
   waitlistOfferExpired,
   // Exported so a new message can be added without reaching past the shell.
   deliver,

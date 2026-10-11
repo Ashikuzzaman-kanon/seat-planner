@@ -1,4 +1,5 @@
-const { Op } = require("sequelize");
+const { Op, fn, col } = require("sequelize");
+const { PLAN_STATUS } = require("../constants/planStatus");
 const {
   sequelize,
   TrainName,
@@ -31,20 +32,37 @@ async function list({ search = "", includeInactive = false } = {}) {
     ];
   }
 
-  const trains = await TrainName.findAll({
-    where,
-    include: [ROUTE_INCLUDE],
-    order: [
-      ["name", "ASC"],
-      [{ model: RouteStop, as: "stops" }, "sequence", "ASC"],
-    ],
-  });
+  const [trains, coachRows, scheduleRows] = await Promise.all([
+    TrainName.findAll({
+      where,
+      include: [ROUTE_INCLUDE],
+      order: [
+        ["name", "ASC"],
+        [{ model: RouteStop, as: "stops" }, "sequence", "ASC"],
+      ],
+    }),
+    // Coaches that would actually be built: active, on an approved layout.
+    TrainCoach.findAll({
+      attributes: ["trainId", [fn("COUNT", col("TrainCoach.id")), "coaches"]],
+      where: { isActive: true },
+      include: [{ model: SeatPlan, as: "seatPlan", attributes: [], where: { status: PLAN_STATUS.APPROVED } }],
+      group: ["trainId"],
+      raw: true,
+    }),
+    TrainSchedule.findAll({ attributes: ["trainId"], where: { isActive: true }, group: ["trainId"], raw: true }),
+  ]);
+  const coachesBy = new Map(coachRows.map((r) => [r.trainId, Number(r.coaches)]));
+  const scheduled = new Set(scheduleRows.map((r) => r.trainId));
 
   return trains.map((train) => {
     const json = train.toPublicJSON();
     const stops = json.stops || [];
+    const coachCount = coachesBy.get(train.id) || 0;
     return {
       ...json,
+      coachCount,
+      // What departure generation needs: coaches it can build, and running days.
+      readyForDepartures: coachCount > 0 && scheduled.has(train.id),
       stopCount: stops.length,
       originStation: stops[0]?.station?.name || null,
       terminusStation: stops[stops.length - 1]?.station?.name || null,

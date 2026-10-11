@@ -1,0 +1,14 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# The signing key and its passwords never go in the repository — see README.md.
+keystore.properties
+*.jks
+*.keystore

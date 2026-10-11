@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The website's tokens (frontend/src/app/theme.css), so the app's own screens match its pages. -->
+<resources>
+    <color name="brand">#4F46E5</color>
+    <color name="brand_dark">#4338CA</color>
+    <color name="page">#F5F7FB</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="border">#E6EAF1</color>
+    <color name="ink">#0F172A</color>
+    <color name="muted">#64748B</color>
+    <color name="faint">#94A3B8</color>
+    <color name="ok">#16A34A</color>
+    <color name="bad">#DC2626</color>
+    <color name="dev_strip">#FEF3C7</color>
+    <color name="dev_strip_text">#92400E</color>
+</resources>

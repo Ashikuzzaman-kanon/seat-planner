@@ -49,7 +49,7 @@ async function stations() {
  * a handful of trains with a few dozen stops each is far cheaper to filter here
  * than to ask the database about repeatedly.
  */
-async function departures({ fromStationId, toStationId, date, coachClassId }) {
+async function departures({ fromStationId, toStationId, date, coachClassId, now = new Date() }) {
   const from = Number(fromStationId);
   const to = Number(toStationId);
 
@@ -117,6 +117,11 @@ async function departures({ fromStationId, toStationId, date, coachClassId }) {
     // origin the night before is not the day the trip is filed under.
     const boardingDate = addDays(trip.departureDate, origin.dayOffset || 0);
     if (boardingDate !== day) continue;
+
+    // Gone already: today's train that has left this station is not for sale.
+    // It used to be listed — and sold — until midnight.
+    const leaves = instantAt(trip.departureDate, origin.departureTime || origin.arrivalTime || "00:00:00", origin.dayOffset || 0);
+    if (leaves && leaves <= now) continue;
 
     let availability;
     try {

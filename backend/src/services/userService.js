@@ -6,6 +6,8 @@ const { AUDIT_ACTIONS } = require("../constants/auditActions");
 const { assertCanAssignRole } = require("./roleService");
 const { invalidateUser } = require("./permissionService");
 const audit = require("./auditService");
+const notify = require("./notificationService");
+const { PERMISSION_CATALOGUE } = require("../constants/permissions");
 
 const USER_INCLUDE = [{ model: Role, as: "roles", through: { attributes: [] } }];
 
@@ -135,7 +137,35 @@ async function setUserRoles({ actingUser, actingAccess, targetUserId, roleIds })
         .join("; ") || "no change",
   });
 
+  // Tell the account itself. Not awaited: the change is made whatever the mail
+  // server does, and notify never throws.
+  if (added.length || removed.length) {
+    notify.rolesChanged({
+      userId: target.id,
+      granted: added.map((r) => ({ name: r.name, description: r.description })),
+      revoked: removed.map((r) => ({ name: r.name, description: r.description })),
+      changedBy: actingUser.fullName || actingUser.email,
+      ...abilitiesOf(roles),
+    });
+  }
+
   return getUser(target.id);
+}
+
+/**
+ * What a set of roles lets an account do, grouped as the role editor groups
+ * it — for telling someone what changed in words they can act on.
+ */
+function abilitiesOf(roles) {
+  if (roles.some((r) => r.name === RESERVED_ROLES.SUPER_ADMIN)) return { everything: true, abilities: [] };
+  const held = new Set(roles.flatMap((r) => (r.permissions || []).map((p) => p.key)));
+  const groups = new Map();
+  for (const entry of PERMISSION_CATALOGUE) {
+    if (!held.has(entry.key)) continue;
+    if (!groups.has(entry.group)) groups.set(entry.group, []);
+    groups.get(entry.group).push(entry.label);
+  }
+  return { everything: false, abilities: [...groups].map(([group, labels]) => ({ group, labels })) };
 }
 
 module.exports = { listUsers, getUser, setUserRoles };

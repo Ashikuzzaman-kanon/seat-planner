@@ -2,76 +2,49 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const env = require("./config/env");
+const { originPolicy } = require("./utils/allowedOrigin");
 const routes = require("./routes");
 const requestContext = require("./middleware/requestContext");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
 
-// Public dev tunnels (cloudflare/localtunnel/ngrok/VS Code) hand out a fresh
-// random hostname each run, so allow their domains by suffix in development
-// rather than hardcoding a URL that changes every session.
-const TUNNEL_SUFFIXES = [
-  ".trycloudflare.com",
-  ".loca.lt",
-  ".ngrok-free.app",
-  ".ngrok.app",
-  ".devtunnels.ms",
-];
+// CORS_ORIGINS, with `*` for Vercel previews — see utils/allowedOrigin.js.
+const isAllowedOrigin = originPolicy(env.corsOrigins, { production: env.isProduction });
 
-/**
- * Addresses that only exist inside somebody's own network.
+const siteCors = cors({
+  origin(origin, callback) {
+    // Allow non-browser clients (no origin) and any whitelisted origin.
+    if (!origin || isAllowedOrigin(origin)) return callback(null, true);
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  credentials: true,
+});
+
+/*
+ * The subscription check is called from anywhere — a page on any other site
+ * included — so it alone answers every origin.
  *
- * Loopback, the three RFC 1918 ranges, and link-local. A phone on the same
- * Wi-Fi reaching a laptop is the ordinary way this gets tested, and writing one
- * address into `CORS_ORIGINS` breaks the next time the router hands out a
- * different one.
- *
- * Development only — see the guard in `isAllowedOrigin`. In production, being
- * on a private address is not a reason to trust an origin: it would let
- * anything sharing a network with the server call the API from a browser.
+ * That is safe to open where the rest of the API is not, because nothing of
+ * the browser's own goes with the call: no cookie, no stored token. The
+ * caller has to send the email and password itself, so another site learns
+ * nothing it was not already given. Credentials mode stays off, and
+ * Retry-After is exposed so a page can read how long a pause lasts.
  */
-const PRIVATE_HOSTS = [
-  /^localhost$/,
-  /^\[?::1\]?$/,
-  /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
-  /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
-  /^192\.168\.\d{1,3}\.\d{1,3}$/,
-  // 172.16.0.0 – 172.31.255.255, and not 172.32+ which is public.
-  /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/,
-  /^169\.254\.\d{1,3}\.\d{1,3}$/,
-];
+const OPEN_TO_ANY_ORIGIN = /^\/api(?:\/v1)?\/subscriptions\/check\/?$/;
+const openCors = cors({
+  origin: "*",
+  methods: ["POST"],
+  allowedHeaders: ["Content-Type"],
+  exposedHeaders: ["Retry-After"],
+  maxAge: 86_400,
+});
 
-const isPrivateHost = (host) => PRIVATE_HOSTS.some((pattern) => pattern.test(host));
-
-function isAllowedOrigin(origin) {
-  if (env.corsOrigins.includes(origin)) return true;
-  if (!env.isProduction) {
-    try {
-      const host = new URL(origin).hostname;
-      // A dev tunnel, or a machine on the same network as this one.
-      return TUNNEL_SUFFIXES.some((s) => host.endsWith(s)) || isPrivateHost(host);
-    } catch {
-      return false;
-    }
-  }
-  return false;
-}
-
-app.use(
-  cors({
-    origin(origin, callback) {
-      // Allow non-browser clients (no origin) and any whitelisted origin.
-      if (!origin || isAllowedOrigin(origin)) return callback(null, true);
-      return callback(new Error(`Origin ${origin} not allowed by CORS`));
-    },
-    credentials: true,
-  })
-);
+app.use((req, res, next) => (OPEN_TO_ANY_ORIGIN.test(req.path) ? openCors : siteCors)(req, res, next));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-if (!env.isProduction) app.use(morgan("dev"));
+if (!env.isProduction && !env.isTest) app.use(morgan("dev"));
 
 // Opens the per-request context (request id, caller, client details) that the
 // audit log reads from. Must sit above the routes.

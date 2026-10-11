@@ -1,0 +1,8 @@
+{
+  "all": true,
+  "include": ["src/**/*.js"],
+  "exclude": ["src/docs/**", "src/seeders/seatPlanSource.js"],
+  "reporter": ["text-summary", "html", "lcov"],
+  "reports-dir": "coverage",
+  "temp-directory": "coverage/tmp"
+}

@@ -32,6 +32,24 @@ defined as data.
   journey with a connecting standing ticket.
 - Join a waitlist for a sold-out stretch; a freed seat is offered in one click.
 
+**For everyone**
+- **Notifications**: a bell with the unread count, a panel of the newest, and a
+  full inbox filtered by kind. Bookings, returns paying out, a cancelled train,
+  a seat offered from the waitlist, a request decided, a change of roles — and,
+  for staff, a plan or request waiting on them and background jobs finishing or
+  failing. Kept in the app whether or not the email arrived; checked every 30
+  seconds while the tab is open, with a toast when something new comes in.
+- **Android app**: the site full screen, with the back button, pull to refresh,
+  the camera for checking tickets and the tickets PDF in the phone's viewer. It
+  loads every page from the live site, so a web deploy needs no app update. See
+  *The Android app*.
+- **Subscriptions**: ask for a subscription, saying on how many devices, and a
+  reviewer approves it for a period and a number of devices they choose, or
+  declines it. It runs through the end of its last day and then ends by itself;
+  the subscriber can cancel it at any time, and so can a reviewer. A caller
+  outside the app can ask whether an account holds one on the device it is
+  running on — see *Subscriptions and the check API*.
+
 **For staff on the train**
 - *Check Tickets*: scan a QR with the phone camera or type the number; eight
   distinct verdicts; scanning can admit the passenger or only read the ticket.
@@ -44,16 +62,21 @@ defined as data.
 - Departures: weekly schedules generate a rolling horizon of departures; per
   departure, add / remove / cancel / reinstate coaches, switch return policies
   and standing sales, and cancel a whole departure — everyone aboard is refunded
-  in full and told why.
+  in full and told why. Once a train is 90 days gone (a setting), the seats
+  nobody bought are cleared daily to keep the database small; every seat with a
+  ticket or a return, and every booking, payment and refund, is kept.
 - Seat Inventory: a station-pair availability matrix and a per-seat occupancy map
   showing who holds each seat and for which stretch; quota holds for specific
   pairs.
 - Seat plans: a grid designer for coach layouts, with an approval workflow.
 
 **For administrators**
-- Roles and permissions are data: create roles, grant any of 49 permissions,
+- Roles and permissions are data: create roles, grant any of 52 permissions,
   assign several roles to a user. An escalation guard stops anyone granting
   what they do not hold.
+- Sign-in pauses for an account after five wrong passwords in a row (both
+  numbers are settings), so a password cannot be guessed at speed. Resetting
+  the password ends the pause; anyone already signed in stays signed in.
 - A settings store for every tunable rule (timeouts, deductions, abuse weights,
   job retries) — changes take effect without a restart.
 - An audit log of every privileged action.
@@ -65,6 +88,9 @@ defined as data.
   and sample bookings; another removes exactly that again. Existing data is
   adopted and never changed, and the delete refuses while anyone outside the
   demo holds a valid ticket on a demo departure.
+- **Railway Data** (super admin): loads Bangladesh Railway's 149 trains, their
+  stations and routes, and the seat plans transcribed from coach diagrams, and
+  makes the 50 trains with plans ready for departures. See *The real railway*.
 
 ## Tech stack
 
@@ -74,12 +100,14 @@ defined as data.
 | Backend | Node.js 20, Express 4, Sequelize 6, express-validator, PDFKit, qrcode, Nodemailer |
 | Data | MySQL 8 (everything transactional) · MongoDB (audit log; optional) |
 | Auth | Short-lived JWT access tokens + rotating, revocable refresh tokens; per-request permission resolution |
+| Android | Kotlin, a WebView over the live site; an APK installed directly, released from GitHub |
 | Deploy | Vercel (frontend) · Render, Docker (API) · Aiven MySQL · Docker Compose + Caddy for self-hosting |
 
 ## How it fits together
 
 ```
- Browser ──▶ Next.js (Vercel)  ── /api/* rewrite ──▶  Express API (Render)
+ Browser or
+ Android app ──▶ Next.js (Vercel)  ── /api/* rewrite ──▶  Express API (Render)
                                                         │
                                    MySQL (Aiven) ◀──────┤  transactions, jobs table
                                    MongoDB (optional) ◀─┘  audit log
@@ -129,6 +157,7 @@ seat-planner/
 │       ├── app/        routes: auth pages, /dashboard/*
 │       ├── components/ booking, checking, departures, inventory, network, ui…
 │       └── lib/        API clients per area
+├── android/            Android app (Kotlin): the site in a WebView — see android/README.md
 ├── tools/lan-https.js  HTTPS proxy for testing the camera scanner from a phone
 ├── docker-compose.yml  MySQL + MongoDB + API + frontend + Caddy
 ├── REQUIREMENTS.md     specification and build log
@@ -182,6 +211,25 @@ Demo accounts follow `<role><n>@example.com` / `<Role>123!` — for example
 `Checker123!`, `user1@example.com` / `User123!`. Anyone can read these
 passwords here, so the button never creates a super admin.
 
+### The real railway
+
+Bangladesh Railway's timetable — 149 trains, their stations and routes — and
+the seat plans transcribed from coach diagrams are loaded from the snapshot in
+`backend/src/data/railway/`:
+
+```bash
+npm run railway:load            # or Administration → Railway Data → Load
+npm run railway:fetch           # refresh the timetable snapshot from the railway (then review the diff)
+```
+
+Loading adds what is missing and never changes what is there. Trains whose seat
+plans are known (50 of them) get coaches, running days and per-kilometre fares,
+ready for departures; diagrams that name no train become draft plans. It never
+generates departures — do that on *Departures → Generate…*. It refuses while
+demo data exists, since the demo's stations share names with the real ones.
+Distances are estimated from running times (the timetable publishes none) and
+can be corrected on each train's route; fares follow.
+
 ### 2. Frontend
 
 ```bash
@@ -196,6 +244,17 @@ npm run dev                     # http://localhost:3000
 Browsers only allow the camera on a secure origin. Run
 `node tools/lan-https.js` and open the printed `https://<your-LAN-IP>:3443`
 address on the phone (accept the self-signed certificate once).
+
+### The Android app
+
+The app in [android/](android/README.md) is the live site full screen, so it
+changes whenever the site does. To try local changes in it, open **Open on
+phone** from the account menu while `npm run dev` runs (or go to
+`http://localhost:3000/dev/phone`): one QR code installs the app from this
+computer, the other switches it to this computer until you tap its **DEV**
+strip. Holding three fingers on the app's screen for three seconds opens the
+same switch by hand. Building, the signing key and releases are in
+[android/README.md](android/README.md).
 
 ### Everything in Docker
 
@@ -222,6 +281,7 @@ Backend environment (`backend/.env`):
 | `BREVO_API_KEY` | no | Send through Brevo's HTTP API instead — also HTTPS. `EMAIL_FROM` must be a verified Brevo sender |
 | `EMAIL_HOST` `EMAIL_PORT` `EMAIL_SECURE` `EMAIL_USER` `EMAIL_PASS` `EMAIL_FROM` | no | SMTP; with neither this nor Brevo, mail is logged to the console |
 | `CORS_ORIGINS` | production | Comma-separated allowed origins |
+| `APP_URL` | no | The web app's address, for buttons and the logo in emails. Defaults to the first `CORS_ORIGINS` entry |
 | `SUPER_ADMIN_NAME` `SUPER_ADMIN_EMAIL` `SUPER_ADMIN_PASSWORD` | for seeding | Used by `npm run seed:superadmin` |
 
 Frontend: `NEXT_PUBLIC_API_BASE_URL` (use `/api`) and, in production,
@@ -231,12 +291,128 @@ Business rules (hold timeouts, refund slabs, waitlist windows, abuse weights,
 job retries…) live in the settings store and are edited on the *Settings*
 screen, not in environment variables.
 
+## Subscriptions and the check API
+
+Two permissions run subscriptions, and a role can hold either or both (the
+super admin holds every permission):
+
+| Permission | Allows |
+|---|---|
+| `subscription:manage` | Create a subscription, rename it, close it to new requests, reopen it, delete one nobody has asked for. Create the platforms subscriptions are used on, rename them, switch them off |
+| `subscription:approve` | See the requests, approve one for a period and a number of devices, or decline it. Change a running subscription's last day or device counts, cancel anyone's. See an account's devices and why any were turned away; note, block or remove a device |
+
+Everyone signed in sees the *Subscriptions* page and can ask for one. A
+subscription is valid from approval **through the end of its last day in
+Dhaka**; an hourly job then marks it ended and tells the subscriber, and warns
+them a few days before (*Settings → Subscriptions*). Every request is kept, so
+who decided what stays on record.
+
+Each subscription has a **code** — made from its name when it is created, or
+chosen then — which never changes, even if the subscription is renamed.
+
+**Devices.** A subscription allows so many devices of each **platform**.
+Platforms are data — `windows` and `android` to begin with, more from the
+*Platforms* tab — and each is a count of its own, 0 to 10. Whoever asks says how
+many of each they want; the reviewer can change those numbers when approving,
+and later while the subscription runs.
+
+Nobody registers a device. The first time one checks in (below) and a place is
+free, it takes one and keeps it; places are held in the order devices arrived,
+per account and platform. So a subscription allowing two Windows devices is
+valid on the account's first two. Lowering a count removes no device — the
+later ones simply stop being valid — and a platform created later starts at 0
+on subscriptions already running, until a reviewer raises it.
+
+A reviewer opens an account's devices from the *Subscribers* tab: what has
+signed in, with a note of their own on each; **block** (never valid, and its
+place passes to the next device) or **remove** (its place is free — and the
+same device may take one again, so block to keep one out); and every check
+that was turned away, with the reason. Subscribers see their own devices and
+how many places are used, to look at only.
+
+**Checking from outside the app.** One endpoint takes an email and password,
+and the device the call is made from, and says for every subscription there is
+whether that account's is valid on that device now:
+
+```bash
+curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"...","deviceId":"458c70e0bd45dc3676dc6d83c5ccec4e","platform":"windows"}'
+```
+
+```json
+{
+  "user": { "name": "Rahim Uddin", "email": "user@example.com" },
+  "subscriptions": [
+    { "code": "basic", "valid": false },
+    { "code": "premium", "valid": true }
+  ]
+}
+```
+
+- It opens no session and returns no tokens or dates.
+- `deviceId` is the caller's own stable id for the installation — 4 to 128
+  letters, digits and `. _ : -` — and `platform` is a platform's value. Send
+  the same id every time: a new id is a new device.
+- **A device that is not let in is told only `valid: false`.** The limit
+  reached, the device blocked, an unknown or switched-off platform, a missing
+  or malformed `deviceId` — each is the same `200` in the same shape, with no
+  reason. The reason is kept for staff: on the account's devices (*Subscribers
+  → Devices → Turned away*), one row per device and reason with a count, the
+  newest hundred per account for ninety days — and in the audit log as
+  `subscription.device_refuse`, when the audit log is configured.
+- **It answers from any origin** — a page on any other site may call it. The
+  rest of the API stays limited to `CORS_ORIGINS`. That is safe here because
+  nothing of the browser's own goes with the call: the caller sends the email
+  and password itself.
+- A wrong password and an unknown email are the same `401`. An email not yet
+  verified is a `403`, as at sign-in.
+- The password is checked exactly as sign-in checks it, **and shares its
+  pause**: after five wrong passwords in a row the account answers `429` here
+  and at sign-in for fifteen minutes, with `Retry-After` saying how long is
+  left.
+- **Call the API's own address, as above — not the website's.** The API sleeps
+  after fifteen idle minutes. A call straight to it wakes it and is held while
+  it starts, so allow up to a minute. The same path on the website's address
+  also works while the API is awake, but while it sleeps that route answers a
+  bare `429` (no JSON body) and does not wake it. A `429` that *does* carry a
+  JSON `error` is the pause after wrong passwords.
+
 ## Tests
+
+Every push runs them on GitHub Actions (`.github/workflows/ci.yml`): the
+backend's unit and integration tests with coverage, and a production build of
+the frontend.
 
 ```bash
 cd backend
-node --test tests/              # unit tests: availability, auto-select, refunds, money, tokens, job retries…
+npm test                        # unit tests — pure logic: availability, auto-select, refunds, money, tokens…
+npm run test:integration        # integration suites against a fresh test database (needs MySQL)
+npm run coverage                # both, measured; fails below 90% lines/functions, 70% branches
 ```
+
+**Integration tests** (`backend/tests/integration/`) build their own database
+— never the development one: the name must end in `_test`
+(`TEST_DB_NAME`, default `seat_planner_test`). It is migrated and seeded the
+way a developer sets up locally, snapshotted, and restored before every suite,
+so each suite starts from the same data whatever ran before it. The API runs
+inside the test runner; each suite in `suites/` talks to it over HTTP.
+
+- `npm run test:integration -- waitlist` runs only suites whose name contains
+  "waitlist"; add `--reuse` to skip rebuilding the database.
+- Set `TEST_MONGO_URI` (a database ending in `_test`) to include the audit-log
+  checks; without it they are skipped.
+- Mail is never sent: what would have gone out is written to
+  `tests/integration/.work/outbox.jsonl`.
+
+**Emails**: `node tools/preview-emails.js` renders every email the system
+sends, with sample data, to `tools/.email-previews/` — open its `index.html`
+after changing a template. They share one layout, `backend/src/emails/layout.js`.
+
+**Browser checks** (`e2e/`) drive the running web app in Chrome at laptop and
+phone widths — every page, every dialog, the booking flow, demo data, waking a
+sleeping server. They need the API and the web app running locally with the
+development data; see [e2e/README.md](e2e/README.md).
 
 ## Deployment
 
@@ -244,6 +420,10 @@ The live deployment follows `master`:
 
 - **Vercel** builds `frontend/` (framework preset Next.js) with
   `NEXT_PUBLIC_API_BASE_URL=/api` and `BACKEND_ORIGIN` set to the API URL.
+  Every branch and pull request also gets a preview address. Previews call the
+  same API, and use its data, so the API's `CORS_ORIGINS` names them with a
+  pattern — `*` stands for one piece of a host name, never a dot:
+  `https://seat-planner-sable.vercel.app,https://seat-planner-*-ashikuzzaman-kanons-projects.vercel.app`
 - **Render** builds `backend/Dockerfile`. The container runs
   `npm run migrate && npm start`, so pending migrations apply on every deploy.
 - **Aiven** hosts MySQL (TLS required).

@@ -1,0 +1,802 @@
+/* ==========================================================================
+   Subscriptions
+   The list everyone sees, and the two reviewer tabs. Built on the theme's
+   tokens (app/theme.css); nothing here sets a colour of its own that a token
+   already names.
+   ========================================================================== */
+
+.sub-centre {
+  display: grid;
+  place-items: center;
+  padding: 3rem 0;
+}
+.sub-muted {
+  color: var(--faint);
+}
+
+/* ---- Tabs: only shown to someone who reviews ---- */
+
+.sub-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1.25rem;
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  width: fit-content;
+  max-width: 100%;
+}
+.sub-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.9rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.sub-tab:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+.sub-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.sub-tab.is-active {
+  background: var(--brand-50);
+  color: var(--brand-700);
+}
+.sub-tab__count {
+  min-width: 1.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: var(--warn);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- The list of subscriptions ---- */
+
+.sub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(19rem, 100%), 1fr));
+  gap: 1rem;
+}
+.sub-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  min-width: 0;
+}
+.sub-card.is-active {
+  border-color: #bbf7d0;
+  box-shadow: inset 0 3px 0 var(--ok), var(--shadow-sm);
+}
+.sub-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.sub-card__head h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.sub-card__about {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.sub-card__note {
+  margin: -0.35rem 0 0;
+  padding-left: 1.6rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+.sub-code {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
+  background: #eef2f7;
+  color: var(--ink-2);
+  font-size: 0.78rem;
+}
+.sub-code--block {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.9rem;
+}
+
+/* What a subscription is for: "On 2 Windows, 1 Android". */
+.sub-card__devices {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: -0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.sub-card__devices .pi {
+  width: 1.05rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.sub-standing {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.sub-standing .pi {
+  font-size: 1.05rem;
+}
+.sub-standing--active {
+  color: var(--ok);
+}
+.sub-standing--pending {
+  color: var(--warn);
+}
+.sub-standing--declined {
+  color: var(--bad);
+}
+
+.sub-counts {
+  display: flex;
+  gap: 1.25rem;
+  padding: 0.55rem 0.75rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+.sub-counts:disabled {
+  cursor: default;
+}
+.sub-counts:not(:disabled):hover {
+  background: var(--brand-50);
+}
+.sub-counts:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.sub-counts strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sub-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.35rem;
+}
+/* Edit, close and delete sit in the corner, out of the way of the one button
+   everybody uses. Pulled into the padding so the icons line up with the edge. */
+.sub-card__manage {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin: -0.4rem -0.55rem 0 0;
+}
+.sub-card__closed {
+  align-self: flex-start;
+}
+
+.sub-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2.75rem 1rem;
+  text-align: center;
+  color: var(--muted);
+}
+.sub-empty .pi {
+  font-size: 2rem;
+  color: var(--faint);
+}
+.sub-empty p {
+  margin: 0;
+}
+
+/* ---- Your earlier requests ---- */
+
+.sub-history {
+  margin-top: 1.25rem;
+}
+.sub-history h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.sub-history ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sub-history li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--border);
+}
+.sub-history li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.sub-history__what,
+.sub-history__how {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.sub-history__how {
+  align-items: flex-end;
+  text-align: right;
+}
+.sub-history small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+/* ---- The queue of requests ---- */
+
+.sub-queue {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sub-request {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+}
+.sub-request__who,
+.sub-request__what,
+.sub-person {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.sub-request__who span,
+.sub-request__what small,
+.sub-person small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+.sub-request__label {
+  color: var(--faint);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sub-request__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.sub-request__devices {
+  color: var(--ink-2);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Subscribers ---- */
+
+.sub-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+}
+/* The shared select is full-width by default; here it shares a row. */
+.sub-filters .sub-filters__which.p-dropdown {
+  width: auto;
+  flex: 0 1 15rem;
+  min-width: 12rem;
+}
+.sub-filters__search {
+  flex: 1 1 14rem;
+}
+.sub-table {
+  padding: 0.5rem;
+}
+.sub-table__actions {
+  width: 8.5rem;
+  text-align: right;
+  white-space: nowrap;
+}
+.sub-table__devices {
+  color: var(--ink-2);
+  font-size: 0.88rem;
+}
+
+/* ---- Chips: pick one of a few ---- */
+
+.sub-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.sub-chip {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.sub-chip:hover {
+  border-color: var(--brand-500);
+}
+.sub-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.sub-chip.is-on {
+  border-color: var(--brand-600);
+  background: var(--brand-600);
+  color: #fff;
+}
+
+/* ---- Device counts: a stepper per platform ---- */
+
+.sub-devices-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+.sub-field .sub-devices-form {
+  margin-bottom: 0;
+}
+.sub-devices-form__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0.5rem 0.45rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.sub-devices-form__name {
+  min-width: 0;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.sub-devices-form__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.sub-devices-form__hint.is-error {
+  color: var(--bad);
+}
+.sub-stepper {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0.15rem;
+}
+.sub-stepper__btn {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.sub-stepper__btn:not(:disabled):hover {
+  border-color: var(--brand-500);
+  color: var(--brand-700);
+  background: var(--brand-50);
+}
+.sub-stepper__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.sub-stepper__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sub-stepper__value {
+  min-width: 2.2rem;
+  color: var(--ink);
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Devices: yours to look at, and a reviewer's to look after ---- */
+
+.sub-mydevices__about {
+  margin: -0.35rem 0 0.85rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.sub-mydevices__none {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.sub-usage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+.sub-usage__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.sub-usage__item strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.sub-usage__item.is-full {
+  background: var(--brand-50);
+}
+.sub-device-id {
+  color: var(--ink-2);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.sub-dev-section {
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.sub-dev-section h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.sub-dev-section__about {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.sub-dev-section .sub-muted {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.sub-centre--tight {
+  padding: 1rem 0;
+}
+.sub-dev-list,
+.sub-refusals {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sub-dev {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.5rem 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.sub-dev.is-blocked {
+  background: var(--bg);
+}
+.sub-dev__main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  flex: 1;
+}
+.sub-dev__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sub-dev__main small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.sub-dev__note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 0.85rem;
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+.sub-dev__note-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.sub-dev__note-form .p-inputtext {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.sub-dev__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--bad-soft);
+  color: var(--ink-2);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.sub-dev__confirm-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.sub-dev__actions {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.sub-refusals li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.sub-refusals__why,
+.sub-refusals__when {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.sub-refusals__why strong {
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+.sub-refusals__when {
+  flex-shrink: 0;
+  align-items: flex-end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sub-refusals small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Platforms ---- */
+
+.sub-platform-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+.sub-platform-form .sub-field {
+  margin-bottom: 0;
+}
+.sub-platform-form__hint {
+  grid-column: 1 / -1;
+}
+.sub-platform {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+}
+.sub-platform .sub-code {
+  margin-top: 0;
+}
+
+/* ---- Dialogs ---- */
+
+.sub-dialog {
+  width: min(32rem, calc(100vw - 2rem));
+}
+.sub-dialog--wide {
+  width: min(42rem, calc(100vw - 2rem));
+}
+
+.sub-dialog__message {
+  margin: 0 0 1rem;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+.sub-dialog__error {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: var(--bad-soft);
+  color: var(--bad);
+  font-size: 0.9rem;
+}
+.sub-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+/* Inside a section of a longer dialog, where the button belongs to what is
+   just above it rather than to the dialog as a whole. */
+.sub-dialog__actions--start {
+  justify-content: flex-start;
+  margin-top: 0;
+}
+.sub-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+.sub-field label,
+.sub-field__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.sub-field__optional {
+  margin-left: 0.3rem;
+  color: var(--faint);
+  font-weight: 500;
+}
+.sub-field__hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.sub-field__hint.is-error {
+  color: var(--bad);
+}
+.sub-field .p-inputtext,
+.sub-field .p-inputtextarea {
+  width: 100%;
+}
+
+.sub-period {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.sub-period__date {
+  width: 100%;
+}
+.sub-period__until {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: var(--ok-soft);
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .sub-tabs {
+    width: 100%;
+  }
+  .sub-tab {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 0.5rem 0.4rem;
+    font-size: 0.85rem;
+  }
+  /* The tabs fit a phone's width only without their icons. */
+  .sub-tab .pi {
+    display: none;
+  }
+  .sub-platform-form,
+  .sub-platform {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sub-platform .sub-request__actions {
+    justify-content: flex-start;
+  }
+  /* A device's id is long and unbroken; give it the full width, with what can
+     be done to the device underneath. */
+  .sub-dev {
+    flex-direction: column;
+    padding-right: 0.85rem;
+  }
+  .sub-dev__actions {
+    margin: -0.15rem 0 -0.3rem -0.5rem;
+  }
+  .sub-refusals li {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .sub-refusals__when {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.5rem;
+    text-align: left;
+  }
+  .sub-request {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sub-request__actions .p-button {
+    flex: 1;
+  }
+  .sub-history__how {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .sub-filters .sub-filters__which.p-dropdown,
+  .sub-filters__search {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}

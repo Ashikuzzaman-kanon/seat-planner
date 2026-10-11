@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Only for the ticket checker's QR scanner, and only asked for when it opens. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!--
+        No backups: the page keeps the sign-in in the WebView's storage, and
+        restoring a months-old copy onto a new phone would only sign people into
+        an expired session.
+    -->
+    <application
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SeatPlanner">
+
+        <!--
+            The configuration changes are handled by the WebView itself, so
+            turning the phone or opening the keyboard does not reload the page
+            and lose what was typed.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+                The switch link a developer's computer shows as a QR code. Android
+                opens it here rather than in the browser once it has checked
+                /.well-known/assetlinks.json on the site.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="${productionHost}"
+                    android:pathPrefix="/app/server"
+                    android:scheme="https" />
+            </intent-filter>
+
+            <!-- The same link, for the web page's "Open in the app" button. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="server"
+                    android:scheme="seatplanner" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ServerActivity"
+            android:exported="false"
+            android:label="@string/server_title"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Hands a ticket PDF to the phone's PDF viewer without storage permission. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>

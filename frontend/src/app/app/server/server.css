@@ -1,0 +1,94 @@
+/* The landing page for a switch link the Android app did not take. */
+
+.switch {
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* Flex rather than a centred grid, whose one column grows to the card's
+     longest line and pushes it off a phone's screen. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: var(--bg);
+}
+.switch__card {
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 2rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+  color: var(--ink-2);
+}
+.switch__mark {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 14px;
+  background: var(--brand-grad);
+  color: #fff;
+  font-size: 1.4rem;
+}
+.switch h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.switch p {
+  margin: 0;
+  line-height: 1.55;
+  font-size: 0.95rem;
+}
+.switch code {
+  padding: 0.1rem 0.35rem;
+  border-radius: 6px;
+  background: #eef2f7;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.switch__bad {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.switch__note {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--info-soft);
+  color: var(--ink);
+  font-size: 0.9rem !important;
+  text-align: left;
+}
+.switch__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius);
+  background: var(--brand-grad);
+  color: #fff;
+  font-weight: 650;
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+}
+.switch__button:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.switch__away {
+  font-size: 0.85rem;
+  color: var(--muted);
+}

@@ -28,6 +28,7 @@ const ACCOUNTS = [
   ["unittest-super2@example.com", "Unit Test Super Admin 2", RESERVED_ROLES.SUPER_ADMIN],
   ["unittest-admin@example.com", "Unit Test Admin", "admin"],
   ["unittest-planner@example.com", "Unit Test Planner", "planner"],
+  ["unittest-checker@example.com", "Unit Test Checker", "checker"],
   ["unittest-user@example.com", "Unit Test User", RESERVED_ROLES.DEFAULT],
   // A separate body for role grant/revoke experiments, so the suites never
   // strip the roles off an account they also assert the defaults of.

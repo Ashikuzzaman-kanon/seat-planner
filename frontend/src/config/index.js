@@ -6,6 +6,10 @@ const config = {
   // The API's health URL, called directly (not through the proxy) to wake it
   // when it has gone to sleep. Set from BACKEND_ORIGIN in next.config.mjs.
   wakeUrl: process.env.NEXT_PUBLIC_WAKE_URL || null,
+  // The live site. The Android app always opens it, and the switch links the
+  // "Open on phone" page draws as QR codes are addresses on it (App Links).
+  // Must match productionUrl in android/app/build.gradle.kts.
+  productionUrl: process.env.NEXT_PUBLIC_PRODUCTION_URL || "https://seat-planner-sable.vercel.app",
 };
 
 export default config;

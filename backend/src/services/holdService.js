@@ -8,6 +8,7 @@ const {
   Trip,
   TrainName,
   Station,
+  RouteStop,
 } = require("../models");
 const { HOLD_STATUS } = require("../models/SeatHold");
 const { SEGMENT_SOURCE } = require("../models/SeatSegmentBooking");
@@ -15,6 +16,7 @@ const { TRIP_STATUS } = require("../models/Trip");
 const ApiError = require("../utils/ApiError");
 const { AUDIT_ACTIONS } = require("../constants/auditActions");
 const { holdReference } = require("../utils/reference");
+const { instantAt } = require("../utils/dhakaTime");
 const inventory = require("./inventoryService");
 const settings = require("./settingService");
 const audit = require("./auditService");
@@ -57,11 +59,33 @@ async function findOr404(reference) {
  * Fails with a conflict if any seat went in the meantime — which is the right
  * answer, and far better than discovering it after the passenger has paid.
  */
-async function create({ tripId, userId, seatIds, fromStationId, toStationId, minutes: window }) {
+async function create({ tripId, userId, seatIds, fromStationId, toStationId, minutes: window, now = new Date() }) {
   const trip = await Trip.findByPk(tripId);
   if (!trip) throw ApiError.notFound("Departure not found");
   if (trip.status === TRIP_STATUS.CANCELLED) {
     throw ApiError.badRequest("This departure is cancelled");
+  }
+
+  /*
+   * Sales for a stop close when the train leaves it — the same moment a
+   * return measures "departed" from. Before this, today's train stayed on sale
+   * until midnight, hours after it had gone.
+   */
+  const boarding = await RouteStop.findOne({
+    where: { trainId: trip.trainId, stationId: fromStationId },
+    include: [{ model: Station, as: "station", attributes: ["name"] }],
+  });
+  if (boarding) {
+    const leaves = instantAt(
+      trip.departureDate,
+      boarding.departureTime || boarding.arrivalTime || "00:00:00",
+      boarding.dayOffset || 0
+    );
+    if (leaves && leaves <= now) {
+      throw ApiError.badRequest(
+        `This train has already left ${boarding.station?.name || "that station"}. Choose a later departure.`
+      );
+    }
   }
 
   /*

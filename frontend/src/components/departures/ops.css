@@ -256,3 +256,67 @@
     justify-content: flex-end;
   }
 }
+
+/* ---------------- Generate departures ---------------- */
+
+.gen-form {
+  display: grid;
+  gap: 0.4rem;
+}
+.gen-hint {
+  margin: 0 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.gen-label {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.gen-quick {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: -0.1rem;
+}
+.gen-run {
+  display: grid;
+  gap: 0.75rem;
+}
+.gen-run__line {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.gen-run__line i {
+  color: var(--brand-600);
+}
+.gen-run__line span {
+  margin-left: auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.gen-run__totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+}
+.gen-run__totals b {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.gen-run__list {
+  margin: 0;
+  padding-left: 1.1rem;
+  max-height: 12rem;
+  overflow: auto;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+.gen-run__list--bad {
+  color: var(--bad);
+}

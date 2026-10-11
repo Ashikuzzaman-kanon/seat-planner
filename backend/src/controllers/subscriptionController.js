@@ -1,0 +1,154 @@
+const asyncHandler = require("../utils/asyncHandler");
+const { PERMISSIONS } = require("../constants/permissions");
+const subscriptions = require("../services/subscriptionService");
+const devices = require("../services/deviceService");
+const auth = require("../services/authService");
+
+const can = (req, permission) => req.permissions.has(permission);
+const reviewer = (req) => can(req, PERMISSIONS.SUBSCRIPTION_APPROVE);
+/** Whoever manages or approves sees every subscription, with its numbers. */
+const staff = (req) => reviewer(req) || can(req, PERMISSIONS.SUBSCRIPTION_MANAGE);
+const actor = (req) => ({ id: req.user.id, fullName: req.user.fullName, email: req.user.email });
+
+/**
+ * Whether an email and password hold valid subscriptions on the device the
+ * call came from — for a caller outside the app, which has no session and
+ * wants none.
+ *
+ * The answer names the account and says yes or no for every subscription
+ * there is; no dates, and no reason for a no. The password is checked exactly
+ * as sign-in checks it, the pause after wrong ones included (authService
+ * `checkCredentials`). `deviceId` and `platform` are deliberately not
+ * validated here: a missing or malformed one is not a 400 that explains
+ * itself, it is `valid: false` like any other device that is not let in.
+ */
+const check = asyncHandler(async (req, res) => {
+  const user = await auth.checkCredentials(req.body, { purpose: "subscription check" });
+  res.set("Cache-Control", "no-store");
+  res.json({
+    user: { name: user.fullName, email: user.email },
+    subscriptions: await subscriptions.validityFor(user, {
+      deviceId: req.body.deviceId,
+      platform: req.body.platform,
+    }),
+  });
+});
+
+const list = asyncHandler(async (req, res) => {
+  res.json(await subscriptions.list(req.user.id, { staff: staff(req) }));
+});
+
+const mine = asyncHandler(async (req, res) => {
+  res.json(await subscriptions.mine(req.user.id));
+});
+
+const create = asyncHandler(async (req, res) => {
+  res.status(201).json({ subscription: await subscriptions.create(req.body, actor(req)) });
+});
+
+const update = asyncHandler(async (req, res) => {
+  res.json({ subscription: await subscriptions.update(req.params.id, req.body, actor(req)) });
+});
+
+const remove = asyncHandler(async (req, res) => {
+  res.json(await subscriptions.remove(req.params.id));
+});
+
+const request = asyncHandler(async (req, res) => {
+  res.status(201).json({ subscription: await subscriptions.request(req.params.id, req.user, req.body?.devices) });
+});
+
+const members = asyncHandler(async (req, res) => {
+  res.json(
+    await subscriptions.members({
+      status: req.query.status,
+      subscriptionId: req.query.subscriptionId,
+      search: req.query.search,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 25,
+    })
+  );
+});
+
+const pendingCount = asyncHandler(async (_req, res) => {
+  res.json(await subscriptions.pendingCount());
+});
+
+const approve = asyncHandler(async (req, res) => {
+  res.json({ subscription: await subscriptions.approve(req.params.id, req.body, actor(req)) });
+});
+
+const decline = asyncHandler(async (req, res) => {
+  res.json({ subscription: await subscriptions.decline(req.params.id, req.body, actor(req)) });
+});
+
+const cancel = asyncHandler(async (req, res) => {
+  res.json({
+    subscription: await subscriptions.cancel(req.params.id, req.body, actor(req), { staff: reviewer(req) }),
+  });
+});
+
+const amend = asyncHandler(async (req, res) => {
+  res.json({ subscription: await subscriptions.amend(req.params.id, req.body, actor(req)) });
+});
+
+/* ---------------- Platforms ---------------- */
+
+const platforms = asyncHandler(async (req, res) => {
+  res.json(await devices.platforms({ staff: staff(req) }));
+});
+
+const createPlatform = asyncHandler(async (req, res) => {
+  res.status(201).json({ platform: await devices.createPlatform(req.body, actor(req)) });
+});
+
+const updatePlatform = asyncHandler(async (req, res) => {
+  res.json({ platform: await devices.updatePlatform(req.params.id, req.body) });
+});
+
+const removePlatform = asyncHandler(async (req, res) => {
+  res.json(await devices.removePlatform(req.params.id));
+});
+
+/* ---------------- Devices ---------------- */
+
+/** The caller's own devices: to look at, not to change. */
+const myDevices = asyncHandler(async (req, res) => {
+  res.json(await devices.devicesOf(req.user.id));
+});
+
+const userDevices = asyncHandler(async (req, res) => {
+  res.json(await devices.devicesOfUser(req.params.userId));
+});
+
+const updateDevice = asyncHandler(async (req, res) => {
+  res.json({ device: await devices.updateDevice(req.params.id, req.body) });
+});
+
+const removeDevice = asyncHandler(async (req, res) => {
+  res.json(await devices.removeDevice(req.params.id));
+});
+
+module.exports = {
+  check,
+  list,
+  mine,
+  create,
+  update,
+  remove,
+  request,
+  members,
+  pendingCount,
+  approve,
+  decline,
+  cancel,
+  amend,
+  platforms,
+  createPlatform,
+  updatePlatform,
+  removePlatform,
+  myDevices,
+  userDevices,
+  updateDevice,
+  removeDevice,
+};

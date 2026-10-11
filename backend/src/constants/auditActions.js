@@ -109,6 +109,38 @@ const AUDIT_ACTIONS = Object.freeze({
   // Demonstration data, filled in and taken away by the super admin.
   DEMO_POPULATE: "demo.populate",
   DEMO_CLEAR: "demo.clear",
+
+  // The real railway timetable and seat plans, loaded by the super admin.
+  RAILWAY_LOAD: "railway.load",
+
+  // The daily sweep deleting long-departed trains' unsold seats.
+  SEATS_CLEARED: "trip.seats_cleared",
+
+  // Subscriptions: what can be subscribed to, and each person's subscription.
+  SUBSCRIPTION_CREATE: "subscription.create",
+  SUBSCRIPTION_UPDATE: "subscription.update",
+  SUBSCRIPTION_DELETE: "subscription.delete",
+  SUBSCRIPTION_REQUEST: "subscription.request",
+  SUBSCRIPTION_APPROVE: "subscription.approve",
+  SUBSCRIPTION_DECLINE: "subscription.decline",
+  SUBSCRIPTION_CANCEL: "subscription.cancel",
+  SUBSCRIPTION_EXTEND: "subscription.extend",
+  SUBSCRIPTION_EXPIRE: "subscription.expire",
+
+  // How many devices a subscription allows, the platforms there are, and the
+  // devices seen on each account. A refusal's reason is recorded here and
+  // never returned to the caller.
+  SUBSCRIPTION_LIMITS: "subscription.limits",
+  SUBSCRIPTION_PLATFORM_CREATE: "subscription.platform_create",
+  SUBSCRIPTION_PLATFORM_UPDATE: "subscription.platform_update",
+  SUBSCRIPTION_PLATFORM_DELETE: "subscription.platform_delete",
+  SUBSCRIPTION_DEVICE_ADD: "subscription.device_add",
+  SUBSCRIPTION_DEVICE_REFUSE: "subscription.device_refuse",
+  SUBSCRIPTION_DEVICE_UPDATE: "subscription.device_update",
+  SUBSCRIPTION_DEVICE_DELETE: "subscription.device_delete",
+
+  // Sign-in paused on an account after too many wrong passwords in a row.
+  AUTH_LOCKED: "auth.locked",
 });
 
 module.exports = { AUDIT_ACTIONS };

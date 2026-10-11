@@ -26,6 +26,12 @@ class ApiError extends Error {
   static conflict(msg = "Conflict") {
     return new ApiError(409, msg);
   }
+  /** `retryAfterSeconds` becomes the Retry-After header (see the error handler). */
+  static tooManyRequests(msg = "Too many requests", retryAfterSeconds) {
+    const error = new ApiError(429, msg);
+    if (retryAfterSeconds > 0) error.retryAfterSeconds = Math.ceil(retryAfterSeconds);
+    return error;
+  }
 }
 
 module.exports = ApiError;

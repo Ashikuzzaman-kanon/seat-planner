@@ -12,10 +12,16 @@
     "seed:seatplans": "node src/seeders/importSeatPlans.js",
     "seed:network": "node src/seeders/seedNetwork.js",
     "seed:departures": "node src/seeders/seedDepartures.js",
+    "railway:fetch": "node tools/railway/fetch-timetable.js",
+    "railway:load": "node tools/railway/load.js",
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "migrate:status": "sequelize-cli db:migrate:status",
-    "migration:generate": "sequelize-cli migration:generate --name"
+    "migration:generate": "sequelize-cli migration:generate --name",
+    "test": "node --test tests/unit/",
+    "test:integration": "node tests/integration/run.js",
+    "test:all": "npm test && npm run test:integration",
+    "coverage": "c8 --reporter=none node --test tests/unit/ && c8 --clean=false --reporter=none node tests/integration/run.js && c8 report --check-coverage --lines 90 --functions 90 --branches 70"
   },
   "keywords": [],
   "author": "",
@@ -37,6 +43,8 @@
     "sequelize-cli": "^6.6.5"
   },
   "devDependencies": {
+    "c8": "^10.1.3",
+    "jsqr": "^1.4.0",
     "nodemon": "^3.1.9"
   }
 }

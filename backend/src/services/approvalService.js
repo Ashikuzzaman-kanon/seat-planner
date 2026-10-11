@@ -6,6 +6,7 @@ const { AUDIT_ACTIONS } = require("../constants/auditActions");
 const { approvalReference, unique } = require("../utils/reference");
 const audit = require("./auditService");
 const notify = require("./notificationService");
+const inbox = require("./inboxService");
 
 /**
  * The one approval mechanism (§16.1).
@@ -67,7 +68,7 @@ function catalogue() {
  * reads sensibly after the subject itself is gone.
  */
 async function open({ type, subject, requestedById, reason, payload }) {
-  handlerFor(type); // fail fast on an unregistered type
+  const handler = handlerFor(type); // fail fast on an unregistered type
 
   const reference = await unique(approvalReference, async (candidate) =>
     Boolean(await ApprovalRequest.findOne({ where: { reference: candidate } }))
@@ -91,6 +92,21 @@ async function open({ type, subject, requestedById, reason, payload }) {
     after: { type, subject: `${subject.type}:${subject.id}`, reason },
     message: `${type.replace(/_/g, " ")} requested for ${subject.label || subject.id}`,
   });
+
+  // Everyone who can decide it, so it does not sit unseen in a queue nobody opened.
+  const what = type.replace(/_/g, " ");
+  await inbox.toHolders(
+    handler.permission,
+    {
+      type: "approval.requested",
+      category: inbox.CATEGORY.APPROVAL,
+      tone: "info",
+      title: `${what[0].toUpperCase()}${what.slice(1)} waiting for a decision — ${request.reference}`,
+      body: [subject.label, reason && `“${reason}”`].filter(Boolean).join(" · "),
+      link: "/dashboard/requests",
+    },
+    { except: [requestedById] }
+  );
 
   return request;
 }

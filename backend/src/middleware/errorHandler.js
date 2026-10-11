@@ -31,6 +31,7 @@ function errorHandler(err, _req, res, _next) {
 
   if (statusCode >= 500) console.error(err);
 
+  if (err.retryAfterSeconds) res.set("Retry-After", String(err.retryAfterSeconds));
   res.status(statusCode).json(payload);
 }
 

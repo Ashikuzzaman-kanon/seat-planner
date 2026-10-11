@@ -89,6 +89,13 @@ const PERMISSIONS = Object.freeze({
 
   // Demo data
   DEMO_MANAGE: "demo:manage",
+
+  // Real railway data
+  RAILWAY_MANAGE: "railway:manage",
+
+  // Subscriptions. Asking for one needs no permission — everyone signed in can.
+  SUBSCRIPTION_MANAGE: "subscription:manage",
+  SUBSCRIPTION_APPROVE: "subscription:approve",
 });
 
 /**
@@ -433,6 +440,36 @@ const PERMISSION_CATALOGUE = Object.freeze([
       "Fill the system with demonstration accounts, trains, departures and bookings, and remove " +
       "them again. Removing touches only what the demo created — but that includes every booking " +
       "made on a demo departure, so it belongs with whoever runs the system.",
+  },
+
+  {
+    key: PERMISSIONS.RAILWAY_MANAGE,
+    group: "Railway data",
+    label: "Load the real railway timetable and seat plans",
+    description:
+      "Load Bangladesh Railway's published stations, trains and routes, and the seat plans transcribed " +
+      "for them, and make the trains that have plans ready for departures. Adds what is missing and " +
+      "leaves anything already there as it is.",
+  },
+
+  {
+    key: PERMISSIONS.SUBSCRIPTION_MANAGE,
+    group: "Subscriptions",
+    label: "Manage subscriptions",
+    description:
+      "Create the subscriptions people can ask for, rename them, close them to new requests and reopen " +
+      "them, and delete one nobody has ever asked for. Also create the platforms a subscription is used " +
+      "on (Windows, Android…), rename them and switch them off.",
+  },
+  {
+    key: PERMISSIONS.SUBSCRIPTION_APPROVE,
+    group: "Subscriptions",
+    label: "Approve and end subscriptions",
+    description:
+      "See who has asked to subscribe, approve a request for a chosen period and number of devices or " +
+      "decline it, change when a running subscription ends or how many devices it allows, and cancel " +
+      "anyone's subscription. Also see the devices on a subscriber's account and why any were turned " +
+      "away, and note, block or remove a device.",
   },
 ]);
 

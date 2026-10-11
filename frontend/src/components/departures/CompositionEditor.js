@@ -34,14 +34,21 @@ export default function CompositionEditor({ train, visible, onHide, onSaved, can
       .finally(() => setLoading(false));
   }, [visible, train]);
 
+  // Plans are copied per train, so a coach number alone repeats across trains:
+  // each option names its train, and this train's own plans come first.
   const planOptions = useMemo(
     () =>
-      plans.map((p) => ({
-        label: `${p.coachNo} — ${p.coachClass?.name || "?"}${p.status === "approved" ? "" : ` (${p.status})`}`,
-        value: p.id,
-        status: p.status,
-      })),
-    [plans]
+      [...plans]
+        .sort((a, b) => (b.trainNameId === train?.id) - (a.trainNameId === train?.id))
+        .map((p) => ({
+          label:
+            `${p.coachNo || "Untitled"} — ${p.coachClass?.name || "no class"}` +
+            `${p.trainNameId === train?.id ? "" : ` · ${p.trainName?.name || "no train"}`}` +
+            `${p.status === "approved" ? "" : ` (${p.status})`}`,
+          value: p.id,
+          status: p.status,
+        })),
+    [plans, train]
   );
 
   const planById = useMemo(() => new Map(plans.map((p) => [p.id, p])), [plans]);

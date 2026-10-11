@@ -16,7 +16,9 @@ const holdService = require("./holdService");
 const bookingService = require("./bookingService");
 const walletService = require("./walletService");
 const emailService = require("./emailService");
+const ui = require("../emails/layout");
 const notify = require("./notificationService");
+const inbox = require("./inboxService");
 const money = require("../utils/money");
 
 /**
@@ -486,41 +488,68 @@ async function offerTo(entry, trip) {
  * in-app is a queue that mostly lapses.
  */
 async function notifyOffer(entry, trip, held, minutes) {
-  const user = await User.findByPk(entry.userId);
-  if (!user?.email) return;
-
   const [from, to] = await Promise.all([
     Station.findByPk(entry.fromStationId),
     Station.findByPk(entry.toStationId),
   ]);
 
-  const seatList = held.seats
-    .map((s) => `${s.coachCode ? `${s.coachCode} ` : ""}${s.seatNumber}`)
-    .join(", ");
   const plural = held.seats.length === 1 ? "" : "s";
 
+  // In the app as well as by email — and first, so an account with no address,
+  // or a mail server that is down, still sees the offer while it is open.
+  await inbox.tryAdd(entry.userId, {
+    type: "waitlist.offer",
+    category: inbox.CATEGORY.WAITLIST,
+    tone: "success",
+    title: `A seat came free — confirm within ${minutes} minutes`,
+    body: [
+      trip.train?.name,
+      [from?.name, to?.name].filter(Boolean).join(" → ").replace(/_/g, " "),
+      trip.departureDate,
+      `${held.seats.length} seat${plural} held for you (${entry.reference})`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    link: "/dashboard/bookings",
+    key: `waitlist:${entry.reference}:offer:${held.hold.reference}`,
+  });
+
+  const user = await User.findByPk(entry.userId);
+  if (!user?.email) return;
+
+  const subject = `A seat came free — ${trip.train?.name || "your train"}, ${entry.reference}`;
   await emailService.sendMail({
     to: user.email,
-    subject: `A seat came free — ${trip.train?.name || "your train"}, ${entry.reference}`,
-    html: `
-      <div style="font-family:system-ui,sans-serif;max-width:520px;">
-        <h2 style="margin:0 0 4px;">A seat came free</h2>
-        <p style="color:#4b5563;margin:0 0 16px;">
-          You queued for ${from?.name || "your journey"} &rarr; ${to?.name || ""} on
-          ${trip.train?.name || "this train"}${trip.departureDate ? `, ${trip.departureDate}` : ""}.
-        </p>
-        <p style="margin:0 0 16px;font-size:15px;">
-          <strong>${seatList}</strong> ${plural ? "are" : "is"} held in your name.
-        </p>
-        <p style="margin:0 0 16px;color:#b45309;">
-          The seat${plural} will go back on sale in <strong>${minutes} minutes</strong> if you do
-          not confirm. Confirming takes one click and is paid from your wallet balance.
-        </p>
-        <p style="color:#6b7280;font-size:13px;margin:0;">
-          Queue reference ${entry.reference}. If you no longer want it, declining passes it
-          straight to the next person waiting.
-        </p>
-      </div>`,
+    subject,
+    html: ui.page({
+      subject,
+      preheader: `Held for you for ${minutes} minutes — confirm in one click.`,
+      eyebrow: "Waitlist",
+      tone: "success",
+      title: "A seat came free",
+      intro: `You queued for this journey, and ${held.seats.length === 1 ? "a seat is" : "seats are"} now held in your name.`,
+      body:
+        ui.journey({
+          from: from?.name || "your journey",
+          to: to?.name || "",
+          train: trip.train?.name || "this train",
+          date: trip.departureDate,
+        }) +
+        ui.sectionTitle(`Held for you (${held.seats.length})`) +
+        ui.chips(held.seats.map((s) => `${s.coachCode ? `Coach ${s.coachCode} · ` : ""}Seat ${s.seatNumber}`), {
+          tone: "success",
+        }) +
+        ui.callout(
+          `The seat${plural} will go back on sale in ${minutes} minutes if you do not confirm. ` +
+            "Confirming takes one click and is paid from your wallet balance.",
+          { tone: "warning", title: `Confirm within ${minutes} minutes` }
+        ) +
+        ui.button("Confirm your seat" + plural, ui.appUrl("/dashboard/bookings"), { tone: "success" }) +
+        ui.paragraph(
+          `Queue reference ${entry.reference}. If you no longer want it, declining passes it straight to the next person waiting.`,
+          { muted: true, size: 14 }
+        ),
+    }),
   });
 }
 
@@ -823,5 +852,7 @@ module.exports = {
   expireOffers,
   closeDeparted,
   positionOf,
+  // For the email preview (tools/preview-emails.js).
+  notifyOffer,
   WAITLIST_STATUS,
 };

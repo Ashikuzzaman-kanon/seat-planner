@@ -56,6 +56,20 @@ export const NAV_GROUPS = [
         blurb: "Transfers and withdrawals",
       },
       {
+        // No permission: anyone signed in can ask for one; reviewers get the queue too.
+        href: "/dashboard/subscriptions",
+        label: "Subscriptions",
+        icon: "pi pi-id-card",
+        blurb: "Ask for one, and see how long yours runs",
+      },
+      {
+        // Everyone has an inbox.
+        href: "/dashboard/notifications",
+        label: "Notifications",
+        icon: "pi pi-bell",
+        blurb: "Everything that happened, and what is waiting on you",
+      },
+      {
         href: "/dashboard/profile",
         label: "My Profile",
         icon: "pi pi-user",
@@ -162,6 +176,13 @@ export const NAV_GROUPS = [
         icon: "pi pi-server",
         permission: PERMISSIONS.JOB_VIEW,
         blurb: "Refunds and messages still running",
+      },
+      {
+        href: "/dashboard/railway-data",
+        label: "Railway Data",
+        icon: "pi pi-directions",
+        permission: PERMISSIONS.RAILWAY_MANAGE,
+        blurb: "Load the real timetable and seat plans",
       },
       {
         href: "/dashboard/demo-data",

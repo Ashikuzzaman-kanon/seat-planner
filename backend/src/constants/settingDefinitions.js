@@ -63,6 +63,30 @@ const SETTING_DEFINITIONS = Object.freeze([
     max: 1440,
   },
   {
+    key: "auth.max_failed_sign_ins",
+    group: "Authentication",
+    label: "Wrong passwords before sign-in is paused",
+    description:
+      "After this many wrong passwords in a row, the account accepts no password — at sign-in or the " +
+      "subscription check — until the pause below is over. A correct password before then starts the count again.",
+    type: SETTING_TYPES.INTEGER,
+    default: 5,
+    min: 3,
+    max: 50,
+  },
+  {
+    key: "auth.lockout_minutes",
+    group: "Authentication",
+    label: "Sign-in pause (minutes)",
+    description:
+      "How long that pause lasts, and how long a run of wrong passwords is remembered. Resetting the " +
+      "password ends the pause at once; anyone already signed in stays signed in.",
+    type: SETTING_TYPES.INTEGER,
+    default: 15,
+    min: 1,
+    max: 1440,
+  },
+  {
     key: "trip.horizon_days",
     group: "Departures",
     label: "Rolling horizon (days)",
@@ -429,6 +453,43 @@ const SETTING_DEFINITIONS = Object.freeze([
     default: 30,
     min: 1,
     max: 365,
+  },
+  {
+    key: "trip.keep_unsold_seats_days",
+    group: "Departures",
+    label: "Days a departed train's unsold seats are kept",
+    description:
+      "Once a departure is this many days in the past, the seats nobody bought are deleted to keep the " +
+      "database small — every seat is a row, and these are most of them. Seats with a ticket or a return, " +
+      "and every booking, ticket, payment, refund and wallet record, are kept for good.",
+    type: SETTING_TYPES.INTEGER,
+    default: 90,
+    min: 30,
+    max: 3650,
+  },
+  {
+    key: "notifications.keep_days",
+    group: "Notifications",
+    label: "Days notifications are kept",
+    description:
+      "Notifications older than this are deleted from everyone's inbox, read or not. The emails " +
+      "about the same events are unaffected, and so is everything a notification pointed to.",
+    type: SETTING_TYPES.INTEGER,
+    default: 90,
+    min: 7,
+    max: 730,
+  },
+  {
+    key: "subscription.reminder_days",
+    group: "Subscriptions",
+    label: "Days before the end to remind a subscriber",
+    description:
+      "A subscriber is told once, this many days before their subscription's last day, that it is about " +
+      "to end. Set to 0 to send no reminder.",
+    type: SETTING_TYPES.INTEGER,
+    default: 3,
+    min: 0,
+    max: 60,
   },
 ]);
 
