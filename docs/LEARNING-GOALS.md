@@ -1,7 +1,7 @@
 # Seat Planner — learning goals
 
 The learning-goal topics this project covers, topic by topic. Topics 1 to 35 came first and keep their
-numbers; 36 to 64 were added so that every sub-goal on the goal sheet has a topic.
+numbers; 36 to 59 were added so that every sub-goal on the goal sheet has a topic.
 [The goal sheet, sub-goal by sub-goal](#the-goal-sheet-sub-goal-by-sub-goal) maps each line of the sheet to its topic.
 
 For each topic: what it is (**Topic**), where and how Seat Planner uses it (**In Seat Planner**), and
@@ -28,11 +28,11 @@ Where two topics are named, the first is the one to present from.
 |---|---|---|---|---|---|
 | [1. Application Deployment (Intermediate)](#goal-1--application-deployment-intermediate) | 18 | 7 | 5 | 0 | 6 |
 | [2. Debugging Techniques (Advanced)](#goal-2--debugging-techniques-advanced) | 7 | 1 | 0 | 4 | 2 |
-| [3. Logging](#goal-3--logging) | 10 | 4 | 5 | 0 | 1 |
+| [3. Logging](#goal-3--logging) | 1 | 0 | 1 | 0 | 0 |
 | [4. ORM (Intermediate)](#goal-4--orm-intermediate) | 12 | 11 | 1 | 0 | 0 |
 | [5. Operating System (Advanced)](#goal-5--operating-system-advanced) | 3 | 0 | 3 | 0 | 0 |
 | [6. Unit Testing (Advanced)](#goal-6--unit-testing-advanced) | 4 | 3 | 1 | 0 | 0 |
-| **Total** | **54** | **26** | **15** | **4** | **9** |
+| **Total** | **45** | **22** | **11** | **4** | **8** |
 
 ### Goal 1 — Application Deployment (Intermediate)
 
@@ -73,16 +73,9 @@ Where two topics are named, the first is the one to present from.
 
 | Sub-goal on the sheet | | Topic | In one line |
 |---|---|---|---|
-| Introduction to logging | ✅ | [55](#55--introduction-to-logging) | Three records for three readers: the console, the audit log, job history. |
-| Basic logging concepts | 🟡 | [21](#21--basic-logging-and-log-levels) | Console lines with a prefix per area; a real logger is planned. |
-| Different log types | ✅ | [56](#56--different-log-types) | Application, access, audit and security, query, and job history. |
-| Log levels | 🟡 | [21](#21--basic-logging-and-log-levels) | Severity by console method; no threshold that can be raised or lowered. |
-| Logging objects | ✅ | [19](#19--logging-objects-and-structured-records) | Audit entries are documents, not sentences. |
-| Log rotation and retention | 🟡 | [22](#22--retention) | Retention is shown; rotation is explained — the app writes no log files. |
-| Structured logging | ✅ | [19](#19--logging-objects-and-structured-records) | The audit log is structured end to end. |
-| Logging frameworks/libraries | 🟡 | [57](#57--logging-frameworkslibraries), [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging) | morgan writes request lines in development; a framework proper is planned and explained. |
-| Asynchronous logging | 💬 | [58](#58--asynchronous-logging), [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging) | Not used. Explained; audit entries are deliberately awaited. |
-| Distributed logging | 🟡 | [59](#59--distributed-logging), [20](#20--correlating-entries-to-one-request) | A request ID on every audit entry and in a response header; no central collection. |
+| Structured logging | 🟡 | [19](#19--logging-objects-and-structured-records), [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging) | The audit log is structured end to end; the application's console lines are still text, and structuring them is planned. |
+
+The sheet's other nine Logging sub-goals are already done, in a Logging goal that is complete, so they are not listed here. Topics [19](#19--logging-objects-and-structured-records) to [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging) are this project's logging topics all the same.
 
 ### Goal 4 — ORM (Intermediate)
 
@@ -98,16 +91,16 @@ Where two topics are named, the first is the one to present from.
 | Repository Pattern | 🟡 | [16](#16--repository-pattern) | A service layer owns all data access, without repository interfaces. |
 | Handle Complex Mapping/Constraints | ✅ | [11](#11--complex-mappings-and-constraints), [2](#2--constraints-and-referential-integrity) | Many-to-many, two links to one table, and constraints that carry business rules. |
 | Caching | ✅ | [15](#15--caching) | Settings, permissions and a mail token, each cached in a different way. |
-| Unit Test | ✅ | [60](#60--unit-test--testing-code-that-uses-the-orm) | Database code is tested against a real test database, snapshotted and restored. |
+| Unit Test | ✅ | [55](#55--unit-test--testing-code-that-uses-the-orm) | Database code is tested against a real test database, snapshotted and restored. |
 | Deployment strategies | ✅ | [17](#17--schema-deployment-strategy) | Migrations run before the API starts, so code and schema arrive together. |
 
 ### Goal 5 — Operating System (Advanced)
 
 | Sub-goal on the sheet | | Topic | In one line |
 |---|---|---|---|
-| Advanced Shell Scripting | 🟡 | [61](#61--advanced-shell-scripting) | The shell that drives the Android release; longer scripts are explained. |
-| Service and System Management | 🟡 | [62](#62--service-and-system-management) | Containers kept running by Compose and timers inside the API; systemd is explained. |
-| Security and Troubleshooting | 🟡 | [63](#63--security-and-troubleshooting) | Least privilege in the containers; a connection test that says what failed. |
+| Advanced Shell Scripting | 🟡 | [56](#56--advanced-shell-scripting) | The shell that drives the Android release; longer scripts are explained. |
+| Service and System Management | 🟡 | [57](#57--service-and-system-management) | Containers kept running by Compose and timers inside the API; systemd is explained. |
+| Security and Troubleshooting | 🟡 | [58](#58--security-and-troubleshooting) | Least privilege in the containers; a connection test that says what failed. |
 
 ### Goal 6 — Unit Testing (Advanced)
 
@@ -115,18 +108,18 @@ Where two topics are named, the first is the one to present from.
 |---|---|---|---|
 | Test-Driven Development (TDD) | ✅ | [24](#24--test-driven-style-on-pure-logic) | Rules written as small pure functions, with their tests. |
 | Code Coverage and Metrics | ✅ | [26](#26--code-coverage-and-ci) | Measured across both test runs, with floors the build enforces. |
-| Testing Asynchronous and Multi-Threaded Code | 🟡 | [25](#25--testing-asynchronous-code), [64](#64--testing-multi-threaded-code) | Timeouts and retries, and races fired together; threads themselves are explained. |
+| Testing Asynchronous and Multi-Threaded Code | 🟡 | [25](#25--testing-asynchronous-code), [59](#59--testing-multi-threaded-code) | Timeouts and retries, and races fired together; threads themselves are explained. |
 | Continuous Integration and Test Automation | ✅ | [26](#26--code-coverage-and-ci), [31](#31--cicd) | Every test runs on every pull request, without anyone starting it. |
 
-**For the theory session** — the 9 sub-goals that are explained and nothing else: Jenkins - Basics ([41](#41--jenkins---basics)), Jenkins - Freestyle Project ([42](#42--jenkins---freestyle-project)), Jenkins - Pipeline Project ([43](#43--jenkins---pipeline-project)), Jenkins - Configuration ([44](#44--jenkins---configuration)), Docker - Resource Management ([46](#46--docker---resource-management)), Docker - Custom Registries ([47](#47--docker---custom-registries)); Debugging in Multi-threaded Applications ([52](#52--debugging-in-multi-threaded-applications)), Core dump analysis ([53](#53--core-dump-analysis)); Asynchronous logging ([58](#58--asynchronous-logging)).
+**For the theory session** — the 8 sub-goals that are explained and nothing else: Jenkins - Basics ([41](#41--jenkins---basics)), Jenkins - Freestyle Project ([42](#42--jenkins---freestyle-project)), Jenkins - Pipeline Project ([43](#43--jenkins---pipeline-project)), Jenkins - Configuration ([44](#44--jenkins---configuration)), Docker - Resource Management ([46](#46--docker---resource-management)), Docker - Custom Registries ([47](#47--docker---custom-registries)); Debugging in Multi-threaded Applications ([52](#52--debugging-in-multi-threaded-applications)), Core dump analysis ([53](#53--core-dump-analysis)).
 
 **To do live** — the 4 that are shown by doing them: Conditional Breakpoints and Actions ([48](#48--conditional-breakpoints-and-actions)), Attach to Process ([49](#49--attach-to-process)), Debugging Child Processes ([50](#50--debugging-child-processes)), Debugging Mixed Code Bases ([51](#51--debugging-mixed-code-bases)).
 
-**Shown in part, the rest explained** — 15: Deployment Strategies ([36](#36--deployment-strategies)), Continuous Integration and Continuous Deployment (CI/CD) ([31](#31--cicd)), Containerization and Orchestration ([39](#39--containerization-and-orchestration)), Monitoring and Logging ([33](#33--monitoring)), Rollback and Disaster Recovery ([32](#32--rollback-and-disaster-recovery)); Basic logging concepts ([21](#21--basic-logging-and-log-levels)), Log levels ([21](#21--basic-logging-and-log-levels)), Log rotation and retention ([22](#22--retention)), Logging frameworks/libraries ([57](#57--logging-frameworkslibraries)), Distributed logging ([59](#59--distributed-logging)); Repository Pattern ([16](#16--repository-pattern)); Advanced Shell Scripting ([61](#61--advanced-shell-scripting)), Service and System Management ([62](#62--service-and-system-management)), Security and Troubleshooting ([63](#63--security-and-troubleshooting)); Testing Asynchronous and Multi-Threaded Code ([25](#25--testing-asynchronous-code)).
+**Shown in part, the rest explained** — 11: Deployment Strategies ([36](#36--deployment-strategies)), Continuous Integration and Continuous Deployment (CI/CD) ([31](#31--cicd)), Containerization and Orchestration ([39](#39--containerization-and-orchestration)), Monitoring and Logging ([33](#33--monitoring)), Rollback and Disaster Recovery ([32](#32--rollback-and-disaster-recovery)); Structured logging ([19](#19--logging-objects-and-structured-records)); Repository Pattern ([16](#16--repository-pattern)); Advanced Shell Scripting ([56](#56--advanced-shell-scripting)), Service and System Management ([57](#57--service-and-system-management)), Security and Troubleshooting ([58](#58--security-and-troubleshooting)); Testing Asynchronous and Multi-Threaded Code ([25](#25--testing-asynchronous-code)).
 
 *Understand object tracking* is on the sheet twice under ORM; it is one line here.
 
-In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency without holding locks ([4](#4--concurrency-without-holding-locks)), Partitioning ([5](#5--partitioning)), Duplicate entries ([14](#14--duplicate-entries)), A document store beside the relational database ([18](#18--a-document-store-beside-the-relational-database)), Concurrency and isolation ([34](#34--concurrency-and-isolation)), Authentication and authorization ([35](#35--authentication-and-authorization)).
+In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency without holding locks ([4](#4--concurrency-without-holding-locks)), Partitioning ([5](#5--partitioning)), Duplicate entries ([14](#14--duplicate-entries)), A document store beside the relational database ([18](#18--a-document-store-beside-the-relational-database)), Correlating entries to one request ([20](#20--correlating-entries-to-one-request)), Basic logging and log levels ([21](#21--basic-logging-and-log-levels)), Retention ([22](#22--retention)), Concurrency and isolation ([34](#34--concurrency-and-isolation)), Authentication and authorization ([35](#35--authentication-and-authorization)).
 
 ## Database — SQL
 
@@ -608,57 +601,9 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **Code.** [the database's UTC clock](../backend/src/services/deviceService.js#L182) · [the check for it](../backend/tests/integration/suites/subscription-devices.js#L144) · [mail over HTTPS](../backend/src/services/emailService.js#L161) · [a simulated sleeping server](../e2e/test-wake.js) · [the real one, recorded](../tools/prod-wake-check.js) · [HTTPS on the local network](../tools/lan-https.js) · [one boot sequence](../backend/src/boot.js#L9)
 
-## Logging — the rest of the goal sheet
-
-### 55. ✅ Introduction to logging
-
-**Topic.** What a system writes down about itself, and who reads it.
-
-**In Seat Planner.** Three records, for three readers. The application log is lines on the console for whoever runs the server: what started, what was skipped, what failed. The audit log is data for whoever is accountable: who did what, to which thing, from where. Job history is rows for operators: what background work ran, how far it got and why it stopped.
-
-**Code.** [a line at start-up](../backend/src/services/emailService.js#L38) · [auditService.record](../backend/src/services/auditService.js#L18) · [a job's run, recorded](../backend/src/services/jobService.js#L243)
-
-### 56. ✅ Different log types
-
-**Topic.** Logs differ by what they are for: running the system, proving who did what, tracing requests, tuning queries.
-
-**In Seat Planner.** Five kinds are kept. An application log on the console. An access log — one line per request — in development. An audit and security log in MongoDB: every privileged action, every sign-in, wrong password and pause. A query log of every SQL statement, in development. And job history in the database.
-
-**Code.** [access log](../backend/src/app.js#L47) · [query log](../backend/src/config/database.js#L17) · [the audit actions](../backend/src/constants/auditActions.js#L8) · [a failed sign-in, recorded](../backend/src/services/authService.js#L284) · [Background Jobs page](../frontend/src/app/dashboard/jobs/page.js)
-
-### 57. 🟡 Logging frameworks/libraries
-
-**Topic.** A library that handles levels, formats and destinations, so the code only says what happened.
-
-**In Seat Planner.** Partly. One small library is used: `morgan` writes the request line in development. Everything else is the built-in console. Adopting a framework proper is the plan in topic [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging).
-
-**Code.** [morgan](../backend/src/app.js#L47)
-
-**Explain.** Say what a framework adds, and name two: pino (fast, JSON first, child loggers that carry context) and winston (transports and formats). Levels by environment, a child logger per request, redaction, and transports to files or to a log service.
-
-### 58. 💬 Asynchronous logging
-
-**Topic.** Writing log entries without making the request wait for the disk or the network.
-
-**Explain.** The request hands the entry to a buffer and carries on; a background writer — in pino, a worker thread — sends it. It is faster under load, at a price: entries still in the buffer are lost if the process dies, so a fatal error is flushed synchronously, and a full buffer must either drop entries or push back.
-
-**Nearest thing here.** Nothing is logged asynchronously here; it is part of the plan in topic [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging). The nearest decision in the code is the opposite one, made on purpose: an audit entry is awaited before the response is sent, so it is not lost — but it can never fail the action either. If the audit store is down, the entry is skipped with a warning.
-
-**Code.** [auditing never fails the action](../backend/src/services/auditService.js#L8)
-
-### 59. 🟡 Distributed logging
-
-**Topic.** One request passes through several programs; their logs have to be joined to tell its story.
-
-**In Seat Planner.** Partly. The joining is topic [20](#20--correlating-entries-to-one-request): every request gets an ID that every audit entry it causes carries. The same ID is returned to the caller in a header, so a person reporting a problem can quote it.
-
-**Code.** [returned in a header](../backend/src/middleware/requestContext.js#L18) · [runWithContext](../backend/src/utils/requestContext.js#L16)
-
-**Explain.** Joining is as far as it goes: the web host, the API host and the database each keep their own logs. Say what completes it — one place that collects every service's logs, and an ID passed along with each call so that a trace spans all of them.
-
 ## ORM — the rest of the goal sheet
 
-### 60. ✅ Unit Test — testing code that uses the ORM
+### 55. ✅ Unit Test — testing code that uses the ORM
 
 **Topic.** Testing code that talks to the database through the ORM.
 
@@ -670,7 +615,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 ## Operating system
 
-### 61. 🟡 Advanced Shell Scripting
+### 56. 🟡 Advanced Shell Scripting
 
 **Topic.** Scripts that make decisions: pulling text apart, conditions, exit codes, values passed from one step to the next.
 
@@ -680,7 +625,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **Explain.** These are short. Say what longer scripts need: `set -euo pipefail`, functions, `trap` for clean-up, arrays, `getopts`, here-documents, and checking with `shellcheck`.
 
-### 62. 🟡 Service and System Management
+### 57. 🟡 Service and System Management
 
 **Topic.** Keeping long-running programs running: starting them in order, restarting them, scheduling work.
 
@@ -690,7 +635,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **Explain.** Say the operating system's own tools for the same job: a systemd unit (`systemctl enable`, `start`, `status`, and `journalctl` for its log), cron and systemd timers, and Windows services.
 
-### 63. 🟡 Security and Troubleshooting
+### 58. 🟡 Security and Troubleshooting
 
 **Topic.** Giving a program the least access it needs, and finding out why two machines cannot talk.
 
@@ -702,7 +647,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 ## Unit testing — the rest of the goal sheet
 
-### 64. 🟡 Testing Multi-Threaded Code
+### 59. 🟡 Testing Multi-Threaded Code
 
 **Topic.** Tests for code that runs at the same moment as other code.
 
@@ -720,9 +665,9 @@ explained, or planned, to being shown.
 | What could be built | Topics it would move |
 |---|---|
 | A `Jenkinsfile` that runs what `ci.yml` runs, with Jenkins in a container beside the stack | [41](#41--jenkins---basics), [43](#43--jenkins---pipeline-project), [44](#44--jenkins---configuration) |
-| A logging library such as pino: JSON lines, a level per environment, the request ID on every line, an asynchronous transport | [21](#21--basic-logging-and-log-levels), [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging), [57](#57--logging-frameworkslibraries), [58](#58--asynchronous-logging), [59](#59--distributed-logging) |
+| A logging library such as pino: JSON lines, a level per environment and the request ID on every line. It would finish *Structured logging*, the one Logging sub-goal still open | [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging), [21](#21--basic-logging-and-log-levels) |
 | Memory and CPU limits on each service in the Compose file, shown with `docker stats` | [46](#46--docker---resource-management) |
 | A CI step that pushes the API image to a registry, and a Compose file that pulls it | [47](#47--docker---custom-registries), [31](#31--cicd) |
-| A database backup script, and a restore that has been tried | [32](#32--rollback-and-disaster-recovery), [61](#61--advanced-shell-scripting) |
+| A database backup script, and a restore that has been tried | [32](#32--rollback-and-disaster-recovery), [56](#56--advanced-shell-scripting) |
 | A metrics endpoint, and an outside check of the health endpoint | [33](#33--monitoring) |
-| A systemd unit that runs the Compose stack on a server | [62](#62--service-and-system-management) |
+| A systemd unit that runs the Compose stack on a server | [57](#57--service-and-system-management) |

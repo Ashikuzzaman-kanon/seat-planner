@@ -359,7 +359,9 @@ const features = [
  * for the same reason.
  *
  * Topics 36 onward were added so that every sub-goal on the goal sheet has a
- * topic. SHEET, further down, is the goal sheet itself, mapped onto topics.
+ * topic. SHEET, further down, is the goal sheet itself, mapped onto topics:
+ * only the sub-goals still open on it. (Its Logging goal has one left; the
+ * other nine were completed under an earlier Logging goal.)
  * ==================================================================== */
 
 const DONE = "✅";
@@ -718,39 +720,6 @@ const goals = [
     ],
   },
   {
-    section: "Logging — the rest of the goal sheet",
-    items: [
-      [DONE, "Introduction to logging", {
-        topic: "What a system writes down about itself, and who reads it.",
-        app: "Three records, for three readers. The application log is lines on the console for whoever runs the server: what started, what was skipped, what failed. The audit log is data for whoever is accountable: who did what, to which thing, from where. Job history is rows for operators: what background work ran, how far it got and why it stopped.",
-        links: code(L("a line at start-up", S("emailService"), 'say("[email] sending through the Gmail API")'), L("auditService.record", S("auditService"), "async function record("), L("a job's run, recorded", S("jobService"), "async function run(")),
-      }],
-      [DONE, "Different log types", {
-        topic: "Logs differ by what they are for: running the system, proving who did what, tracing requests, tuning queries.",
-        app: "Five kinds are kept. An application log on the console. An access log — one line per request — in development. An audit and security log in MongoDB: every privileged action, every sign-in, wrong password and pause. A query log of every SQL statement, in development. And job history in the database.",
-        links: code(L("access log", `${B}app.js`, 'morgan("dev")'), L("query log", `${B}config/database.js`, "logging:"), L("the audit actions", `${B}constants/auditActions.js`, "const AUDIT_ACTIONS"), L("a failed sign-in, recorded", S("authService"), "AUDIT_ACTIONS.AUTH_LOGIN_FAILED"), L("Background Jobs page", `${F}app/dashboard/jobs/page.js`)),
-      }],
-      [PART, "Logging frameworks/libraries", {
-        topic: "A library that handles levels, formats and destinations, so the code only says what happened.",
-        app: "Partly. One small library is used: `morgan` writes the request line in development. Everything else is the built-in console. Adopting a framework proper is the plan in topic {{Asynchronous logging, frameworks, rotation, distributed logging}}.",
-        links: code(L("morgan", `${B}app.js`, 'morgan("dev")')),
-        say: "Say what a framework adds, and name two: pino (fast, JSON first, child loggers that carry context) and winston (transports and formats). Levels by environment, a child logger per request, redaction, and transports to files or to a log service.",
-      }],
-      [TALK, "Asynchronous logging", {
-        topic: "Writing log entries without making the request wait for the disk or the network.",
-        say: "The request hands the entry to a buffer and carries on; a background writer — in pino, a worker thread — sends it. It is faster under load, at a price: entries still in the buffer are lost if the process dies, so a fatal error is flushed synchronously, and a full buffer must either drop entries or push back.",
-        near: "Nothing is logged asynchronously here; it is part of the plan in topic {{Asynchronous logging, frameworks, rotation, distributed logging}}. The nearest decision in the code is the opposite one, made on purpose: an audit entry is awaited before the response is sent, so it is not lost — but it can never fail the action either. If the audit store is down, the entry is skipped with a warning.",
-        links: code(L("auditing never fails the action", S("auditService"), "Auditing must never be the reason a legitimate action fails")),
-      }],
-      [PART, "Distributed logging", {
-        topic: "One request passes through several programs; their logs have to be joined to tell its story.",
-        app: "Partly. The joining is topic {{Correlating entries to one request}}: every request gets an ID that every audit entry it causes carries. The same ID is returned to the caller in a header, so a person reporting a problem can quote it.",
-        links: code(L("returned in a header", `${B}middleware/requestContext.js`, "X-Request-Id"), L("runWithContext", `${B}utils/requestContext.js`, "function runWithContext(")),
-        say: "Joining is as far as it goes: the web host, the API host and the database each keep their own logs. Say what completes it — one place that collects every service's logs, and an ID passed along with each call so that a trace spans all of them.",
-      }],
-    ],
-  },
-  {
     section: "ORM — the rest of the goal sheet",
     items: [
       [DONE, "Unit Test — testing code that uses the ORM", {
@@ -840,17 +809,9 @@ const SHEET = [
   },
   {
     goal: "Logging",
+    note: "The sheet's other nine Logging sub-goals are already done, in a Logging goal that is complete, so they are not listed here. Topics {{Logging objects and structured records}} to {{Asynchronous logging, frameworks, rotation, distributed logging}} are this project's logging topics all the same.",
     items: [
-      ["Introduction to logging", DONE, ["Introduction to logging"], "Three records for three readers: the console, the audit log, job history."],
-      ["Basic logging concepts", PART, ["Basic logging and log levels"], "Console lines with a prefix per area; a real logger is planned."],
-      ["Different log types", DONE, ["Different log types"], "Application, access, audit and security, query, and job history."],
-      ["Log levels", PART, ["Basic logging and log levels"], "Severity by console method; no threshold that can be raised or lowered."],
-      ["Logging objects", DONE, ["Logging objects and structured records"], "Audit entries are documents, not sentences."],
-      ["Log rotation and retention", PART, ["Retention"], "Retention is shown; rotation is explained — the app writes no log files."],
-      ["Structured logging", DONE, ["Logging objects and structured records"], "The audit log is structured end to end."],
-      ["Logging frameworks/libraries", PART, ["Logging frameworks/libraries", "Asynchronous logging, frameworks, rotation, distributed logging"], "morgan writes request lines in development; a framework proper is planned and explained."],
-      ["Asynchronous logging", TALK, ["Asynchronous logging", "Asynchronous logging, frameworks, rotation, distributed logging"], "Not used. Explained; audit entries are deliberately awaited."],
-      ["Distributed logging", PART, ["Distributed logging", "Correlating entries to one request"], "A request ID on every audit entry and in a response header; no central collection."],
+      ["Structured logging", PART, ["Logging objects and structured records", "Asynchronous logging, frameworks, rotation, distributed logging"], "The audit log is structured end to end; the application's console lines are still text, and structuring them is planned."],
     ],
   },
   {
@@ -892,7 +853,7 @@ const SHEET = [
 /** What would turn a talk into something to show, and which topics it would move. */
 const COULD_BUILD = [
   ["A `Jenkinsfile` that runs what `ci.yml` runs, with Jenkins in a container beside the stack", ["Jenkins - Basics", "Jenkins - Pipeline Project", "Jenkins - Configuration"]],
-  ["A logging library such as pino: JSON lines, a level per environment, the request ID on every line, an asynchronous transport", ["Basic logging and log levels", "Asynchronous logging, frameworks, rotation, distributed logging", "Logging frameworks/libraries", "Asynchronous logging", "Distributed logging"]],
+  ["A logging library such as pino: JSON lines, a level per environment and the request ID on every line. It would finish *Structured logging*, the one Logging sub-goal still open", ["Asynchronous logging, frameworks, rotation, distributed logging", "Basic logging and log levels"]],
   ["Memory and CPU limits on each service in the Compose file, shown with `docker stats`", ["Docker - Resource Management"]],
   ["A CI step that pushes the API image to a registry, and a Compose file that pulls it", ["Docker - Custom Registries", "CI/CD"]],
   ["A database backup script, and a restore that has been tried", ["Rollback and disaster recovery", "Advanced Shell Scripting"]],
@@ -1059,6 +1020,7 @@ function goalsDoc() {
       "|---|---|---|---|",
       ...g.items.map(([name, mark, titles, brief]) => `| ${name} | ${mark} | ${refs(titles, `sheet "${name}"`)} | ${brief} |`),
       "",
+      ...(g.note ? [fill(g.note, `the note on "${g.goal}"`), ""] : []),
     ].join("\n")
   ).join("\n");
 
