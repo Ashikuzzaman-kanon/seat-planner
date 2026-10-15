@@ -349,6 +349,100 @@ const clickLabelled = (page, within, mention, label) =>
   await dialogGone(manager.page);
   check("and the list shows the new counts", /2 Windows, 1 Android/.test((await waitFor(manager.page, subscriberRow, NAME)) || ""));
 
+  /* ---------------- Version rules, for this subscription ---------------- */
+  // While the passenger's subscription runs and DEVICE_A has a place, so a
+  // version this subscription turns away is the only thing in the way — the
+  // one case the check says why.
+  console.log("\n== this subscription's rules on app versions ==");
+  await manager.page.goto(PAGE, { waitUntil: "networkidle0" });
+  check("each card has a way to its version rules", await clickInCard(manager.page, NAME, "Version rules"));
+  await waitFor(manager.page, () => document.querySelector(".sub-versions-pick"));
+  check("which opens the Versions tab on that subscription",
+    (await manager.page.$eval(".sub-tab.is-active", (t) => t.textContent.trim())).startsWith("Versions") &&
+      (await manager.page.$eval(".sub-versions-pick .p-dropdown-label", (l) => l.textContent.trim())) === NAME &&
+      new URL(manager.page.url()).searchParams.get("subscription") !== null,
+    manager.page.url());
+
+  /** The Windows rules of the subscription shown: its text, or click, focus or read one thing in it. */
+  const inCard = (op, selector) =>
+    manager.page.evaluate(
+      (op, selector) => {
+        const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+        if (!el) return null;
+        if (op === "text") return el.innerText;
+        const target = el.querySelector(selector);
+        if (!target) return null;
+        if (op === "click") target.click();
+        if (op === "focus") target.focus();
+        return op === "disabled" ? target.disabled : op === "value" ? target.value : true;
+      },
+      op,
+      selector
+    );
+  const cardText = async () => (await inCard("text")) || "";
+  const savedToast = (words) => waitFor(manager.page, (words) => (document.querySelector(".p-toast")?.textContent || "").includes(words), words);
+  await waitFor(manager.page, () => document.querySelector(".sub-versions"));
+  check("it starts with no rules", /None[.]/.test(await cardText()) && !(await inCard("value", ".sub-versions__minimum input")), await cardText());
+  check("and shows the version its subscriber's device checked in with", /1\.4\.2\s+1 device/.test(await cardText()), await cardText());
+
+  const entryOf = (r) => r.entry || {};
+  let res = await checkFrom(DEVICE_A, "windows", "");
+  check("with no rules, a check without a version is valid", res.entry?.valid === true, JSON.stringify(res.body));
+
+  await inCard("click", ".p-inputswitch input");
+  await savedToast("A version is now required");
+  res = await checkFrom(DEVICE_A, "windows", "");
+  check("a version can be required — then that subscription says so",
+    entryOf(res).valid === false && entryOf(res).message === "A version is required", JSON.stringify(res.body));
+
+  await inCard("focus", ".sub-versions__minimum input");
+  await manager.page.keyboard.type("two");
+  check("a minimum that is not a version cannot be saved", await inCard("disabled", ".sub-versions__minimum button[type=submit]"));
+  await manager.page.keyboard.down("Control");
+  await manager.page.keyboard.press("a");
+  await manager.page.keyboard.up("Control");
+  await manager.page.keyboard.type("2.0");
+  await inCard("click", ".sub-versions__minimum button[type=submit]");
+  check("a minimum can be set", Boolean(await savedToast("Minimum is now 2.0")));
+  res = await checkFrom(DEVICE_A);
+  check("then an older version is told to update",
+    entryOf(res).valid === false && entryOf(res).message === "This version is no longer supported. Please update.", JSON.stringify(res.body));
+  check("and the screen marks who that turns away",
+    Boolean(await waitFor(manager.page, () => /Older than the minimum/.test(document.body.innerText) && /1 device last checked in with a version these rules refuse/.test(document.body.innerText))));
+  check("while the minimum itself is valid", (await checkFrom(DEVICE_A, "windows", "2")).entry?.valid === true);
+
+  await inCard("focus", ".sub-versions__block-form input");
+  await manager.page.keyboard.type("v2.1");
+  await manager.page.keyboard.press("Tab");
+  await manager.page.keyboard.type("Crashes on start");
+  await inCard("click", ".sub-versions__block-form button[type=submit]");
+  check("a single version can be blocked, with why",
+    Boolean(await waitFor(manager.page, () => {
+      const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+      const row = el?.querySelector(".sub-versions__blocked li");
+      return row && /2\.1/.test(row.textContent) && /Crashes on start/.test(row.textContent);
+    })));
+  res = await checkFrom(DEVICE_A, "windows", "2.1.0");
+  check("which is then refused, however it is written", entryOf(res).message === "This version is no longer supported. Please update.", JSON.stringify(res.body));
+  check("while the next one is valid", (await checkFrom(DEVICE_A, "windows", "2.2")).entry?.valid === true);
+  await manager.page.screenshot({ path: path.join(OUT, "subs-5b-versions.png") });
+
+  await inCard("click", '.sub-versions__blocked button[aria-label^="Unblock"]');
+  await savedToast("Version 2.1 unblocked");
+  check("it can be unblocked, after which it checks again", (await checkFrom(DEVICE_A, "windows", "2.1")).entry?.valid === true);
+
+  // Back to no rules, so the rest of the run is not about versions.
+  await inCard("focus", ".sub-versions__minimum input");
+  await manager.page.keyboard.down("Control");
+  await manager.page.keyboard.press("a");
+  await manager.page.keyboard.up("Control");
+  await manager.page.keyboard.press("Backspace");
+  await inCard("click", ".sub-versions__minimum button[type=submit]");
+  await savedToast("Minimum removed");
+  await inCard("click", ".p-inputswitch input");
+  await savedToast("A version is no longer required");
+  check("and the rules can be cleared", (await checkFrom(DEVICE_A, "windows", "")).entry?.valid === true);
+
   /* ---------------- The passenger sees it, and cancels ---------------- */
   console.log("\n== the passenger sees it running, and cancels ==");
   await passenger.page.goto(PAGE, { waitUntil: "networkidle0" });
@@ -398,99 +492,6 @@ const clickLabelled = (page, within, mention, label) =>
   check("a new platform joins the list",
     Boolean(await waitFor(manager.page, (value) => [...document.querySelectorAll(".sub-platform")].some((r) => r.textContent.includes(value)), PLATFORM)));
   await manager.page.screenshot({ path: path.join(OUT, "subs-7-platforms.png") });
-
-  /* ---------------- Versions, on the new platform ---------------- */
-  // On a platform made for this run, so the rules never touch Windows or
-  // Android. Nobody holds a subscription by now, so a check that gets past
-  // the version is a 200 with nothing valid.
-  console.log("\n== the rules on app versions ==");
-  await manager.page.goto(`${PAGE}?tab=versions`, { waitUntil: "networkidle0" });
-  check("?tab=versions opens on them",
-    (await manager.page.$eval(".sub-tab.is-active", (t) => t.textContent.trim())).startsWith("Versions"));
-  /** One platform's version rules: its text, or click, focus or read one thing in it. */
-  const inCard = (op, selector) =>
-    manager.page.evaluate(
-      (value, op, selector) => {
-        const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === value);
-        if (!el) return null;
-        if (op === "text") return el.innerText;
-        const target = el.querySelector(selector);
-        if (!target) return null;
-        if (op === "click") target.click();
-        if (op === "focus") target.focus();
-        return op === "disabled" ? target.disabled : op === "value" ? target.value : op === "has" ? target.innerText : true;
-      },
-      PLATFORM,
-      op,
-      selector
-    );
-  const cardText = async () => (await inCard("text")) || "";
-  check("each platform has its rules, starting with none",
-    /No device has checked in/.test(await cardText()) && /None[.]/.test(await cardText()), await cardText());
-  const versionCheck = (version) =>
-    api("POST", "/subscriptions/check", { body: { email: PASSENGER, password: PASSWORD, deviceId: `${DEVICE_A}-v`, platform: PLATFORM, ...(version ? { version } : {}) } });
-  check("with no rules, a check without a version is let through", (await versionCheck()).status === 200);
-
-  await inCard("click", ".p-inputswitch input");
-  check("a version can be required",
-    Boolean(await waitFor(manager.page, (value) => {
-      const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === value);
-      return el?.querySelector(".p-inputswitch")?.classList.contains("p-highlight");
-    }, PLATFORM)));
-  let refused = await versionCheck();
-  check("then a check without one is told so", refused.status === 400 && /A version is required/.test(JSON.stringify(refused.body)), JSON.stringify(refused.body));
-  refused = await versionCheck("one.two");
-  check("and one that is not a version", refused.status === 400 && /not valid/.test(JSON.stringify(refused.body)), JSON.stringify(refused.body));
-
-  const minimumInput = await manager.page.evaluateHandle((value) => {
-    const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === value);
-    return el.querySelector(".sub-versions__minimum input");
-  }, PLATFORM);
-  await minimumInput.type("two");
-  check("a minimum that is not a version cannot be saved",
-    await inCard("disabled", ".sub-versions__minimum button[type=submit]"));
-  await minimumInput.click({ clickCount: 3 });
-  await manager.page.keyboard.press("Backspace");
-  await minimumInput.type("2.0");
-  await inCard("click", ".sub-versions__minimum button[type=submit]");
-  check("a minimum can be set",
-    Boolean(await waitFor(manager.page, (value) => {
-      const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === value);
-      // Saved, not just saving: a button that is busy is disabled too.
-      return el && el.querySelector(".sub-versions__minimum input").value === "2.0" && /Minimum is now 2\.0/.test(document.querySelector(".p-toast")?.textContent || "");
-    }, PLATFORM)));
-  refused = await versionCheck("1.9.9");
-  check("then an older version is told to update", refused.status === 426 && /Please update/.test(JSON.stringify(refused.body)), JSON.stringify(refused.body));
-  check("and the minimum itself is let through", (await versionCheck("2")).status === 200);
-
-  await manager.page.evaluate((value) => {
-    const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === value);
-    el.querySelector(".sub-versions__block-form input").focus();
-  }, PLATFORM);
-  await manager.page.keyboard.type("v2.1");
-  await manager.page.keyboard.press("Tab");
-  await manager.page.keyboard.type("Crashes on start");
-  await inCard("click", ".sub-versions__block-form button[type=submit]");
-  check("a single version can be blocked, with why",
-    Boolean(await waitFor(manager.page, (value) => {
-      const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === value);
-      const row = el?.querySelector(".sub-versions__blocked li");
-      return row && /2\.1/.test(row.textContent) && /Crashes on start/.test(row.textContent);
-    }, PLATFORM)));
-  refused = await versionCheck("2.1.0");
-  check("which is then refused, however it is written", refused.status === 426, JSON.stringify(refused.body));
-  check("while the next one is not", (await versionCheck("2.2")).status === 200);
-  await manager.page.screenshot({ path: path.join(OUT, "subs-7b-versions.png") });
-
-  await inCard("click", '.sub-versions__blocked button[aria-label^="Unblock"]');
-  check("and it can be unblocked",
-    Boolean(await waitFor(manager.page, (value) => {
-      const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === value);
-      return el && !el.querySelector(".sub-versions__blocked li");
-    }, PLATFORM)));
-  check("after which it checks again", (await versionCheck("2.1")).status === 200);
-
-  await manager.page.goto(`${PAGE}?tab=platforms`, { waitUntil: "networkidle0" });
   await clickLabelled(manager.page, ".sub-platform", PLATFORM, "Switch off");
   check("it can be switched off",
     Boolean(await waitFor(manager.page, (value) => {

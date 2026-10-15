@@ -7,6 +7,7 @@ import { InputText } from "primereact/inputtext";
 import { Tag } from "primereact/tag";
 import { ProgressSpinner } from "primereact/progressspinner";
 import PersonLink from "@/components/people/PersonLink";
+import Select from "@/components/ui/Select";
 import { tip } from "@/components/ui/tip";
 import {
   blockVersion,
@@ -31,56 +32,87 @@ function refusedBy(platform, version) {
 }
 
 /**
- * Which versions of each platform's app may make the subscription check.
+ * Which versions of each platform's app a subscription accepts on the check.
  *
- * Per platform: whether a check must say its version at all, the oldest one
- * still accepted, and single versions turned away whatever the minimum. Beside
- * them, the versions devices last checked in with — so a minimum is raised
- * knowing who it will turn away. All of it is off until someone turns it on;
- * a platform with no rules lets every check through, as before.
+ * One subscription at a time, chosen at the top: for each platform, whether a
+ * check must say its version at all, the oldest one still accepted, and single
+ * versions turned away whatever the minimum. Beside them, the versions its
+ * subscribers' devices last checked in with — so a minimum is raised knowing
+ * who it will turn away. A subscription starts with no rules, and accepts any
+ * version or none.
+ *
+ * `chosenId` is the subscription shown; `onChoose` changes it, so the page can
+ * keep it in the address.
  */
-export default function Versions({ notify }) {
-  const [platforms, setPlatforms] = useState(null);
+export default function Versions({ subscriptions, chosenId, onChoose, notify }) {
+  const [rules, setRules] = useState(null);
+  const chosen = subscriptions.find((s) => s.id === chosenId) || subscriptions[0] || null;
+  const shownId = chosen?.id ?? null;
 
   const load = useCallback(async () => {
+    if (!shownId) return;
     try {
-      setPlatforms(await fetchVersionPolicies());
+      setRules(await fetchVersionPolicies(shownId));
     } catch (err) {
       notify("error", "Could not load the version rules", err.message);
-      setPlatforms([]);
+      setRules({ platforms: [] });
     }
-  }, [notify]);
+  }, [shownId, notify]);
 
   useEffect(() => {
+    setRules(null);
     load();
   }, [load]);
 
-  if (!platforms) {
-    return (
-      <div className="sub-centre">
-        <ProgressSpinner style={{ width: 36, height: 36 }} />
-      </div>
-    );
-  }
-  if (!platforms.length) {
+  if (!chosen) {
     return (
       <div className="card sub-empty">
-        <i className="pi pi-desktop" aria-hidden="true" />
-        <p>There are no platforms yet. Add one on the Platforms tab first.</p>
+        <i className="pi pi-tag" aria-hidden="true" />
+        <p>There are no subscriptions yet. Version rules belong to a subscription, so create one first.</p>
       </div>
     );
   }
 
   return (
-    <ul className="sub-queue">
-      {platforms.map((platform) => (
-        <PlatformVersions key={platform.id} platform={platform} reload={load} notify={notify} />
-      ))}
-    </ul>
+    <>
+      <div className="card sub-versions-pick">
+        <div className="sub-field">
+          <label htmlFor="versions-subscription">Subscription</label>
+          <Select
+            inputId="versions-subscription"
+            value={chosen.id}
+            options={subscriptions.map((s) => ({ label: s.name, value: s.id }))}
+            onChange={(e) => onChoose(e.value)}
+            required
+          />
+        </div>
+        <p className="sub-field__hint">
+          Each subscription has its own rules for each platform. A check is answered subscription by subscription: one that
+          turns the app&rsquo;s version away says so on its own entry, and the rest are answered as usual.
+        </p>
+      </div>
+
+      {!rules ? (
+        <div className="sub-centre">
+          <ProgressSpinner style={{ width: 36, height: 36 }} />
+        </div>
+      ) : !rules.platforms.length ? (
+        <div className="card sub-empty">
+          <i className="pi pi-desktop" aria-hidden="true" />
+          <p>There are no platforms yet. Add one on the Platforms tab first.</p>
+        </div>
+      ) : (
+        <ul className="sub-queue">
+          {rules.platforms.map((platform) => (
+            <PlatformVersions key={`${chosen.id}-${platform.id}`} subscription={chosen} platform={platform} reload={load} notify={notify} />
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 
-function PlatformVersions({ platform, reload, notify }) {
+function PlatformVersions({ subscription, platform, reload, notify }) {
   const [minimum, setMinimum] = useState(platform.minVersion || "");
   const [version, setVersion] = useState("");
   const [note, setNote] = useState("");
@@ -93,7 +125,7 @@ function PlatformVersions({ platform, reload, notify }) {
     setBusy(what);
     try {
       await work();
-      notify("success", said, platform.name);
+      notify("success", said, `${subscription.name} · ${platform.name}`);
       await reload();
       return true;
     } catch (err) {
@@ -115,10 +147,18 @@ function PlatformVersions({ platform, reload, notify }) {
   const versionOk = !typedVersion || Boolean(cleanVersion(typedVersion));
 
   const saveMinimum = () =>
-    run("minimum", () => setVersionPolicy(platform.id, { minVersion: typedMinimum || null }), typedMinimum ? `Minimum is now ${cleanVersion(typedMinimum)}` : "Minimum removed");
+    run(
+      "minimum",
+      () => setVersionPolicy(subscription.id, platform.id, { minVersion: typedMinimum || null }),
+      typedMinimum ? `Minimum is now ${cleanMinimum}` : "Minimum removed"
+    );
 
   const block = async () => {
-    const done = await run("block", () => blockVersion(platform.id, { version: typedVersion, note: note.trim() }), `Version ${cleanVersion(typedVersion)} blocked`);
+    const done = await run(
+      "block",
+      () => blockVersion(subscription.id, platform.id, { version: typedVersion, note: note.trim() }),
+      `Version ${cleanVersion(typedVersion)} blocked`
+    );
     if (done) {
       setVersion("");
       setNote("");
@@ -126,6 +166,7 @@ function PlatformVersions({ platform, reload, notify }) {
   };
 
   const turnedAway = platform.inUse.filter((v) => refusedBy(platform, v.version)).reduce((n, v) => n + v.devices, 0);
+  const field = `${subscription.id}-${platform.id}`;
 
   return (
     <li className="card sub-versions">
@@ -142,20 +183,20 @@ function PlatformVersions({ platform, reload, notify }) {
       <div className="sub-versions__rules">
         <div className="sub-versions__rule">
           <InputSwitch
-            inputId={`required-${platform.id}`}
+            inputId={`required-${field}`}
             checked={platform.versionRequired}
             disabled={busy === "required"}
             onChange={(e) =>
               run(
                 "required",
-                () => setVersionPolicy(platform.id, { versionRequired: e.value }),
+                () => setVersionPolicy(subscription.id, platform.id, { versionRequired: e.value }),
                 e.value ? "A version is now required" : "A version is no longer required"
               )
             }
           />
-          <label htmlFor={`required-${platform.id}`}>
+          <label htmlFor={`required-${field}`}>
             <strong>Require a version</strong>
-            <small>A check that does not say its version is refused: “A version is required”.</small>
+            <small>A check that does not say its version is told, for this subscription: “A version is required”.</small>
           </label>
         </div>
 
@@ -167,24 +208,24 @@ function PlatformVersions({ platform, reload, notify }) {
           }}
         >
           <div className="sub-field">
-            <label htmlFor={`minimum-${platform.id}`}>
+            <label htmlFor={`minimum-${field}`}>
               Oldest version accepted <span className="sub-field__optional">optional</span>
             </label>
             <div className="sub-dev__note-form">
               <InputText
-                id={`minimum-${platform.id}`}
+                id={`minimum-${field}`}
                 value={minimum}
                 onChange={(e) => setMinimum(e.target.value)}
                 maxLength={40}
                 placeholder="No minimum"
                 className={minimumOk ? "" : "p-invalid"}
-                aria-describedby={`minimum-hint-${platform.id}`}
+                aria-describedby={`minimum-hint-${field}`}
               />
               <Button type="submit" label="Save" size="small" loading={busy === "minimum"} disabled={!minimumOk || !minimumChanged} />
             </div>
-            <small id={`minimum-hint-${platform.id}`} className={`sub-field__hint${minimumOk ? "" : " is-error"}`}>
+            <small id={`minimum-hint-${field}`} className={`sub-field__hint${minimumOk ? "" : " is-error"}`}>
               {minimumOk
-                ? "Anything older is refused: “This version is no longer supported. Please update.” Leave it empty for no minimum."
+                ? "Anything older is told, for this subscription: “This version is no longer supported. Please update.” Leave it empty for no minimum."
                 : "Numbers and dots, such as 1.4.2"}
             </small>
           </div>
@@ -216,7 +257,7 @@ function PlatformVersions({ platform, reload, notify }) {
                   text
                   rounded
                   loading={busy === b.id}
-                  onClick={() => run(b.id, () => unblockVersion(platform.id, b.id), `Version ${b.version} unblocked`)}
+                  onClick={() => run(b.id, () => unblockVersion(subscription.id, platform.id, b.id), `Version ${b.version} unblocked`)}
                   {...tip("Unblock — let it check again")}
                   aria-label={`Unblock ${b.version}`}
                 />
@@ -247,7 +288,7 @@ function PlatformVersions({ platform, reload, notify }) {
       </section>
 
       <section className="sub-versions__section" aria-label={`Versions of ${platform.name} in use`}>
-        <h3 className="sub-request__label">In use</h3>
+        <h3 className="sub-request__label">In use by its subscribers</h3>
         {platform.inUse.length ? (
           <>
             <ul className="sub-versions__inuse">
@@ -272,7 +313,7 @@ function PlatformVersions({ platform, reload, notify }) {
             )}
           </>
         ) : (
-          <p className="sub-versions__none">No device has checked in on this platform yet.</p>
+          <p className="sub-versions__none">No subscriber&rsquo;s device has checked in on this platform yet.</p>
         )}
       </section>
     </li>

@@ -662,6 +662,23 @@
 
 /* ---- App versions ---- */
 
+.sub-versions-pick {
+  display: grid;
+  grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+  align-items: end;
+  gap: 0.5rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.sub-versions-pick .sub-field {
+  margin-bottom: 0;
+}
+.sub-versions-pick .p-dropdown {
+  width: 100%;
+}
+.sub-versions-pick .sub-field__hint {
+  margin: 0;
+}
+
 .sub-versions {
   display: flex;
   flex-direction: column;
@@ -881,6 +898,7 @@
   .sub-platform .sub-request__actions {
     justify-content: flex-start;
   }
+  .sub-versions-pick,
   .sub-versions__rules,
   .sub-versions__block-form {
     grid-template-columns: minmax(0, 1fr);

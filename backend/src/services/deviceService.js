@@ -5,6 +5,7 @@ const ApiError = require("../utils/ApiError");
 const { AUDIT_ACTIONS } = require("../constants/auditActions");
 const rules = require("../utils/subscriptionDevices");
 const audit = require("./auditService");
+const versions = require("./appVersionService");
 
 const { REASON } = rules;
 
@@ -181,6 +182,7 @@ const REASON_WORDS = Object.freeze({
   [REASON.BLOCKED]: "the device is blocked",
   [REASON.LIMIT_REACHED]: "every place on that platform is taken",
   [REASON.BEYOND_LIMIT]: "the device has a place, but beyond what the subscription allows now",
+  [REASON.APP_VERSION]: "every subscription the device may use turns away the version of the app",
   [REASON.NO_SUBSCRIPTION]: "the account has no subscription running",
 });
 
@@ -223,17 +225,22 @@ async function keepRefusal(user, sent, reason) {
  * Decide which of an account's running subscriptions the device in this check
  * may use.
  *
- * Returns `{ allowed, reason, detail, added }`: `allowed` is the ids of those
- * subscriptions, empty when it may use none — and then `reason` says why.
- * `added` is true when the device took a place just now, and `detail` is what
- * the numbers were, for the record.
+ * Returns `{ allowed, versionRefused, reason, detail, added }`: `allowed` is
+ * the ids of those subscriptions, empty when it may use none — and then
+ * `reason` says why. `versionRefused` maps the id of each subscription the
+ * device has a place under but whose rules turn the app's version away, to
+ * why. `added` is true when the device took a place just now, and `detail`
+ * is what the numbers were, for the record.
+ *
+ * The version decides only which subscriptions are valid, never the place: a
+ * device keeps its place, or takes one, whatever version it checks in with.
  *
  * `memberships` are the account's valid UserSubscription rows. With none there
  * is nothing to use a device on: that is its own reason, and not a device
  * being turned away, so no refusal row is kept for it.
  */
 async function admit(user, sent, memberships, now = new Date()) {
-  const verdict = (found = {}) => ({ allowed: new Set(), reason: null, detail: {}, added: false, ...found });
+  const verdict = (found = {}) => ({ allowed: new Set(), versionRefused: new Map(), reason: null, detail: {}, added: false, ...found });
   if (!memberships.length) return verdict({ reason: REASON.NO_SUBSCRIPTION });
 
   const refuse = async (reason, detail = {}) => {
@@ -297,12 +304,18 @@ async function admit(user, sent, memberships, now = new Date()) {
   }
 
   const allowed = memberships.filter((m) => outcome.place <= rules.limitFor(m.deviceLimits, platform.id));
-  if (!allowed.length) return refuse(REASON.BEYOND_LIMIT, { place: outcome.place, mostAllowed: most });
-  return verdict({
-    allowed: new Set(allowed.map((m) => m.subscriptionId)),
-    added: Boolean(outcome.added),
-    detail: { place: outcome.place, mostAllowed: most },
-  });
+  const detail = { place: outcome.place, mostAllowed: most };
+  if (!allowed.length) return refuse(REASON.BEYOND_LIMIT, detail);
+
+  // Each subscription's own rules for the app's version on this platform.
+  const versionRefused = await versions.refusals(platform.id, allowed.map((m) => m.subscriptionId), sent.version || null);
+  const usable = allowed.filter((m) => !versionRefused.has(m.subscriptionId));
+  const added = Boolean(outcome.added);
+  if (!usable.length) {
+    await keepRefusal(user, sent, REASON.APP_VERSION);
+    return verdict({ versionRefused, reason: REASON.APP_VERSION, added, detail });
+  }
+  return verdict({ allowed: new Set(usable.map((m) => m.subscriptionId)), versionRefused, added, detail });
 }
 
 /**
@@ -311,10 +324,14 @@ async function admit(user, sent, memberships, now = new Date()) {
  *
  * `verdict` is what `admit` decided and `validCodes` the subscriptions that came
  * back valid. With none, the entry carries the reason — which is the only
- * place a caller's "not valid" is explained.
+ * place a caller's "not valid" is explained. `onVersion` is
+ * `{ "<code>": refusal }` for each subscription that turned the app's version
+ * away, whether or not others were valid.
  */
-async function noteCheck(user, sent, verdict, validCodes) {
+async function noteCheck(user, sent, verdict, validCodes, onVersion = {}) {
   const valid = validCodes.length > 0;
+  const refusedVersion = Object.entries(onVersion);
+  const versionWords = refusedVersion.map(([code, why]) => `${code}: ${versions.WORDS[why] || why}`).join("; ");
   await audit.record({
     action: AUDIT_ACTIONS.SUBSCRIPTION_CHECK,
     actor: person(user),
@@ -323,13 +340,16 @@ async function noteCheck(user, sent, verdict, validCodes) {
       ...asRecorded(sent),
       valid: validCodes,
       ...(valid ? {} : { reason: verdict.reason }),
+      ...(refusedVersion.length ? { refusedOnVersion: onVersion } : {}),
       ...(verdict.added ? { newDevice: true } : {}),
       ...verdict.detail,
     },
     outcome: valid ? "success" : "failure",
     message: valid
-      ? `subscription check answered "valid" for ${validCodes.join(", ")}${verdict.added ? " — from a new device, which took a place" : ""}`
-      : `subscription check answered "not valid": ${REASON_WORDS[verdict.reason] || verdict.reason}`,
+      ? `subscription check answered "valid" for ${validCodes.join(", ")}${verdict.added ? " — from a new device, which took a place" : ""}` +
+        (refusedVersion.length ? `; the app's version was turned away by ${versionWords}` : "")
+      : `subscription check answered "not valid": ${REASON_WORDS[verdict.reason] || verdict.reason}` +
+        (refusedVersion.length ? ` — ${versionWords}` : ""),
   });
 }
 

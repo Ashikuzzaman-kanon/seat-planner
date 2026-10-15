@@ -50,6 +50,8 @@ export default function SubscriptionsPage() {
   const [myDevices, setMyDevices] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
+  // The subscription the Versions tab shows; kept in the address as ?subscription=.
+  const [versionsOf, setVersionsOf] = useState(null);
 
   const notify = useCallback(
     (severity, summary, detail) =>
@@ -85,7 +87,9 @@ export default function SubscriptionsPage() {
   // Read the tab from the address once the permission is known — a link to the
   // queue must not strand someone who cannot see it on an empty page.
   useEffect(() => {
-    const wanted = new URLSearchParams(window.location.search).get("tab");
+    const params = new URLSearchParams(window.location.search);
+    const wanted = params.get("tab");
+    if (params.get("subscription")) setVersionsOf(Number(params.get("subscription")));
     if (
       (canReview && ["requests", "subscribers"].includes(wanted)) ||
       (canManage && wanted === "platforms") ||
@@ -104,12 +108,19 @@ export default function SubscriptionsPage() {
     canVersions && { key: "versions", label: "Versions", icon: "pi pi-tag" },
   ].filter(Boolean);
 
-  const show = (next) => {
+  const show = (next, { subscriptionId = null } = {}) => {
     setTab(next);
     const url = new URL(window.location.href);
     if (next === "subscriptions") url.searchParams.delete("tab");
     else url.searchParams.set("tab", next);
+    if (next === "versions" && subscriptionId) url.searchParams.set("subscription", subscriptionId);
+    if (next !== "versions") url.searchParams.delete("subscription");
     window.history.replaceState(null, "", url);
+  };
+
+  const showVersionsOf = (subscriptionId) => {
+    setVersionsOf(subscriptionId);
+    show("versions", { subscriptionId });
   };
 
   return (
@@ -168,7 +179,7 @@ export default function SubscriptionsPage() {
       ) : tab === "platforms" && canManage ? (
         <Platforms platforms={offered.platforms} onChanged={load} notify={notify} />
       ) : tab === "versions" && canVersions ? (
-        <Versions notify={notify} />
+        <Versions subscriptions={subscriptions} chosenId={versionsOf} onChoose={showVersionsOf} notify={notify} />
       ) : (
         <SubscriptionList
           subscriptions={subscriptions}
@@ -180,6 +191,7 @@ export default function SubscriptionsPage() {
           staff={staff}
           onEdit={setEditing}
           onOpenRequests={canReview ? () => show("requests") : undefined}
+          onOpenVersions={canVersions ? (subscription) => showVersionsOf(subscription.id) : undefined}
           reload={load}
           notify={notify}
         />

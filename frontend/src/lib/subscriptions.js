@@ -126,25 +126,28 @@ export async function deleteDevice(id) {
 
 /* ---------------- App versions ---------------- */
 
-/** Every platform with its rules, blocked versions and the versions in use. */
-export async function fetchVersionPolicies() {
-  const { data } = await api.get("/subscriptions/versions");
-  return data.platforms;
+/**
+ * One subscription's version rules: `{ subscription, platforms }`, each platform
+ * with its rules, blocked versions and the versions its subscribers use.
+ */
+export async function fetchVersionPolicies(subscriptionId) {
+  const { data } = await api.get(`/subscriptions/${subscriptionId}/versions`);
+  return data;
 }
 
 /** `{ versionRequired }`, `{ minVersion }` (empty or null clears it), or both. */
-export async function setVersionPolicy(platformId, changes) {
-  const { data } = await api.patch(`/subscriptions/platforms/${platformId}/versions`, changes);
+export async function setVersionPolicy(subscriptionId, platformId, changes) {
+  const { data } = await api.patch(`/subscriptions/${subscriptionId}/versions/${platformId}`, changes);
   return data.policy;
 }
 
-export async function blockVersion(platformId, { version, note }) {
-  const { data } = await api.post(`/subscriptions/platforms/${platformId}/blocked-versions`, { version, note });
+export async function blockVersion(subscriptionId, platformId, { version, note }) {
+  const { data } = await api.post(`/subscriptions/${subscriptionId}/versions/${platformId}/blocked`, { version, note });
   return data.blocked;
 }
 
-export async function unblockVersion(platformId, blockedId) {
-  await api.delete(`/subscriptions/platforms/${platformId}/blocked-versions/${blockedId}`);
+export async function unblockVersion(subscriptionId, platformId, blockedId) {
+  await api.delete(`/subscriptions/${subscriptionId}/versions/${platformId}/blocked/${blockedId}`);
 }
 
 /*
@@ -250,6 +253,7 @@ export const REFUSAL_WORDS = {
   blocked: "The device is blocked",
   limit_reached: "A new device, and every place was taken",
   beyond_limit: "It has a place, but beyond what the subscription allows",
+  app_version: "Every subscription it may use turns away its app's version",
 };
 
 /* ---------------- Words ---------------- */
