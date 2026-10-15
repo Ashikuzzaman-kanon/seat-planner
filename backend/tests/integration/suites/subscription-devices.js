@@ -293,18 +293,47 @@ const A1 = { deviceId: "android-phone-0001", platform: "android" };
   check("refusals too old to matter are dropped by the hourly sweep", swept.refusalsPruned === flood.length, JSON.stringify(swept));
 
   console.log("\n== the audit log, when there is one ==");
-  const audit = await call("GET", "/audit?action=subscription.device_refuse&limit=50", { token: st });
-  if (audit.body?.available === false) {
+  const logged = async (action, limit = 20) => (await call("GET", `/audit?action=${action}&limit=${limit}`, { token: st })).body;
+  if ((await logged("subscription.check", 1)).available === false) {
     console.log("  (no document store here — skipped)");
   } else {
+    // By now the other account's Windows device has had its place for a while,
+    // and the first account's subscription has run out.
+    const before = (await logged("subscription.check", 1)).pagination.total;
+    const NEW = { deviceId: "one-too-many-0001", platform: "windows" };
+    for (let i = 0; i < 3; i++) await ask(OTHER, W2);
+    await ask(OTHER, NEW);
+    await ask(USER, W2);
+    await ask(OTHER, W2, "not-the-password");
     await pause(300);
-    const events = (await call("GET", "/audit?action=subscription.device_refuse&limit=100", { token: st })).body.events || [];
-    check("every refusal is recorded with its reason", events.some((e) => e.after?.reason === "limit_reached" && e.after?.deviceId === W2.deviceId),
-      JSON.stringify(events.slice(0, 3).map((e) => e.after)));
-    check("as a failure, in words", events.every((e) => e.outcome === "failure" && /not valid/.test(e.message)));
-    const added = (await call("GET", "/audit?action=subscription.device_add&limit=100", { token: st })).body.events || [];
-    check("and so is every device that took a place", added.some((e) => e.after?.deviceId === W1.deviceId && e.after?.place === 1),
+
+    const { events, pagination } = await logged("subscription.check");
+    check("every check that is answered is recorded — a registered device's as much as a new one's",
+      pagination.total - before === 5, `${pagination.total - before} of 5`);
+    const [none, refused, ...repeats] = events.slice(0, 5);
+    check("a registered device's says what was valid, and where it came from",
+      repeats.length === 3 &&
+        repeats.every((e) => e.actor?.email === OTHER && e.outcome === "success" && e.after?.valid?.includes("gold-plan") &&
+          e.after.deviceId === W2.deviceId && e.after.platform === "windows" && e.after.reason === undefined),
+      JSON.stringify(repeats.map((e) => [e.actor?.email, e.outcome, e.after])));
+    check("one turned away says why, which the caller was not told",
+      refused?.outcome === "failure" && refused.after?.reason === "limit_reached" && refused.after.deviceId === NEW.deviceId &&
+        refused.after.valid.length === 0 && /not valid/.test(refused.message),
+      JSON.stringify([refused?.outcome, refused?.after, refused?.message]));
+    check("so does one from an account with nothing running",
+      none?.actor?.email === USER && none.outcome === "failure" && none.after?.reason === "no_subscription", JSON.stringify([none?.actor, none?.after]));
+    check("each with the request it was",
+      events.slice(0, 5).every((e) => e.context?.method === "POST" && /\/subscriptions\/check$/.test(e.context?.path || "") && e.context.requestId),
+      JSON.stringify(events[0]?.context));
+
+    const wrong = (await logged("auth.login_failed", 1)).events[0];
+    check("a check refused at the password is recorded as that, with the device it came from",
+      wrong?.after?.reason === "wrong password" && wrong.after.deviceId === W2.deviceId && /^subscription check refused/.test(wrong.message),
+      JSON.stringify([wrong?.after, wrong?.message]));
+    const added = (await logged("subscription.device_add", 100)).events || [];
+    check("a device taking a place is an entry of its own", added.some((e) => e.after?.deviceId === W1.deviceId && e.after?.place === 1),
       JSON.stringify(added.slice(0, 3).map((e) => e.after)));
+    check("written only when one does", !added.some((e) => e.after?.deviceId === NEW.deviceId));
   }
 
   console.log(`\n${pass} passed, ${fail} failed\n`);

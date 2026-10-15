@@ -21,16 +21,21 @@ const actor = (req) => ({ id: req.user.id, fullName: req.user.fullName, email: r
  * `checkCredentials`). `deviceId` and `platform` are deliberately not
  * validated here: a missing or malformed one is not a 400 that explains
  * itself, it is `valid: false` like any other device that is not let in.
+ *
+ * Every call leaves an entry in the audit log, with the device it said it
+ * came from: `auth.login_failed` when the password was not taken, and
+ * `subscription.check` with what was answered when it was.
  */
 const check = asyncHandler(async (req, res) => {
-  const user = await auth.checkCredentials(req.body, { purpose: "subscription check" });
+  const sent = { deviceId: req.body.deviceId, platform: req.body.platform };
+  const user = await auth.checkCredentials(req.body, {
+    purpose: "subscription check",
+    detail: devices.asRecorded(sent),
+  });
   res.set("Cache-Control", "no-store");
   res.json({
     user: { name: user.fullName, email: user.email },
-    subscriptions: await subscriptions.validityFor(user, {
-      deviceId: req.body.deviceId,
-      platform: req.body.platform,
-    }),
+    subscriptions: await subscriptions.validityFor(user, sent),
   });
 });
 

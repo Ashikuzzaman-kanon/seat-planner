@@ -46,9 +46,18 @@ const ACTION_SEVERITY = {
   "subscription.platform_update": "info",
   "subscription.platform_delete": "danger",
   "subscription.device_add": "success",
-  "subscription.device_refuse": "warning",
   "subscription.device_update": "info",
+  "subscription.check": "success",
   "subscription.device_delete": "danger",
+};
+
+/**
+ * One action whose entries end two ways. Every subscription check is the same
+ * action whether it was answered yes or no, so the list says which: without
+ * this a week of checks is a column of identical tags.
+ */
+const WHEN_IT_FAILED = {
+  "subscription.check": { severity: "warning", note: "not valid" },
 };
 
 export default function AuditPage() {
@@ -84,9 +93,15 @@ export default function AuditPage() {
 
   const whenBody = (row) => <When value={row.at} extra={row.context?.requestId?.slice(0, 8)} />;
 
-  const actionBody = (row) => (
-    <Tag value={row.action} severity={ACTION_SEVERITY[row.action] || "secondary"} />
-  );
+  const actionBody = (row) => {
+    const failed = row.outcome === "failure" ? WHEN_IT_FAILED[row.action] : null;
+    return (
+      <span style={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: "0.35rem" }}>
+        <Tag value={row.action} severity={failed?.severity || ACTION_SEVERITY[row.action] || "secondary"} />
+        {failed && <small style={{ color: "#b45309", fontWeight: 600 }}>{failed.note}</small>}
+      </span>
+    );
+  };
 
   const actorBody = (row) => (
     <div>

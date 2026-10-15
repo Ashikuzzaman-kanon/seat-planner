@@ -127,15 +127,18 @@ const AUDIT_ACTIONS = Object.freeze({
   SUBSCRIPTION_EXTEND: "subscription.extend",
   SUBSCRIPTION_EXPIRE: "subscription.expire",
 
+  // Every check from outside the app that got as far as an answer: who, from
+  // which device, what came back valid — and when nothing did, the reason the
+  // caller was never given. (A check refused at the password is auth.login_failed.)
+  SUBSCRIPTION_CHECK: "subscription.check",
+
   // How many devices a subscription allows, the platforms there are, and the
-  // devices seen on each account. A refusal's reason is recorded here and
-  // never returned to the caller.
+  // devices seen on each account.
   SUBSCRIPTION_LIMITS: "subscription.limits",
   SUBSCRIPTION_PLATFORM_CREATE: "subscription.platform_create",
   SUBSCRIPTION_PLATFORM_UPDATE: "subscription.platform_update",
   SUBSCRIPTION_PLATFORM_DELETE: "subscription.platform_delete",
   SUBSCRIPTION_DEVICE_ADD: "subscription.device_add",
-  SUBSCRIPTION_DEVICE_REFUSE: "subscription.device_refuse",
   SUBSCRIPTION_DEVICE_UPDATE: "subscription.device_update",
   SUBSCRIPTION_DEVICE_DELETE: "subscription.device_delete",
 
