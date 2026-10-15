@@ -307,7 +307,7 @@ super admin holds every permission):
 |---|---|
 | `subscription:manage` | Create a subscription, rename it, close it to new requests, reopen it, delete one nobody has asked for. Create the platforms subscriptions are used on, rename them, switch them off |
 | `subscription:approve` | See the requests, approve one for a period and a number of devices, or decline it. Change a running subscription's last day or device counts, cancel anyone's. See an account's devices and why any were turned away; note, block or remove a device |
-| `subscription:versions` | Decide which versions of each platform's app may check: require a version, set the oldest accepted, block single versions |
+| `subscription:versions` | Decide, for each subscription and platform, which versions of the app it accepts: require a version, set the oldest accepted, block single versions |
 
 Everyone signed in sees the *Subscriptions* page and can ask for one. A
 subscription is valid from approval **through the end of its last day in
@@ -338,15 +338,17 @@ same device may take one again, so block to keep one out); and every check
 that was turned away, with the reason. Subscribers see their own devices and
 how many places are used, to look at only.
 
-**App versions.** Each platform can set rules on the version of the app making
-the check, from the *Versions* tab: **require** one (a check without it is
-refused), set the **oldest accepted**, and **block** single versions with a
-fault whatever the minimum. A version is one to four numbers joined by dots —
-`2`, `1.4.2`, `v1.4.2.17` — compared number by number, so `1.10` is newer
-than `1.9` and `1.4` is `1.4.0`. The tab lists the versions devices last
-checked in with, so a minimum is raised knowing who it turns away. Every
-platform starts with no rules: a check without a version is let through as
-before.
+**App versions.** Each subscription has its own rules on the version of the
+app making the check, platform by platform — so one version can be fine for
+*basic* and too old for *premium*. From the *Versions* tab (pick the
+subscription, or use the tag button on its card): **require** a version, set
+the **oldest accepted**, and **block** single versions with a fault whatever
+the minimum. A version is one to four numbers joined by dots — `2`, `1.4.2`,
+`v1.4.2.17` — compared number by number, so `1.10` is newer than `1.9` and
+`1.4` is `1.4.0`. The tab lists the versions the subscription's current
+subscribers' devices last checked in with, so a minimum is raised knowing who
+it turns away. A new subscription has no rules: any version, or none, is
+accepted.
 
 **Checking from outside the app.** One endpoint takes an email and password,
 and the device the call is made from, and says for every subscription there is
@@ -362,8 +364,9 @@ curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
 {
   "user": { "name": "Rahim Uddin", "email": "user@example.com" },
   "subscriptions": [
-    { "code": "basic", "valid": false },
-    { "code": "premium", "valid": true }
+    { "code": "basic", "valid": true },
+    { "code": "premium", "valid": false, "message": "This version is no longer supported. Please update." },
+    { "code": "pro", "valid": false }
   ]
 }
 ```
@@ -373,12 +376,16 @@ curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
   letters, digits and `. _ : -` — and `platform` is a platform's value. Send
   the same id every time: a new id is a new device. `version` is the app's
   version; the device remembers the last one it sent.
-- **A version the platform does not accept is told so**, before the password
-  is checked, so the app can show it: no version where one is required, or one
-  that is not numbers and dots, is a `400` (`"A version is required"`); one
-  older than the minimum or blocked is a `426` (`"This version is no longer
-  supported. Please update."`). It is in the audit log as a refused
-  `subscription.check` with the version and why.
+- **A subscription that does not accept the app's version says so**, on its
+  own entry, so the app can show it: `"message": "A version is required"`
+  when none was sent, or `"This version is no longer supported. Please
+  update."` when it is older than that subscription's minimum or blocked by
+  it. The other subscriptions are answered as usual. It is said only when the
+  version is the one thing in the way — the account holds the subscription and
+  the device has a place — so it never hints at why a device was turned away.
+  The audit entry names each subscription that refused the version, and why.
+- A `version` that is not numbers and dots at all is a `400` for the whole
+  call, before the password is checked.
 - **A device that is not let in is told only `valid: false`.** The limit
   reached, the device blocked, an unknown or switched-off platform, a missing
   or malformed `deviceId` — each is the same `200` in the same shape, with no

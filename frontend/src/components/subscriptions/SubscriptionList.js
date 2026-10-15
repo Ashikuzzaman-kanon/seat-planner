@@ -47,6 +47,7 @@ export default function SubscriptionList({
   staff,
   onEdit,
   onOpenRequests,
+  onOpenVersions,
   reload,
   notify,
 }) {
@@ -131,39 +132,53 @@ export default function SubscriptionList({
                     </code>
                   )}
                 </div>
-                {canManage && (
+                {(canManage || onOpenVersions) && (
                   <span className="sub-card__manage">
-                    <Button icon="pi pi-pencil" size="small" text rounded onClick={() => onEdit(subscription)} {...tip("Rename or re-describe")} />
-                    {subscription.isOpen ? (
+                    {onOpenVersions && (
                       <Button
-                        icon="pi pi-lock"
+                        icon="pi pi-tag"
                         size="small"
                         text
                         rounded
-                        onClick={() => setAsking({ kind: "close", subscription })}
-                        {...tip("Close to new requests")}
-                      />
-                    ) : (
-                      <Button
-                        icon="pi pi-lock-open"
-                        size="small"
-                        text
-                        rounded
-                        loading={busyId === subscription.id}
-                        onClick={() => reopen(subscription)}
-                        {...tip("Open to requests again")}
+                        onClick={() => onOpenVersions(subscription)}
+                        {...tip("Version rules")}
                       />
                     )}
-                    <Button
-                      icon="pi pi-trash"
-                      size="small"
-                      text
-                      rounded
-                      severity="danger"
-                      disabled={!untouched}
-                      onClick={() => setAsking({ kind: "delete", subscription })}
-                      {...tip(untouched ? "Delete" : "People have asked for this one — close it instead")}
-                    />
+                    {canManage && (
+                      <>
+                        <Button icon="pi pi-pencil" size="small" text rounded onClick={() => onEdit(subscription)} {...tip("Rename or re-describe")} />
+                        {subscription.isOpen ? (
+                          <Button
+                            icon="pi pi-lock"
+                            size="small"
+                            text
+                            rounded
+                            onClick={() => setAsking({ kind: "close", subscription })}
+                            {...tip("Close to new requests")}
+                          />
+                        ) : (
+                          <Button
+                            icon="pi pi-lock-open"
+                            size="small"
+                            text
+                            rounded
+                            loading={busyId === subscription.id}
+                            onClick={() => reopen(subscription)}
+                            {...tip("Open to requests again")}
+                          />
+                        )}
+                        <Button
+                          icon="pi pi-trash"
+                          size="small"
+                          text
+                          rounded
+                          severity="danger"
+                          disabled={!untouched}
+                          onClick={() => setAsking({ kind: "delete", subscription })}
+                          {...tip(untouched ? "Delete" : "People have asked for this one — close it instead")}
+                        />
+                      </>
+                    )}
                   </span>
                 )}
               </header>

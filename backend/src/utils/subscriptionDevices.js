@@ -7,8 +7,11 @@
  * order devices arrived, and that order is the whole rule — a subscription
  * allowing two Windows devices is valid on the account's first two.
  *
- * Whatever goes wrong here, the caller of the check API is told only
- * `valid: false`. The reason is for staff, and these are the reasons.
+ * Whatever goes wrong with the device, the caller of the check API is told
+ * only `valid: false`. The reason is for staff, and these are the reasons.
+ * The one thing a caller is told is about its app, not its device: a
+ * subscription that turns the app's version away says so on its entry
+ * (services/appVersionService).
  */
 
 /** The most devices of one platform a subscription can allow. */
@@ -29,6 +32,11 @@ const REASON = Object.freeze({
   LIMIT_REACHED: "limit_reached",
   /** A device with a place, but beyond what the subscription allows now. */
   BEYOND_LIMIT: "beyond_limit",
+  /**
+   * The device may use a subscription, but every one it may use turns away
+   * the version of the app it checked in with.
+   */
+  APP_VERSION: "app_version",
   /**
    * Not about the device at all: the account has no subscription running. It
    * is the reason on the record of a check, never a row among the refusals.

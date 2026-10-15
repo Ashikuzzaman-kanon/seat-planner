@@ -12,6 +12,7 @@ const audit = require("./auditService");
 const inbox = require("./inboxService");
 const notify = require("./notificationService");
 const devices = require("./deviceService");
+const versions = require("./appVersionService");
 
 /**
  * Subscriptions: what can be subscribed to, and each person's subscription.
@@ -248,8 +249,8 @@ async function remove(id) {
 /**
  * The subscriptions page: each subscription with the caller's own standing.
  *
- * `staff` (anyone who manages or approves) sees every subscription and how
- * many people are waiting or subscribed. Everyone else sees the open ones,
+ * `staff` (anyone who manages or approves them, or sets their version rules)
+ * sees every subscription and how many people are waiting or subscribed. Everyone else sees the open ones,
  * plus any closed one they have a history with.
  */
 async function list(userId, { staff = false } = {}) {
@@ -726,12 +727,17 @@ async function pendingCount() {
  * For POST /subscriptions/check: every subscription there is, and whether this
  * person's is valid right now **on the device the check came from**.
  *
- * `sent` is `{ deviceId, platform }` as the caller gave them. A subscription
- * is valid when it is running and the device has a place it allows; the device
- * takes a place here if it is new and one is free (deviceService `admit`).
+ * `sent` is `{ deviceId, platform, version }` as the caller gave them, the
+ * version cleaned. A subscription is valid when it is running, the device has
+ * a place it allows, and its rules for the platform accept the app's version;
+ * the device takes a place here if it is new and one is free (deviceService
+ * `admit`).
  *
- * No dates, and no reasons: a device turned away for any cause is simply
- * `valid: false` — why is written down for staff, not returned.
+ * No dates, and no reasons about the device: a device turned away for any
+ * cause is simply `valid: false` — why is written down for staff, not
+ * returned. The app's version is the one thing said: when it is all that
+ * stands between this account and a subscription, that entry carries a
+ * `message` the app can show ("Please update").
  *
  * Every call is put in the audit log with what it was answered (deviceService
  * `noteCheck`) — a device's hundredth check as much as its first.
@@ -742,8 +748,14 @@ async function validityFor(user, sent = {}, now = new Date()) {
     UserSubscription.findAll({ where: { userId: user.id, status: STATUS.ACTIVE, expiresAt: { [Op.gt]: now } } }),
   ]);
   const verdict = await devices.admit(user, sent, held, now);
-  const answer = subscriptions.map((s) => ({ code: s.code, valid: verdict.allowed.has(s.id) }));
-  await devices.noteCheck(user, sent, verdict, answer.filter((a) => a.valid).map((a) => a.code));
+  const onVersion = {};
+  const answer = subscriptions.map((s) => {
+    const refusal = verdict.versionRefused.get(s.id);
+    if (!refusal) return { code: s.code, valid: verdict.allowed.has(s.id) };
+    onVersion[s.code] = refusal;
+    return { code: s.code, valid: false, message: versions.MESSAGE[refusal] };
+  });
+  await devices.noteCheck(user, sent, verdict, answer.filter((a) => a.valid).map((a) => a.code), onVersion);
   return answer;
 }
 

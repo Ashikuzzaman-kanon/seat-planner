@@ -19,7 +19,8 @@ const { MAX_DAYS, isCalendarDate } = require("../utils/subscriptionPeriod");
  *     and the platforms they can be used on;
  *   - `subscription:approve` works the requests and the subscriber list, sets
  *     how many devices each subscription allows, and looks after devices;
- *   - `subscription:versions` decides which versions of the apps may check.
+ *   - `subscription:versions` decides, for each subscription, which versions
+ *     of the apps it accepts.
  *
  * And one with no session at all: POST /check takes an email and password,
  * the device the call came from and the version of the app making it, and
@@ -118,14 +119,17 @@ router.patch(
 );
 router.delete("/platforms/:id", manage, id, validate, c.removePlatform);
 
-/* ---------------- App versions ---------------- */
+/* ---------------- App versions, per subscription and platform ---------------- */
 
-router.get("/versions", versionsPermission, c.versionPolicies);
+const platformId = param("platformId").isInt({ min: 1 }).withMessage("Invalid platform id");
+
+router.get("/:id/versions", versionsPermission, id, validate, c.versionPolicies);
 router.patch(
-  "/platforms/:id/versions",
+  "/:id/versions/:platformId",
   versionsPermission,
   [
     ...id,
+    platformId,
     body("versionRequired").optional().isBoolean().withMessage("versionRequired must be true or false").toBoolean(),
     body("minVersion").optional({ values: "null" }).isString().isLength({ max: 40 }).withMessage("minVersion must be a version, such as 1.4.2"),
     body().custom((value) => {
@@ -137,10 +141,11 @@ router.patch(
   c.setVersionPolicy
 );
 router.post(
-  "/platforms/:id/blocked-versions",
+  "/:id/versions/:platformId/blocked",
   versionsPermission,
   [
     ...id,
+    platformId,
     body("version").isString().isLength({ min: 1, max: 40 }).withMessage("A version such as 1.4.2 is required"),
     text("note", 200),
   ],
@@ -148,9 +153,9 @@ router.post(
   c.blockVersion
 );
 router.delete(
-  "/platforms/:id/blocked-versions/:blockedId",
+  "/:id/versions/:platformId/blocked/:blockedId",
   versionsPermission,
-  [...id, param("blockedId").isInt({ min: 1 }).withMessage("Invalid id")],
+  [...id, platformId, param("blockedId").isInt({ min: 1 }).withMessage("Invalid id")],
   validate,
   c.unblockVersion
 );

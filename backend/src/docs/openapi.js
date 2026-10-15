@@ -626,13 +626,10 @@ module.exports = {
         value: str("What a caller sends as `platform`. Set when it is created and never changed"),
         name: str("What it is called on screen"),
         isActive: bool("Switched off, nobody can ask for devices on it and no check from it is valid"),
-        versionRequired: bool("A check from it must send `version`"),
-        minVersion: { ...str("The oldest app version still accepted"), nullable: true },
       }),
 
       BlockedVersion: obj({
         id: int(),
-        platformId: int(),
         version: str("Clean: v1.04 is stored as 1.4"),
         note: { ...str(), nullable: true },
         createdAt: { type: "string", format: "date-time" },
@@ -2825,10 +2822,13 @@ module.exports = {
           "with no place — the limit is reached, it is blocked, the platform is unknown or switched off, or " +
           "`deviceId` or `platform` is missing or malformed — is answered `valid: false` and nothing else: " +
           "still a 200, in the same shape, with no reason. Staff can read the reason on the account's devices.\n\n" +
-          "A platform can set rules on the app's `version`, checked before the password: it may require one, set " +
-          "the oldest it accepts, and block single versions. A missing version where one is required, or one that " +
-          "is not numbers and dots, is a 400; a version too old or blocked is a 426 the app can show as it is. A " +
-          "platform without rules ignores `version` except to remember it on the device.",
+          "Each subscription can set its own rules on the app's `version`, platform by platform: require one, set " +
+          "the oldest it accepts, block single versions. Each subscription is answered on its own: when its rules " +
+          "turn the version away and that is the only thing in the way — the account holds it and the device has a " +
+          "place — its entry is `valid: false` with a `message` the app can show (\"A version is required\", or " +
+          "\"This version is no longer supported. Please update.\"); the others are answered as usual. A version " +
+          "that is not numbers and dots at all is a 400 for the whole call, before the password. A subscription " +
+          "without rules ignores `version`; the device remembers the last one sent.",
         requestBody: body(
           obj(
             {
@@ -2849,13 +2849,18 @@ module.exports = {
             "The account, and yes or no for each subscription",
             obj({
               user: obj({ name: str(), email: str() }),
-              subscriptions: arr(obj({ code: str("The subscription's fixed code"), valid: bool() })),
+              subscriptions: arr(
+                obj({
+                  code: str("The subscription's fixed code"),
+                  valid: bool(),
+                  message: str("Only when this subscription turns the app's version away, and nothing else stood in the way"),
+                })
+              ),
             })
           ),
-          400: errors[400],
+          400: response("Missing email or password, or a version that is not numbers and dots", ref("Error")),
           401: errors[401],
           403: response("Email not yet verified, or the account is restricted", ref("Error")),
-          426: response("This version of the app is no longer supported: older than the minimum, or blocked", ref("Error")),
           429: response("Paused after too many wrong passwords; see Retry-After", ref("Error")),
         },
       },
@@ -3123,21 +3128,27 @@ module.exports = {
       },
     },
 
-    "/subscriptions/versions": {
+    "/subscriptions/{id}/versions": {
       get: {
         tags: ["Subscriptions"],
-        summary: "Every platform's version rules, and the versions its devices use",
-        description: "`inUse` is the version each device last checked in with, counted, newest first; null for devices that never said.",
+        summary: "One subscription's version rules on every platform, and the versions its subscribers use",
+        description:
+          "A platform it has set nothing for has no rules: any version, or none. `inUse` is the version each device " +
+          "of a current subscriber last checked in with, counted, newest first; null for devices that never said.",
         ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Subscription id")],
         responses: {
           200: response(
             "The rules",
             obj({
+              subscription: obj({ id: int(), code: str(), name: str() }),
               platforms: arr({
                 allOf: [
                   ref("SubscriptionPlatform"),
                   obj({
                     blocked: arr(ref("BlockedVersion")),
+                    versionRequired: bool("A check must send `version` to be valid for this subscription"),
+                    minVersion: { ...str("The oldest app version this subscription accepts"), nullable: true },
                     inUse: arr(obj({ version: { ...str(), nullable: true }, devices: int(), lastSeenAt: { type: "string", format: "date-time" } })),
                   }),
                 ],
@@ -3145,17 +3156,18 @@ module.exports = {
             })
           ),
           403: errors[403],
+          404: errors[404],
         },
       },
     },
 
-    "/subscriptions/platforms/{id}/versions": {
+    "/subscriptions/{id}/versions/{platformId}": {
       patch: {
         tags: ["Subscriptions"],
-        summary: "Require a version on a platform, or set its minimum",
+        summary: "Require a version for a subscription on a platform, or set its minimum there",
         description: "Either or both. An empty or null `minVersion` removes the minimum. A change to what it already is (2 for 2.0) is a 400.",
         ...secured("subscription:versions"),
-        parameters: [pathParam("id", "Platform id")],
+        parameters: [pathParam("id", "Subscription id"), pathParam("platformId", "Platform id")],
         requestBody: body(obj({ versionRequired: bool(), minVersion: { ...str(), nullable: true } })),
         responses: {
           200: response("Updated", obj({ policy: obj({ versionRequired: bool(), minVersion: { ...str(), nullable: true } }) })),
@@ -3166,13 +3178,13 @@ module.exports = {
       },
     },
 
-    "/subscriptions/platforms/{id}/blocked-versions": {
+    "/subscriptions/{id}/versions/{platformId}/blocked": {
       post: {
         tags: ["Subscriptions"],
-        summary: "Block one version of a platform's app",
-        description: "Checks from it are refused whatever the minimum.",
+        summary: "Block one version of a platform's app for a subscription",
+        description: "That subscription turns it away whatever its minimum; other subscriptions are not affected.",
         ...secured("subscription:versions"),
-        parameters: [pathParam("id", "Platform id")],
+        parameters: [pathParam("id", "Subscription id"), pathParam("platformId", "Platform id")],
         requestBody: body(obj({ version: str(), note: str("Optional, up to 200 characters") }, ["version"])),
         responses: {
           201: response("Blocked", obj({ blocked: ref("BlockedVersion") })),
@@ -3184,12 +3196,12 @@ module.exports = {
       },
     },
 
-    "/subscriptions/platforms/{id}/blocked-versions/{blockedId}": {
+    "/subscriptions/{id}/versions/{platformId}/blocked/{blockedId}": {
       delete: {
         tags: ["Subscriptions"],
-        summary: "Unblock a version",
+        summary: "Unblock a version for a subscription",
         ...secured("subscription:versions"),
-        parameters: [pathParam("id", "Platform id"), pathParam("blockedId", "The blocked version's id")],
+        parameters: [pathParam("id", "Subscription id"), pathParam("platformId", "Platform id"), pathParam("blockedId", "The blocked version's id")],
         responses: { 200: response("Unblocked", obj({ unblocked: bool() })), 403: errors[403], 404: errors[404] },
       },
     },

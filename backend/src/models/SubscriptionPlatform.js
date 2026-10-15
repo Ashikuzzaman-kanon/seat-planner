@@ -22,8 +22,6 @@ class SubscriptionPlatform extends Model {
       value: this.value,
       name: this.name,
       isActive: this.isActive,
-      versionRequired: this.versionRequired,
-      minVersion: this.minVersion,
     };
   }
 }
@@ -35,21 +33,13 @@ SubscriptionPlatform.init(
     name: { type: DataTypes.STRING(60), allowNull: false },
     isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
     createdById: { type: DataTypes.INTEGER, allowNull: true },
-    /**
-     * The app's version rules for this platform (services/appVersionService):
-     * whether a check must say which version is calling, and the oldest
-     * version still let through. Single versions can also be blocked
-     * (SubscriptionBlockedVersion).
-     */
-    versionRequired: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
-    minVersion: { type: DataTypes.STRING(40), allowNull: true },
   },
   { sequelize, modelName: "SubscriptionPlatform", tableName: "subscription_platforms" }
 );
 
-SubscriptionPlatform.associate = ({ UserDevice, SubscriptionBlockedVersion }) => {
+SubscriptionPlatform.associate = ({ UserDevice, SubscriptionVersionRule }) => {
   SubscriptionPlatform.hasMany(UserDevice, { foreignKey: "platformId", as: "devices" });
-  SubscriptionPlatform.hasMany(SubscriptionBlockedVersion, { foreignKey: "platformId", as: "blockedVersions" });
+  SubscriptionPlatform.hasMany(SubscriptionVersionRule, { foreignKey: "platformId", as: "versionRules" });
 };
 
 module.exports = SubscriptionPlatform;

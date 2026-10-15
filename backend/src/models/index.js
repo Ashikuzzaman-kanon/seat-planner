@@ -45,7 +45,8 @@ const SubscriptionPlatform = require("./SubscriptionPlatform");
 const UserDevice = require("./UserDevice");
 const UserDeviceRefusal = require("./UserDeviceRefusal");
 const AccountRestriction = require("./AccountRestriction");
-const SubscriptionBlockedVersion = require("./SubscriptionBlockedVersion");
+const SubscriptionVersionRule = require("./SubscriptionVersionRule");
+const SubscriptionVersionBlock = require("./SubscriptionVersionBlock");
 const demoCapture = require("../utils/demoCapture");
 
 const models = {
@@ -95,7 +96,8 @@ const models = {
   UserDevice,
   UserDeviceRefusal,
   AccountRestriction,
-  SubscriptionBlockedVersion,
+  SubscriptionVersionRule,
+  SubscriptionVersionBlock,
 };
 
 // Wire up associations for any model that declares them.

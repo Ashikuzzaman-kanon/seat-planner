@@ -17,11 +17,13 @@ const actor = (req) => ({ id: req.user.id, fullName: req.user.fullName, email: r
  * wants none.
  *
  * The answer names the account and says yes or no for every subscription
- * there is; no dates, and no reason for a no. The password is checked exactly
- * as sign-in checks it, the pause after wrong ones included (authService
- * `checkCredentials`). `deviceId` and `platform` are deliberately not
- * validated here: a missing or malformed one is not a 400 that explains
- * itself, it is `valid: false` like any other device that is not let in.
+ * there is; no dates, and no reason for a no — except a subscription that
+ * turns the app's version away, which says so on its entry. The password is
+ * checked exactly as sign-in checks it, the pause after wrong ones included
+ * (authService `checkCredentials`). `deviceId` and `platform` are
+ * deliberately not validated here: a missing or malformed one is not a 400
+ * that explains itself, it is `valid: false` like any other device that is
+ * not let in.
  *
  * Every call leaves an entry in the audit log, with the device it said it
  * came from: `auth.login_failed` when the password was not taken, and
@@ -29,8 +31,9 @@ const actor = (req) => ({ id: req.user.id, fullName: req.user.fullName, email: r
  */
 const check = asyncHandler(async (req, res) => {
   const sent = { deviceId: req.body.deviceId, platform: req.body.platform, version: req.body.version };
-  // Before the password: a version that may not call is turned away without
-  // anything about the account being looked at (appVersionService `gate`).
+  // Before the password: a version that is not one at all is the calling
+  // app's mistake, refused for the whole call (appVersionService `gate`).
+  // Each subscription's own rules come later, with its answer.
   sent.version = await versions.gate(sent, { email: req.body.email });
   const user = await auth.checkCredentials(req.body, {
     purpose: "subscription check",
@@ -43,8 +46,9 @@ const check = asyncHandler(async (req, res) => {
   });
 });
 
+// Whoever sets version rules picks from every subscription too, closed ones included.
 const list = asyncHandler(async (req, res) => {
-  res.json(await subscriptions.list(req.user.id, { staff: staff(req) }));
+  res.json(await subscriptions.list(req.user.id, { staff: staff(req) || can(req, PERMISSIONS.SUBSCRIPTION_VERSIONS) }));
 });
 
 const mine = asyncHandler(async (req, res) => {
@@ -140,20 +144,20 @@ const removeDevice = asyncHandler(async (req, res) => {
 
 /* ---------------- App versions ---------------- */
 
-const versionPolicies = asyncHandler(async (_req, res) => {
-  res.json(await versions.policies());
+const versionPolicies = asyncHandler(async (req, res) => {
+  res.json(await versions.policies(req.params.id));
 });
 
 const setVersionPolicy = asyncHandler(async (req, res) => {
-  res.json({ policy: await versions.setPolicy(req.params.id, req.body) });
+  res.json({ policy: await versions.setPolicy(req.params.id, req.params.platformId, req.body) });
 });
 
 const blockVersion = asyncHandler(async (req, res) => {
-  res.status(201).json({ blocked: await versions.block(req.params.id, req.body, actor(req)) });
+  res.status(201).json({ blocked: await versions.block(req.params.id, req.params.platformId, req.body, actor(req)) });
 });
 
 const unblockVersion = asyncHandler(async (req, res) => {
-  res.json(await versions.unblock(req.params.id, req.params.blockedId));
+  res.json(await versions.unblock(req.params.id, req.params.platformId, req.params.blockedId));
 });
 
 module.exports = {

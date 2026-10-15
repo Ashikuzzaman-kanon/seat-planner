@@ -40,9 +40,10 @@ Subscription.init(
   { sequelize, modelName: "Subscription", tableName: "subscriptions" }
 );
 
-Subscription.associate = ({ User, UserSubscription }) => {
+Subscription.associate = ({ User, UserSubscription, SubscriptionVersionRule }) => {
   Subscription.belongsTo(User, { foreignKey: "createdById", as: "createdBy" });
   Subscription.hasMany(UserSubscription, { foreignKey: "subscriptionId", as: "members" });
+  Subscription.hasMany(SubscriptionVersionRule, { foreignKey: "subscriptionId", as: "versionRules" });
 };
 
 module.exports = Subscription;

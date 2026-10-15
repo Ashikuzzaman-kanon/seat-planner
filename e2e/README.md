@@ -10,7 +10,7 @@ widths, and check what a person would see.
 | `dialogs.js` | Every dialog opens, fits on a phone, and closes. |
 | `flow.js`, `flow2.js` | The booking flow from search to tickets. |
 | `demo-ui.js` | Administration → Demo Data: populate, watch it run, read the result, delete. |
-| `subscriptions-ui.js` | Subscriptions as three people: a manager creates one, a passenger asks for it on so many devices, a reviewer approves it for a week with counts of their own, devices check in from outside and the reviewer notes, blocks and removes them, the passenger cancels; then the platforms, and the rules on app versions on a platform made for the run. Not part of `npm run all` — see below. |
+| `subscriptions-ui.js` | Subscriptions as three people: a manager creates one, a passenger asks for it on so many devices, a reviewer approves it for a week with counts of their own, devices check in from outside and the reviewer notes, blocks and removes them, the passenger cancels; the subscription's own rules on app versions while it runs; then the platforms. Not part of `npm run all` — see below. |
 | `people-ui.js` | Profiles and restriction: a name opens the profile; restrict an account with a reason, see it refused at sign-in and by the subscription check, lift it; the same for several at once from Users; the profile window on a phone. Restricts and lifts `unittest-target@example.com`. |
 | `test-wake.js` | A sleeping API (simulated): the "Starting the server…" notice, one wake-up for many refused requests, staying signed in when it cannot be woken. |
 | `test-phase2-ui.js`, `test-proxy.js` | The network screens; the web app's `/api` proxy. |
