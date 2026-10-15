@@ -11,6 +11,7 @@ import SubscriptionEditor from "@/components/subscriptions/SubscriptionEditor";
 import RequestsQueue from "@/components/subscriptions/RequestsQueue";
 import Subscribers from "@/components/subscriptions/Subscribers";
 import Platforms from "@/components/subscriptions/Platforms";
+import Versions from "@/components/subscriptions/Versions";
 import {
   fetchMyDevices,
   fetchMySubscriptions,
@@ -24,9 +25,10 @@ import "@/components/subscriptions/subscriptions.css";
  * Subscriptions.
  *
  * Everyone signed in sees what there is and where they stand with each. The
- * two reviewer tabs — who is waiting, and who is subscribed — and the
- * manager's tab for platforms appear only for someone who can act on them;
- * with neither permission there are no tabs at all, just the list.
+ * two reviewer tabs — who is waiting, and who is subscribed — the manager's
+ * tab for platforms, and the tab for which app versions may check appear only
+ * for someone who can act on them; with none of those permissions there are
+ * no tabs at all, just the list.
  *
  * `?tab=requests` opens on the queue, which is where the "someone asked"
  * notification points.
@@ -37,6 +39,7 @@ export default function SubscriptionsPage() {
 
   const canManage = hasPermission(PERMISSIONS.SUBSCRIPTION_MANAGE);
   const canReview = hasPermission(PERMISSIONS.SUBSCRIPTION_APPROVE);
+  const canVersions = hasPermission(PERMISSIONS.SUBSCRIPTION_VERSIONS);
   const staff = canManage || canReview;
 
   const [tab, setTab] = useState("subscriptions");
@@ -83,8 +86,13 @@ export default function SubscriptionsPage() {
   // queue must not strand someone who cannot see it on an empty page.
   useEffect(() => {
     const wanted = new URLSearchParams(window.location.search).get("tab");
-    if ((canReview && ["requests", "subscribers"].includes(wanted)) || (canManage && wanted === "platforms")) setTab(wanted);
-  }, [canReview, canManage]);
+    if (
+      (canReview && ["requests", "subscribers"].includes(wanted)) ||
+      (canManage && wanted === "platforms") ||
+      (canVersions && wanted === "versions")
+    )
+      setTab(wanted);
+  }, [canReview, canManage, canVersions]);
 
   // Staff are sent the switched-off platforms too; only the others can be asked for.
   const askable = offered.platforms.filter((p) => p.isActive);
@@ -93,6 +101,7 @@ export default function SubscriptionsPage() {
     canReview && { key: "requests", label: "Requests", icon: "pi pi-inbox", count: pending },
     canReview && { key: "subscribers", label: "Subscribers", icon: "pi pi-users" },
     canManage && { key: "platforms", label: "Platforms", icon: "pi pi-desktop" },
+    canVersions && { key: "versions", label: "Versions", icon: "pi pi-tag" },
   ].filter(Boolean);
 
   const show = (next) => {
@@ -119,7 +128,7 @@ export default function SubscriptionsPage() {
         {canManage && <Button label="New subscription" icon="pi pi-plus" onClick={() => setEditing({})} />}
       </div>
 
-      {staff && (
+      {tabs.length > 1 && (
         <div className="sub-tabs" role="tablist" aria-label="Subscriptions">
           {tabs.map((t) => (
             <button
@@ -158,6 +167,8 @@ export default function SubscriptionsPage() {
         />
       ) : tab === "platforms" && canManage ? (
         <Platforms platforms={offered.platforms} onChanged={load} notify={notify} />
+      ) : tab === "versions" && canVersions ? (
+        <Versions notify={notify} />
       ) : (
         <SubscriptionList
           subscriptions={subscriptions}

@@ -124,6 +124,54 @@ export async function deleteDevice(id) {
   await api.delete(`/subscriptions/devices/${id}`);
 }
 
+/* ---------------- App versions ---------------- */
+
+/** Every platform with its rules, blocked versions and the versions in use. */
+export async function fetchVersionPolicies() {
+  const { data } = await api.get("/subscriptions/versions");
+  return data.platforms;
+}
+
+/** `{ versionRequired }`, `{ minVersion }` (empty or null clears it), or both. */
+export async function setVersionPolicy(platformId, changes) {
+  const { data } = await api.patch(`/subscriptions/platforms/${platformId}/versions`, changes);
+  return data.policy;
+}
+
+export async function blockVersion(platformId, { version, note }) {
+  const { data } = await api.post(`/subscriptions/platforms/${platformId}/blocked-versions`, { version, note });
+  return data.blocked;
+}
+
+export async function unblockVersion(platformId, blockedId) {
+  await api.delete(`/subscriptions/platforms/${platformId}/blocked-versions/${blockedId}`);
+}
+
+/*
+ * The server's version arithmetic (backend utils/appVersion), so the screen
+ * can say which versions in use a rule would turn away before it is saved:
+ * one to four numbers joined by dots, an optional leading "v", compared number
+ * by number with a missing one counting as 0.
+ */
+const VERSION = /^v?(\d{1,6}(?:\.\d{1,6}){0,3})$/i;
+
+/** "v1.4.02" → "1.4.2", or null if it is not a version. */
+export function cleanVersion(input) {
+  const match = String(input ?? "").trim().match(VERSION);
+  return match ? match[1].split(".").map((n) => String(Number(n))).join(".") : null;
+}
+
+/** -1, 0 or 1. */
+export function compareVersions(a, b) {
+  const x = a.split(".").map(Number);
+  const y = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d < 0 ? -1 : 1;
+  }
+  return 0;
+}
+
 /* ---------------- Dates ----------------
  *
  * A subscription runs through the end of its last day in Dhaka, so the days

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
+import PersonLink from "@/components/people/PersonLink";
 import { Toast } from "primereact/toast";
 import { Dialog } from "primereact/dialog";
 import { InputTextarea } from "primereact/inputtextarea";
@@ -236,13 +237,18 @@ export default function RequestsPage() {
 
                 {!mine && request.requestedBy && (
                   <p className="request-who">
-                    Asked by <strong>{request.requestedBy.fullName}</strong> ({request.requestedBy.email})
+                    Asked by{" "}
+                    <strong>
+                      <PersonLink id={request.requestedBy.id} name={request.requestedBy.fullName} />
+                    </strong>{" "}
+                    ({request.requestedBy.email})
                   </p>
                 )}
 
                 {request.decidedAt && (
                   <p className="request-decision">
-                    {request.status} by {request.decidedBy?.fullName || "a reviewer"}
+                    {request.status} by{" "}
+                    {request.decidedBy ? <PersonLink id={request.decidedBy.id} name={request.decidedBy.fullName} /> : "a reviewer"}
                     {request.decisionNote && <span> — “{request.decisionNote}”</span>}
                   </p>
                 )}

@@ -69,6 +69,7 @@ const PERMISSIONS = Object.freeze({
   // Users
   USER_VIEW: "user:view",
   USER_MANAGE_ROLES: "user:manage_roles",
+  USER_RESTRICT: "user:restrict",
 
   // Roles & permissions
   ROLE_VIEW: "role:view",
@@ -96,6 +97,7 @@ const PERMISSIONS = Object.freeze({
   // Subscriptions. Asking for one needs no permission — everyone signed in can.
   SUBSCRIPTION_MANAGE: "subscription:manage",
   SUBSCRIPTION_APPROVE: "subscription:approve",
+  SUBSCRIPTION_VERSIONS: "subscription:versions",
 });
 
 /**
@@ -374,6 +376,14 @@ const PERMISSION_CATALOGUE = Object.freeze([
       "Grant and revoke roles. Limited to roles whose permissions the grantor already holds.",
   },
   {
+    key: PERMISSIONS.USER_RESTRICT,
+    group: "Users",
+    label: "Restrict accounts",
+    description:
+      "Stop an account signing in at all, and lift that again — one at a time or several at once. " +
+      "Not your own account, not a super admin's, and not one that holds a permission you do not.",
+  },
+  {
     key: PERMISSIONS.ROLE_VIEW,
     group: "Roles & permissions",
     label: "View roles",
@@ -470,6 +480,14 @@ const PERMISSION_CATALOGUE = Object.freeze([
       "decline it, change when a running subscription ends or how many devices it allows, and cancel " +
       "anyone's subscription. Also see the devices on a subscriber's account and why any were turned " +
       "away, and note, block or remove a device.",
+  },
+  {
+    key: PERMISSIONS.SUBSCRIPTION_VERSIONS,
+    group: "Subscriptions",
+    label: "Manage app versions",
+    description:
+      "Decide, per platform, which versions of the apps may use the subscription check: whether a " +
+      "version must be sent, the oldest one still allowed, and single versions to turn away.",
   },
 ]);
 

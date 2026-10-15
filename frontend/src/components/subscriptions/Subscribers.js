@@ -13,6 +13,7 @@ import Chips from "./Chips";
 import DevicesDialog from "./DevicesDialog";
 import PeriodPicker, { isChosen, lastDayOf } from "./PeriodPicker";
 import ReasonDialog from "./ReasonDialog";
+import PersonLink from "@/components/people/PersonLink";
 import {
   amendSubscription,
   cancelSubscription,
@@ -141,7 +142,9 @@ export default function Subscribers({ subscriptions, platforms, maxDevices, onCh
             header="Person"
             body={(m) => (
               <div className="sub-person">
-                <strong>{m.user.fullName}</strong>
+                <strong>
+                  <PersonLink id={m.user.id} name={m.user.fullName} />
+                </strong>
                 <small>{m.user.email}</small>
               </div>
             )}
@@ -161,7 +164,11 @@ export default function Subscribers({ subscriptions, platforms, maxDevices, onCh
               m.lastDay ? (
                 <div className="sub-person">
                   <span>{longDate(m.lastDay)}</span>
-                  {m.decidedBy && m.startsAt && <small>approved by {m.decidedBy}</small>}
+                  {m.decidedBy && m.startsAt && (
+                    <small>
+                      approved by <PersonLink id={m.decidedById} name={m.decidedBy} />
+                    </small>
+                  )}
                 </div>
               ) : (
                 <span className="sub-muted">—</span>
@@ -174,7 +181,15 @@ export default function Subscribers({ subscriptions, platforms, maxDevices, onCh
               if (m.status === "cancelled") {
                 return (
                   <div className="sub-person">
-                    <span>{m.endedBy ? `By ${m.endedBy}` : "Cancelled"}</span>
+                    <span>
+                      {m.endedBy ? (
+                        <>
+                          By <PersonLink id={m.endedById} name={m.endedBy} />
+                        </>
+                      ) : (
+                        "Cancelled"
+                      )}
+                    </span>
                     {m.endReason && <small>“{m.endReason}”</small>}
                   </div>
                 );
@@ -182,7 +197,15 @@ export default function Subscribers({ subscriptions, platforms, maxDevices, onCh
               if (m.status === "declined") {
                 return (
                   <div className="sub-person">
-                    <span>{m.decidedBy ? `By ${m.decidedBy}` : "Declined"}</span>
+                    <span>
+                      {m.decidedBy ? (
+                        <>
+                          By <PersonLink id={m.decidedById} name={m.decidedBy} />
+                        </>
+                      ) : (
+                        "Declined"
+                      )}
+                    </span>
                     {m.decisionNote && <small>“{m.decisionNote}”</small>}
                   </div>
                 );

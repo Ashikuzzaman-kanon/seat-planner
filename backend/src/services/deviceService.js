@@ -50,6 +50,7 @@ const clean = (text) => (typeof text === "string" && text.trim() ? text.trim() :
 const asRecorded = (sent = {}) => ({
   platform: rules.asSent(sent.platform, 40).toLowerCase() || null,
   deviceId: rules.asSent(sent.deviceId, 128) || null,
+  version: rules.asSent(sent.version, 40) || null,
 });
 
 /* ------------------------------------------------------------------ *
@@ -265,7 +266,11 @@ async function admit(user, sent, memberships, now = new Date()) {
     if (known?.isBlocked) return { reason: REASON.BLOCKED };
 
     if (known) {
-      await known.update({ lastSeenAt: now, checks: known.checks + 1 }, { transaction });
+      // A check that does not say its version leaves the last one known.
+      await known.update(
+        { lastSeenAt: now, checks: known.checks + 1, ...(sent.version ? { appVersion: sent.version } : {}) },
+        { transaction }
+      );
       return { place: rules.placeOf(devices, device.id) };
     }
 
@@ -273,7 +278,7 @@ async function admit(user, sent, memberships, now = new Date()) {
     if (taken >= most) return { reason: REASON.LIMIT_REACHED, detail: { devicesOnPlatform: taken, mostAllowed: most } };
 
     const added = await UserDevice.create(
-      { userId: user.id, platformId: platform.id, deviceId: device.id, lastSeenAt: now },
+      { userId: user.id, platformId: platform.id, deviceId: device.id, lastSeenAt: now, appVersion: sent.version || null },
       { transaction }
     );
     return { place: taken + 1, added };

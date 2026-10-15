@@ -8,6 +8,7 @@ import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { InputTextarea } from "primereact/inputtextarea";
 import { Toast } from "primereact/toast";
+import PersonLink from "@/components/people/PersonLink";
 import { confirmDialog, ConfirmDialog } from "primereact/confirmdialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -109,7 +110,7 @@ export default function ApprovalsPage() {
           <Column field="coachNo" header="Coach No" sortable />
           <Column header="Type" body={(r) => r.coachType?.name || "—"} />
           <Column header="Class" body={(r) => r.coachClass?.name || "—"} />
-          <Column header="Submitted by" body={(r) => r.createdBy?.fullName || "—"} />
+          <Column header="Submitted by" body={(r) => (r.createdBy ? <PersonLink id={r.createdBy.id} name={r.createdBy.fullName} /> : "—")} />
           <Column header="" body={actionBody} style={{ width: "10rem" }} />
         </DataTable>
       </div>

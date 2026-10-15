@@ -140,8 +140,10 @@ async function verifyEmail({ email, code }, context) {
   ) {
     throw ApiError.badRequest("Invalid or expired verification code");
   }
+  if (user.restrictedAt) throw ApiError.forbidden(RESTRICTED);
 
   user.isVerified = true;
+  user.lastSignInAt = new Date();
   user.verificationCode = null;
   user.verificationCodeExpires = null;
   await user.save();
@@ -175,6 +177,9 @@ async function resendVerification({ email }) {
  * time an answer takes does not say which it was.
  */
 const NOBODYS_HASH = bcrypt.hashSync("no account has this password", SALT_ROUNDS);
+
+/** What a restricted account is told — at sign-in, and by the subscription check. */
+const RESTRICTED = "This account is restricted. Contact an administrator.";
 
 /*
  * Password attempts for one address are checked one at a time. Without this, a
@@ -317,6 +322,12 @@ function checkCredentials({ email, password }, { purpose = "sign-in", detail = {
       await user.update({ failedSignIns: 0, lastFailedSignInAt: null, lockedUntil: null });
     }
 
+    // Only after the password: whether an account is restricted is told to
+    // whoever holds it, not to anyone who types its address.
+    if (user.restrictedAt) {
+      return refuse("account restricted", ApiError.forbidden(RESTRICTED));
+    }
+
     if (!user.isVerified) {
       return refuse("email not verified yet", ApiError.forbidden("Please verify your email before logging in"));
     }
@@ -327,6 +338,7 @@ function checkCredentials({ email, password }, { purpose = "sign-in", detail = {
 /** Authenticate with email + password, opening a session. */
 async function login({ email, password }, context) {
   const user = await checkCredentials({ email, password });
+  await user.update({ lastSignInAt: new Date() });
 
   const session = await buildSession(user, context);
   await audit.record({
@@ -349,7 +361,7 @@ async function refresh({ refreshToken }, context) {
   if (!record) throw ApiError.unauthorized("Invalid or expired session");
 
   const user = await User.findByPk(record.userId);
-  if (!user || !user.isVerified) {
+  if (!user || !user.isVerified || user.restrictedAt) {
     throw ApiError.unauthorized("Invalid or expired session");
   }
 

@@ -53,6 +53,7 @@ export default function MyDevices({ data }) {
                 {device.isBlocked && <Tag value="Blocked" severity="danger" />}
                 <small>
                   First used {when(device.firstSeenAt)} · last used {when(device.lastSeenAt)}
+                  {device.appVersion && ` · version ${device.appVersion}`}
                 </small>
               </span>
             </li>

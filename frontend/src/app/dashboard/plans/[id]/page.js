@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
+import PersonLink from "@/components/people/PersonLink";
 import { Message } from "primereact/message";
 import { Toast } from "primereact/toast";
 import { ProgressSpinner } from "primereact/progressspinner";
@@ -82,7 +83,7 @@ export default function ViewPlanPage() {
     ["Class", plan.coachClass?.name],
     ["From", plan.layout?.fromStation || "—"],
     ["To", plan.layout?.toStation || "—"],
-    ["Created by", plan.createdBy?.fullName],
+    ["Created by", plan.createdBy ? <PersonLink id={plan.createdBy.id} name={plan.createdBy.fullName} /> : null],
   ];
 
   return (

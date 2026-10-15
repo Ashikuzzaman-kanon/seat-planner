@@ -3,6 +3,7 @@ const { PERMISSIONS } = require("../constants/permissions");
 const subscriptions = require("../services/subscriptionService");
 const devices = require("../services/deviceService");
 const auth = require("../services/authService");
+const versions = require("../services/appVersionService");
 
 const can = (req, permission) => req.permissions.has(permission);
 const reviewer = (req) => can(req, PERMISSIONS.SUBSCRIPTION_APPROVE);
@@ -27,7 +28,10 @@ const actor = (req) => ({ id: req.user.id, fullName: req.user.fullName, email: r
  * `subscription.check` with what was answered when it was.
  */
 const check = asyncHandler(async (req, res) => {
-  const sent = { deviceId: req.body.deviceId, platform: req.body.platform };
+  const sent = { deviceId: req.body.deviceId, platform: req.body.platform, version: req.body.version };
+  // Before the password: a version that may not call is turned away without
+  // anything about the account being looked at (appVersionService `gate`).
+  sent.version = await versions.gate(sent, { email: req.body.email });
   const user = await auth.checkCredentials(req.body, {
     purpose: "subscription check",
     detail: devices.asRecorded(sent),
@@ -134,6 +138,24 @@ const removeDevice = asyncHandler(async (req, res) => {
   res.json(await devices.removeDevice(req.params.id));
 });
 
+/* ---------------- App versions ---------------- */
+
+const versionPolicies = asyncHandler(async (_req, res) => {
+  res.json(await versions.policies());
+});
+
+const setVersionPolicy = asyncHandler(async (req, res) => {
+  res.json({ policy: await versions.setPolicy(req.params.id, req.body) });
+});
+
+const blockVersion = asyncHandler(async (req, res) => {
+  res.status(201).json({ blocked: await versions.block(req.params.id, req.body, actor(req)) });
+});
+
+const unblockVersion = asyncHandler(async (req, res) => {
+  res.json(await versions.unblock(req.params.id, req.params.blockedId));
+});
+
 module.exports = {
   check,
   list,
@@ -156,4 +178,8 @@ module.exports = {
   userDevices,
   updateDevice,
   removeDevice,
+  versionPolicies,
+  setVersionPolicy,
+  blockVersion,
+  unblockVersion,
 };

@@ -10,7 +10,12 @@ import SearchBox from "@/components/ui/SearchBox";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { Toast } from "primereact/toast";
+import { InputTextarea } from "primereact/inputtextarea";
 import api from "@/lib/api";
+import Select from "@/components/ui/Select";
+import PersonLink from "@/components/people/PersonLink";
+import { useAccountChanges } from "@/components/people/ProfileProvider";
+import { liftRestrictions, restrictAccounts } from "@/lib/people";
 import { fetchRoles, setUserRoles } from "@/lib/roles";
 import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -28,21 +33,38 @@ export default function UsersPage() {
   const [editing, setEditing] = useState(null);
   const [selectedRoleIds, setSelectedRoleIds] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState(null);
+  const [selected, setSelected] = useState([]);
+  const [bulk, setBulk] = useState(null); // "restrict" | "lift"
+  const [bulkText, setBulkText] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  // Opened from a profile's "Edit roles": search for that account, then open its editor.
+  const pendingEdit = useRef(null);
 
   const canManage = hasPermission(PERMISSIONS.USER_MANAGE_ROLES);
   // Reading an account's standing is a reviewer's permission, not a user
   // administrator's — seeing the score is separate from being able to act on it.
   const canReview = hasPermission(PERMISSIONS.ABUSE_REVIEW);
   const canSeeRoles = hasPermission(PERMISSIONS.ROLE_VIEW);
+  const canRestrict = hasPermission(PERMISSIONS.USER_RESTRICT);
   const amSuperAdmin = hasRole(SUPER_ADMIN_ROLE);
 
-  const fetchUsers = useCallback(async (searchValue = "") => {
+  const fetchUsers = useCallback(async (searchValue = "", statusValue = null) => {
     setLoading(true);
     try {
       const { data } = await api.get("/users", {
-        params: { search: searchValue, limit: 100 },
+        params: { search: searchValue, limit: 100, status: statusValue || undefined },
       });
       setUsers(data.users);
+      // Keep only what is still on the page selected.
+      setSelected((was) => was.filter((s) => data.users.some((u) => u.id === s.id)));
+      if (pendingEdit.current) {
+        const row = data.users.find((u) => u.id === pendingEdit.current);
+        if (row) {
+          pendingEdit.current = null;
+          openEditor(row);
+        }
+      }
     } catch (err) {
       toast.current?.show({ severity: "error", summary: "Error", detail: err.message });
     } finally {
@@ -51,13 +73,46 @@ export default function UsersPage() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("edit")) pendingEdit.current = Number(params.get("edit"));
+    if (params.get("q")) setSearch(params.get("q"));
+  }, []);
+
+  // Restricting or lifting from a profile window changes the list.
+  useAccountChanges(() => fetchUsers(search, status));
+
+  useEffect(() => {
     if (canSeeRoles) fetchRoles().then(setRoles).catch(() => setRoles([]));
   }, [canSeeRoles]);
 
   useEffect(() => {
-    const t = setTimeout(() => fetchUsers(search), 350);
+    const t = setTimeout(() => fetchUsers(search, status), 350);
     return () => clearTimeout(t);
-  }, [search, fetchUsers]);
+  }, [search, status, fetchUsers]);
+
+  const runBulk = async () => {
+    const ids = selected.map((u) => u.id);
+    setBulkBusy(true);
+    try {
+      const outcome = bulk === "restrict" ? await restrictAccounts(ids, bulkText.trim()) : await liftRestrictions(ids, bulkText.trim());
+      const refused = outcome.results.filter((r) => !r.done);
+      const nameOf = (id) => users.find((u) => u.id === id)?.fullName || `account ${id}`;
+      toast.current?.show({
+        severity: refused.length ? (outcome.done ? "warn" : "error") : "success",
+        summary: `${bulk === "restrict" ? "Restricted" : "Restriction lifted on"} ${outcome.done} of ${ids.length}`,
+        detail: refused.length ? refused.map((r) => `${nameOf(r.userId)}: ${r.error}`).join(" · ") : undefined,
+        life: refused.length ? 9000 : 4500,
+      });
+      setBulk(null);
+      setBulkText("");
+      setSelected([]);
+      await fetchUsers(search, status);
+    } catch (err) {
+      toast.current?.show({ severity: "error", summary: "That did not work", detail: err.message });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   /**
    * Mirrors the server's escalation guard so un-assignable roles are visibly
@@ -114,12 +169,18 @@ export default function UsersPage() {
     </div>
   );
 
-  const verifiedBody = (row) =>
-    row.isVerified ? (
-      <Tag value="Verified" severity="success" icon="pi pi-check" />
-    ) : (
-      <Tag value="Pending" severity="warning" icon="pi pi-clock" />
-    );
+  const verifiedBody = (row) => (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+      {row.restrictedAt && <Tag value="Restricted" severity="danger" icon="pi pi-lock" />}
+      {row.isVerified ? (
+        <Tag value="Verified" severity="success" icon="pi pi-check" />
+      ) : (
+        <Tag value="Pending" severity="warning" icon="pi pi-clock" />
+      )}
+    </div>
+  );
+
+  const nameBody = (row) => <PersonLink id={row.id} name={row.fullName} />;
 
   /*
    * Which account's standing is open.
@@ -170,8 +231,29 @@ export default function UsersPage() {
       <div className="card">
         <div className="ui-toolbar">
           <SearchBox value={search} onChange={setSearch} placeholder="Search by name or email" />
-          <Button icon="pi pi-refresh" label="Refresh" outlined onClick={() => fetchUsers(search)} />
+          <Select
+            value={status}
+            options={[
+              { label: "All accounts", value: null },
+              { label: "Restricted", value: "restricted" },
+              { label: "Not restricted", value: "active" },
+            ]}
+            onChange={(e) => setStatus(e.value)}
+            placeholder="All accounts"
+            aria-label="Show"
+            style={{ width: "auto", minWidth: "11rem" }}
+          />
+          <Button icon="pi pi-refresh" label="Refresh" outlined onClick={() => fetchUsers(search, status)} />
         </div>
+
+        {canRestrict && selected.length > 0 && (
+          <div className="users-bulk" role="region" aria-label="Selected accounts">
+            <strong>{selected.length} selected</strong>
+            <Button label="Restrict" icon="pi pi-lock" size="small" severity="danger" outlined onClick={() => setBulk("restrict")} />
+            <Button label="Lift restriction" icon="pi pi-lock-open" size="small" outlined onClick={() => setBulk("lift")} />
+            <Button label="Clear" size="small" text onClick={() => setSelected([])} />
+          </div>
+        )}
 
         <DataTable
           value={users}
@@ -181,14 +263,58 @@ export default function UsersPage() {
           dataKey="id"
           emptyMessage="No users found"
           stripedRows
+          {...(canRestrict
+            ? { selectionMode: "checkbox", selection: selected, onSelectionChange: (e) => setSelected(e.value) }
+            : {})}
         >
-          <Column field="fullName" header="Name" sortable />
+          {canRestrict && <Column selectionMode="multiple" headerStyle={{ width: "3rem" }} />}
+          <Column field="fullName" header="Name" sortable body={nameBody} />
           <Column field="email" header="Email" sortable />
           <Column header="Status" body={verifiedBody} />
           <Column header="Roles" body={rolesBody} />
           <Column header="Actions" body={actionBody} />
         </DataTable>
       </div>
+
+      <Dialog
+        header={bulk === "restrict" ? `Restrict ${selected.length} account${selected.length === 1 ? "" : "s"}?` : `Lift the restriction on ${selected.length}?`}
+        visible={Boolean(bulk)}
+        style={{ width: "min(30rem, calc(100vw - 2rem))" }}
+        onHide={() => (bulkBusy ? null : setBulk(null))}
+        draggable={false}
+        footer={
+          <>
+            <Button label="Cancel" text onClick={() => setBulk(null)} disabled={bulkBusy} />
+            <Button
+              label={bulk === "restrict" ? "Restrict" : "Lift restriction"}
+              icon={bulk === "restrict" ? "pi pi-lock" : "pi pi-lock-open"}
+              severity={bulk === "restrict" ? "danger" : undefined}
+              onClick={runBulk}
+              loading={bulkBusy}
+              disabled={bulk === "restrict" && !bulkText.trim()}
+            />
+          </>
+        }
+      >
+        <p style={{ marginTop: 0, color: "var(--ink-2)", lineHeight: 1.5 }}>
+          {bulk === "restrict"
+            ? "They are signed out everywhere at once, and cannot sign in or use the subscription check until the restriction is lifted. Accounts you may not restrict are left alone and listed afterwards."
+            : "They can sign in again straight away."}
+        </p>
+        <label htmlFor="bulk-text" style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.35rem" }}>
+          {bulk === "restrict" ? "Reason" : "Note (optional)"}
+        </label>
+        <InputTextarea
+          id="bulk-text"
+          value={bulkText}
+          onChange={(e) => setBulkText(e.target.value)}
+          rows={2}
+          autoResize
+          maxLength={500}
+          style={{ width: "100%" }}
+          placeholder={bulk === "restrict" ? "Test accounts — off until needed" : ""}
+        />
+      </Dialog>
 
       <StandingDialog
         userId={showing?.id}

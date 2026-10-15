@@ -7,6 +7,7 @@ import { ProgressSpinner } from "primereact/progressspinner";
 import DeviceCounts from "./DeviceCounts";
 import PeriodPicker, { isChosen, lastDayOf } from "./PeriodPicker";
 import ReasonDialog from "./ReasonDialog";
+import PersonLink from "@/components/people/PersonLink";
 import {
   approveRequest,
   countsOf,
@@ -109,7 +110,9 @@ export default function RequestsQueue({ platforms, maxDevices, onDecided, notify
           {requests.map((request) => (
             <li key={request.id} className="card sub-request">
               <div className="sub-request__who">
-                <strong>{request.user.fullName}</strong>
+                <strong>
+                  <PersonLink id={request.user.id} name={request.user.fullName} />
+                </strong>
                 <span>{request.user.email}</span>
               </div>
               <div className="sub-request__what">
