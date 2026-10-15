@@ -82,7 +82,9 @@ function present(row, platformRows, now = new Date()) {
       : undefined,
     user: row.user ? { id: row.user.id, fullName: row.user.fullName, email: row.user.email } : undefined,
     decidedBy: row.decidedBy?.fullName || null,
+    decidedById: row.decidedById || null,
     endedBy: row.endedBy?.fullName || null,
+    endedById: row.endedById || null,
   };
 }
 

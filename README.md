@@ -46,6 +46,10 @@ defined as data.
   the subscriber can cancel it at any time, and so can a reviewer. A caller
   outside the app can ask whether an account holds one on the device it is
   running on — see *Subscriptions and the check API*.
+- **Profiles**: a person's name, wherever the dashboard shows it, opens their
+  profile. Everyone sees the name and roles; the person themself, and staff
+  who can view users, also see the email, date of birth, the last four of the
+  national ID, when they joined and last signed in, and anything stopping them.
 
 **For staff on the train**
 - *Check Tickets*: scan a QR with the phone camera or type the number; eight
@@ -68,9 +72,15 @@ defined as data.
 - Seat plans: a grid designer for coach layouts, with an approval workflow.
 
 **For administrators**
-- Roles and permissions are data: create roles, grant any of 52 permissions,
+- Roles and permissions are data: create roles, grant any of 54 permissions,
   assign several roles to a user. An escalation guard stops anyone granting
   what they do not hold.
+- **Restricting an account** (`user:restrict`): from its profile, or several at
+  once from *Users*, with a reason. It is signed out everywhere at once and
+  cannot sign in or pass the subscription check until someone lifts it; every
+  restriction and lift is kept with who did it and why. Nobody restricts their
+  own account or a super admin's, and an account holding a permission you lack
+  can only be restricted by someone who holds it too.
 - Sign-in pauses for an account after five wrong passwords in a row (both
   numbers are settings), so a password cannot be guessed at speed. Resetting
   the password ends the pause; anyone already signed in stays signed in.
@@ -290,13 +300,14 @@ screen, not in environment variables.
 
 ## Subscriptions and the check API
 
-Two permissions run subscriptions, and a role can hold either or both (the
+Three permissions run subscriptions, and a role can hold any of them (the
 super admin holds every permission):
 
 | Permission | Allows |
 |---|---|
 | `subscription:manage` | Create a subscription, rename it, close it to new requests, reopen it, delete one nobody has asked for. Create the platforms subscriptions are used on, rename them, switch them off |
 | `subscription:approve` | See the requests, approve one for a period and a number of devices, or decline it. Change a running subscription's last day or device counts, cancel anyone's. See an account's devices and why any were turned away; note, block or remove a device |
+| `subscription:versions` | Decide which versions of each platform's app may check: require a version, set the oldest accepted, block single versions |
 
 Everyone signed in sees the *Subscriptions* page and can ask for one. A
 subscription is valid from approval **through the end of its last day in
@@ -327,6 +338,16 @@ same device may take one again, so block to keep one out); and every check
 that was turned away, with the reason. Subscribers see their own devices and
 how many places are used, to look at only.
 
+**App versions.** Each platform can set rules on the version of the app making
+the check, from the *Versions* tab: **require** one (a check without it is
+refused), set the **oldest accepted**, and **block** single versions with a
+fault whatever the minimum. A version is one to four numbers joined by dots —
+`2`, `1.4.2`, `v1.4.2.17` — compared number by number, so `1.10` is newer
+than `1.9` and `1.4` is `1.4.0`. The tab lists the versions devices last
+checked in with, so a minimum is raised knowing who it turns away. Every
+platform starts with no rules: a check without a version is let through as
+before.
+
 **Checking from outside the app.** One endpoint takes an email and password,
 and the device the call is made from, and says for every subscription there is
 whether that account's is valid on that device now:
@@ -334,7 +355,7 @@ whether that account's is valid on that device now:
 ```bash
 curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
   -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"...","deviceId":"458c70e0bd45dc3676dc6d83c5ccec4e","platform":"windows"}'
+  -d '{"email":"user@example.com","password":"...","deviceId":"458c70e0bd45dc3676dc6d83c5ccec4e","platform":"windows","version":"1.4.2"}'
 ```
 
 ```json
@@ -350,7 +371,14 @@ curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
 - It opens no session and returns no tokens or dates.
 - `deviceId` is the caller's own stable id for the installation — 4 to 128
   letters, digits and `. _ : -` — and `platform` is a platform's value. Send
-  the same id every time: a new id is a new device.
+  the same id every time: a new id is a new device. `version` is the app's
+  version; the device remembers the last one it sent.
+- **A version the platform does not accept is told so**, before the password
+  is checked, so the app can show it: no version where one is required, or one
+  that is not numbers and dots, is a `400` (`"A version is required"`); one
+  older than the minimum or blocked is a `426` (`"This version is no longer
+  supported. Please update."`). It is in the audit log as a refused
+  `subscription.check` with the version and why.
 - **A device that is not let in is told only `valid: false`.** The limit
   reached, the device blocked, an unknown or switched-off platform, a missing
   or malformed `deviceId` — each is the same `200` in the same shape, with no
@@ -370,7 +398,8 @@ curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
   nothing of the browser's own goes with the call: the caller sends the email
   and password itself.
 - A wrong password and an unknown email are the same `401`. An email not yet
-  verified is a `403`, as at sign-in.
+  verified, or a restricted account, is a `403`, as at sign-in — told only
+  after the password is right.
 - The password is checked exactly as sign-in checks it, **and shares its
   pause**: after five wrong passwords in a row the account answers `429` here
   and at sign-in for fifteen minutes, with `Retry-After` saying how long is

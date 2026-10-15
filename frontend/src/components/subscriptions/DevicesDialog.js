@@ -233,6 +233,7 @@ export default function DevicesDialog({ member, platforms, maxDevices, onHide, o
                             <small>
                               First seen {day(device.firstSeenAt)} · last seen {timeAgo(device.lastSeenAt)} · {device.checks} check
                               {device.checks === 1 ? "" : "s"}
+                              {device.appVersion && ` · version ${device.appVersion}`}
                             </small>
 
                             {noting?.id === device.id ? (

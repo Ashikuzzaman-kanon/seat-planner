@@ -7,12 +7,16 @@ const { assertCanAssignRole } = require("./roleService");
 const { invalidateUser } = require("./permissionService");
 const audit = require("./auditService");
 const notify = require("./notificationService");
-const { PERMISSION_CATALOGUE } = require("../constants/permissions");
+const { PERMISSION_CATALOGUE, PERMISSIONS } = require("../constants/permissions");
+const restrictions = require("./restrictionService");
 
 const USER_INCLUDE = [{ model: Role, as: "roles", through: { attributes: [] } }];
 
-/** Paginated, searchable user list. Optionally filtered to holders of one role. */
-async function listUsers({ page = 1, limit = 20, search = "", roleId } = {}) {
+/**
+ * Paginated, searchable user list. Optionally filtered to holders of one role,
+ * or to accounts that are, or are not, restricted (`status`).
+ */
+async function listUsers({ page = 1, limit = 20, search = "", roleId, status } = {}) {
   const where = {};
   if (search) {
     where[Op.or] = [
@@ -20,6 +24,8 @@ async function listUsers({ page = 1, limit = 20, search = "", roleId } = {}) {
       { email: { [Op.like]: `%${search}%` } },
     ];
   }
+  if (status === "restricted") where.restrictedAt = { [Op.ne]: null };
+  if (status === "active") where.restrictedAt = null;
 
   const offset = (page - 1) * limit;
   const { rows, count } = await User.findAndCountAll({
@@ -168,4 +174,58 @@ function abilitiesOf(roles) {
   return { everything: false, abilities: [...groups].map(([group, labels]) => ({ group, labels })) };
 }
 
-module.exports = { listUsers, getUser, setUserRoles };
+/**
+ * One account, as the profile window shows it to `viewer`.
+ *
+ * Anyone signed in can open anyone's profile, but sees only the name and the
+ * roles. The rest — email, date of birth, the last four digits of the National
+ * ID, when the account joined and last signed in, and whether it is
+ * restricted, paused or held — is for the account itself and for whoever holds
+ * `user:view`. Only the full National ID never leaves the account's own
+ * profile page.
+ *
+ * `can` says which actions the viewer may take on it here, so the window shows
+ * only the buttons that will work.
+ */
+async function profileOf(targetId, viewer, viewerAccess) {
+  const target = await User.findByPk(targetId, { include: USER_INCLUDE });
+  if (!target) throw ApiError.notFound("No such account");
+
+  const isSelf = target.id === viewer.id;
+  const holds = new Set(viewerAccess.permissions);
+  const base = { id: target.id, fullName: target.fullName, roles: target.roleNames(), isSelf };
+  if (!isSelf && !holds.has(PERMISSIONS.USER_VIEW)) return { ...base, limited: true };
+
+  // Required here rather than at the top: abuseService reaches back into the
+  // services that require this one.
+  const { activeHold } = require("./abuseService");
+  const now = new Date();
+  const [restriction, hold, history] = await Promise.all([
+    target.restrictedAt ? restrictions.currentOf(target.id) : null,
+    activeHold(target.id),
+    holds.has(PERMISSIONS.USER_VIEW) ? restrictions.historyOf(target.id) : undefined,
+  ]);
+  const mayRestrict = holds.has(PERMISSIONS.USER_RESTRICT) && !isSelf && (await restrictions.mayAct(viewer, viewerAccess, target));
+
+  return {
+    ...base,
+    limited: false,
+    email: target.email,
+    dateOfBirth: target.dateOfBirth || null,
+    nidLast4: target.nid ? target.nid.slice(-4) : null,
+    memberSince: target.createdAt,
+    lastSignInAt: target.lastSignInAt || null,
+    isVerified: target.isVerified,
+    restriction,
+    signInPausedUntil: target.lockedUntil && target.lockedUntil > now ? target.lockedUntil : null,
+    buyingHold: hold ? { since: hold.createdAt, detail: hold.detail } : null,
+    ...(history ? { restrictions: history } : {}),
+    can: {
+      restrict: mayRestrict && !target.restrictedAt,
+      lift: mayRestrict && Boolean(target.restrictedAt),
+      editRoles: holds.has(PERMISSIONS.USER_MANAGE_ROLES) && !isSelf,
+    },
+  };
+}
+
+module.exports = { listUsers, getUser, setUserRoles, profileOf };

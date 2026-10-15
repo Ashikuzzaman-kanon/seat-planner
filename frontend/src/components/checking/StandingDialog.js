@@ -5,6 +5,7 @@ import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { InputTextarea } from "primereact/inputtextarea";
 import { Tag } from "primereact/tag";
+import PersonLink from "@/components/people/PersonLink";
 import { Toast } from "primereact/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -235,7 +236,13 @@ export default function StandingDialog({ userId, name, onHide, onChanged }) {
                       <strong>{h.active ? "Active" : "Lifted"}</strong>
                       <span>{h.detail}</span>
                       <small>
-                        {h.automatic ? "automatic" : `by ${h.placedBy || "staff"}`}
+                        {h.automatic ? (
+                          "automatic"
+                        ) : (
+                          <>
+                            by <PersonLink id={h.placedById} name={h.placedBy || "staff"} />
+                          </>
+                        )}
                         {h.releaseNote && ` · lifted: ${h.releaseNote}`}
                       </small>
                     </li>

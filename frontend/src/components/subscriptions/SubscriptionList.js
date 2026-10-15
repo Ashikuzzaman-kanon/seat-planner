@@ -6,6 +6,7 @@ import { Tag } from "primereact/tag";
 import DeviceCounts from "./DeviceCounts";
 import MyDevices from "./MyDevices";
 import ReasonDialog from "./ReasonDialog";
+import PersonLink from "@/components/people/PersonLink";
 import { tip } from "@/components/ui/tip";
 import {
   cancelSubscription,
@@ -252,7 +253,17 @@ export default function SubscriptionList({
                     <Tag value={meta.label} severity={meta.severity} />
                     <small>
                       {h.status === "expired" && `Ran until ${longDate(h.lastDay)}`}
-                      {h.status === "cancelled" && h.startsAt && `Ended ${when(h.endedAt)}${h.endedBy ? ` by ${h.endedBy}` : ""}`}
+                      {h.status === "cancelled" && h.startsAt && (
+                        <>
+                          Ended {when(h.endedAt)}
+                          {h.endedBy && (
+                            <>
+                              {" by "}
+                              <PersonLink id={h.endedById} name={h.endedBy} />
+                            </>
+                          )}
+                        </>
+                      )}
                       {h.status === "cancelled" && !h.startsAt && "Withdrawn before it was reviewed"}
                       {h.status === "declined" && (h.decisionNote ? `“${h.decisionNote}”` : `Declined ${when(h.decidedAt)}`)}
                     </small>

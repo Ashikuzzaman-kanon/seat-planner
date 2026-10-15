@@ -5,6 +5,7 @@ import DataTable from "@/components/ui/DataTable";
 import When from "@/components/ui/When";
 import { Column } from "primereact/column";
 import { Tag } from "primereact/tag";
+import PersonLink from "@/components/people/PersonLink";
 import Select from "@/components/ui/Select";
 import { Checkbox } from "primereact/checkbox";
 import { Button } from "primereact/button";
@@ -49,6 +50,11 @@ const ACTION_SEVERITY = {
   "subscription.device_update": "info",
   "subscription.check": "success",
   "subscription.device_delete": "danger",
+  "subscription.version_policy": "warning",
+  "subscription.version_block": "danger",
+  "subscription.version_unblock": "info",
+  "account.restrict": "danger",
+  "account.unrestrict": "success",
 };
 
 /**
@@ -105,7 +111,7 @@ export default function AuditPage() {
 
   const actorBody = (row) => (
     <div>
-      <div>{row.actor?.email || "system"}</div>
+      <div>{row.actor?.email ? <PersonLink id={row.actor.id} name={row.actor.email} /> : "system"}</div>
       <div style={{ fontSize: "0.75rem", color: "#9ca3af" }}>
         {(row.actor?.roles || []).join(", ")}
       </div>
@@ -115,7 +121,13 @@ export default function AuditPage() {
   const entityBody = (row) =>
     row.entity?.type ? (
       <div>
-        <div style={{ fontWeight: 500 }}>{row.entity.label || row.entity.id}</div>
+        <div style={{ fontWeight: 500 }}>
+          {row.entity.type === "user" ? (
+            <PersonLink id={row.entity.id} name={row.entity.label || row.entity.id} />
+          ) : (
+            row.entity.label || row.entity.id
+          )}
+        </div>
         <div style={{ fontSize: "0.75rem", color: "#9ca3af" }}>
           {row.entity.type} #{row.entity.id}
         </div>

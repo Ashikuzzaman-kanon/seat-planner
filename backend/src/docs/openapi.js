@@ -148,9 +148,51 @@ module.exports = {
         fullName: str(),
         email: { type: "string", format: "email" },
         isVerified: bool(),
+        restrictedAt: { type: "string", format: "date-time", nullable: true, description: "Set while the account is restricted" },
+        lastSignInAt: { type: "string", format: "date-time", nullable: true, description: "Its last password sign-in or email verification" },
         roles: arr(obj({ id: int(), name: str() })),
         createdAt: { type: "string", format: "date-time" },
         updatedAt: { type: "string", format: "date-time" },
+      }),
+
+      AccountRestriction: obj({
+        id: int(),
+        userId: int(),
+        reason: str("Why it was restricted. Staff only; the account itself is never told it"),
+        restrictedAt: { type: "string", format: "date-time" },
+        restrictedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        liftedAt: { type: "string", format: "date-time", nullable: true },
+        liftedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        liftNote: { ...str(), nullable: true },
+        inForce: bool("Not yet lifted"),
+      }),
+
+      Profile: obj({
+        id: int(),
+        fullName: str(),
+        roles: arr(str("Role name")),
+        isSelf: bool(),
+        limited: bool("True when only the name and roles are sent: the caller is neither the account nor holds user:view"),
+        email: { type: "string", format: "email", description: "From here down, only when not limited" },
+        dateOfBirth: { type: "string", format: "date", nullable: true },
+        nidLast4: { ...str("The last four characters of the national ID; the rest is never sent"), nullable: true },
+        memberSince: { type: "string", format: "date-time" },
+        lastSignInAt: { type: "string", format: "date-time", nullable: true },
+        isVerified: bool(),
+        restriction: { ...ref("AccountRestriction"), nullable: true },
+        signInPausedUntil: { type: "string", format: "date-time", nullable: true },
+        buyingHold: { ...obj({ since: { type: "string", format: "date-time" }, detail: str() }), nullable: true },
+        restrictions: { ...arr(ref("AccountRestriction")), description: "Every restriction, newest first. Only to user:view holders" },
+        can: obj({
+          restrict: bool("The caller may restrict this account now"),
+          lift: bool("The caller may lift its restriction now"),
+          editRoles: bool(),
+        }),
+      }),
+
+      BulkOutcome: obj({
+        results: arr(obj({ userId: int(), done: bool(), error: str("Why this one was left alone") })),
+        done: int("How many were changed"),
       }),
 
       Session: obj({
@@ -584,6 +626,17 @@ module.exports = {
         value: str("What a caller sends as `platform`. Set when it is created and never changed"),
         name: str("What it is called on screen"),
         isActive: bool("Switched off, nobody can ask for devices on it and no check from it is valid"),
+        versionRequired: bool("A check from it must send `version`"),
+        minVersion: { ...str("The oldest app version still accepted"), nullable: true },
+      }),
+
+      BlockedVersion: obj({
+        id: int(),
+        platformId: int(),
+        version: str("Clean: v1.04 is stored as 1.4"),
+        note: { ...str(), nullable: true },
+        createdAt: { type: "string", format: "date-time" },
+        createdBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
       }),
 
       UserDevice: obj({
@@ -597,6 +650,7 @@ module.exports = {
         firstSeenAt: { type: "string", format: "date-time" },
         lastSeenAt: { type: "string", format: "date-time" },
         checks: int("How many times it has checked in"),
+        appVersion: { ...str("The app version it last checked in with"), nullable: true },
       }),
 
       DeviceUsage: obj({
@@ -1290,6 +1344,7 @@ module.exports = {
           queryParam("limit", "Page size, max 100", "integer"),
           queryParam("search", "Matches name or email"),
           queryParam("roleId", "Only users holding this role", "integer"),
+          { ...queryParam("status", "restricted, or active for every account that is not"), schema: { type: "string", enum: ["restricted", "active"] } },
         ],
         responses: {
           200: response(
@@ -1297,6 +1352,83 @@ module.exports = {
             obj({ users: arr(ref("User")), pagination: ref("Pagination") })
           ),
           403: errors[403],
+        },
+      },
+    },
+
+    "/users/restrict": {
+      post: {
+        tags: ["Users"],
+        summary: "Restrict several accounts at once",
+        description:
+          "Each is restricted as if one at a time, under the same guards; one refused does not stop the rest. " +
+          "The answer says which were done and why the others were not.",
+        ...secured("user:restrict"),
+        requestBody: body(obj({ userIds: arr(int()), reason: str() }, ["userIds", "reason"])),
+        responses: { 200: response("What happened to each", ref("BulkOutcome")), 400: errors[400], 403: errors[403] },
+      },
+    },
+
+    "/users/lift-restriction": {
+      post: {
+        tags: ["Users"],
+        summary: "Lift the restriction on several accounts at once",
+        ...secured("user:restrict"),
+        requestBody: body(obj({ userIds: arr(int()), note: str("Optional") }, ["userIds"])),
+        responses: { 200: response("What happened to each", ref("BulkOutcome")), 400: errors[400], 403: errors[403] },
+      },
+    },
+
+    "/users/{id}/profile": {
+      get: {
+        tags: ["Users"],
+        summary: "Someone's profile — what the caller may see of it",
+        description:
+          "Anyone signed in gets the name and roles. The account itself, and whoever holds user:view, gets the " +
+          "rest: email, date of birth, the national ID's last four, when they joined and last signed in, and " +
+          "whether anything stops them. Only user:view holders get the restriction history.",
+        security: [{ bearerAuth: [] }],
+        parameters: [pathParam("id", "User id")],
+        responses: { 200: response("The profile", obj({ profile: ref("Profile") })), 401: errors[401], 404: errors[404] },
+      },
+    },
+
+    "/users/{id}/restrict": {
+      post: {
+        tags: ["Users"],
+        summary: "Restrict an account until someone lifts it",
+        description: [
+          "It is signed out everywhere at once and cannot sign in, refresh a session, verify its email or pass",
+          "the subscription check until the restriction is lifted. Guards: nobody restricts their own account,",
+          "a super admin's account cannot be restricted, and an account holding a permission the caller lacks",
+          "(beyond what every new account gets) can only be restricted by someone who holds it too.",
+        ].join(" "),
+        ...secured("user:restrict"),
+        parameters: [pathParam("id", "User id")],
+        requestBody: body(obj({ reason: str("Up to 500 characters") }, ["reason"])),
+        responses: {
+          201: response("Restricted", obj({ restriction: ref("AccountRestriction") })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+          409: response("Already restricted", ref("Error")),
+        },
+      },
+    },
+
+    "/users/{id}/lift-restriction": {
+      post: {
+        tags: ["Users"],
+        summary: "Lift an account's restriction",
+        description: "Under the same guards as restricting. It can sign in again straight away.",
+        ...secured("user:restrict"),
+        parameters: [pathParam("id", "User id")],
+        requestBody: body(obj({ note: str("Optional, up to 500 characters") }), false),
+        responses: {
+          200: response("Lifted", obj({ lifted: bool() })),
+          403: errors[403],
+          404: errors[404],
+          409: response("Not restricted", ref("Error")),
         },
       },
     },
@@ -2692,7 +2824,11 @@ module.exports = {
           "place is free it takes one, and keeps it; places are held in the order devices arrived. A device " +
           "with no place — the limit is reached, it is blocked, the platform is unknown or switched off, or " +
           "`deviceId` or `platform` is missing or malformed — is answered `valid: false` and nothing else: " +
-          "still a 200, in the same shape, with no reason. Staff can read the reason on the account's devices.",
+          "still a 200, in the same shape, with no reason. Staff can read the reason on the account's devices.\n\n" +
+          "A platform can set rules on the app's `version`, checked before the password: it may require one, set " +
+          "the oldest it accepts, and block single versions. A missing version where one is required, or one that " +
+          "is not numbers and dots, is a 400; a version too old or blocked is a 426 the app can show as it is. A " +
+          "platform without rules ignores `version` except to remember it on the device.",
         requestBody: body(
           obj(
             {
@@ -2703,6 +2839,7 @@ module.exports = {
                   "same one every time; a new id is a new device"
               ),
               platform: str("A platform's value, such as windows or android"),
+              version: str("The app's version, such as 1.4.2: one to four numbers joined by dots, optionally after a v"),
             },
             ["email", "password"]
           )
@@ -2717,7 +2854,8 @@ module.exports = {
           ),
           400: errors[400],
           401: errors[401],
-          403: response("Email not yet verified", ref("Error")),
+          403: response("Email not yet verified, or the account is restricted", ref("Error")),
+          426: response("This version of the app is no longer supported: older than the minimum, or blocked", ref("Error")),
           429: response("Paused after too many wrong passwords; see Retry-After", ref("Error")),
         },
       },
@@ -2982,6 +3120,77 @@ module.exports = {
         ...secured("subscription:manage"),
         parameters: [pathParam("id", "Platform id")],
         responses: { 200: response("Deleted", obj({ deleted: bool() })), 403: errors[403], 404: errors[404], 409: errors[409] },
+      },
+    },
+
+    "/subscriptions/versions": {
+      get: {
+        tags: ["Subscriptions"],
+        summary: "Every platform's version rules, and the versions its devices use",
+        description: "`inUse` is the version each device last checked in with, counted, newest first; null for devices that never said.",
+        ...secured("subscription:versions"),
+        responses: {
+          200: response(
+            "The rules",
+            obj({
+              platforms: arr({
+                allOf: [
+                  ref("SubscriptionPlatform"),
+                  obj({
+                    blocked: arr(ref("BlockedVersion")),
+                    inUse: arr(obj({ version: { ...str(), nullable: true }, devices: int(), lastSeenAt: { type: "string", format: "date-time" } })),
+                  }),
+                ],
+              }),
+            })
+          ),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/subscriptions/platforms/{id}/versions": {
+      patch: {
+        tags: ["Subscriptions"],
+        summary: "Require a version on a platform, or set its minimum",
+        description: "Either or both. An empty or null `minVersion` removes the minimum. A change to what it already is (2 for 2.0) is a 400.",
+        ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Platform id")],
+        requestBody: body(obj({ versionRequired: bool(), minVersion: { ...str(), nullable: true } })),
+        responses: {
+          200: response("Updated", obj({ policy: obj({ versionRequired: bool(), minVersion: { ...str(), nullable: true } }) })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+    },
+
+    "/subscriptions/platforms/{id}/blocked-versions": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Block one version of a platform's app",
+        description: "Checks from it are refused whatever the minimum.",
+        ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Platform id")],
+        requestBody: body(obj({ version: str(), note: str("Optional, up to 200 characters") }, ["version"])),
+        responses: {
+          201: response("Blocked", obj({ blocked: ref("BlockedVersion") })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+          409: response("Already blocked", ref("Error")),
+        },
+      },
+    },
+
+    "/subscriptions/platforms/{id}/blocked-versions/{blockedId}": {
+      delete: {
+        tags: ["Subscriptions"],
+        summary: "Unblock a version",
+        ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Platform id"), pathParam("blockedId", "The blocked version's id")],
+        responses: { 200: response("Unblocked", obj({ unblocked: bool() })), 403: errors[403], 404: errors[404] },
       },
     },
 

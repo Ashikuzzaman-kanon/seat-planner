@@ -40,6 +40,11 @@ const authenticate = asyncHandler(async (req, _res, next) => {
   if (!user.isVerified) {
     throw ApiError.forbidden("Account is not verified");
   }
+  // A 401, not a 403: the app then tries to renew the session, which fails too
+  // (restricting ends every session), and the person lands on the sign-in page.
+  if (user.restrictedAt) {
+    throw ApiError.unauthorized("This account is restricted");
+  }
 
   const access = await getAccess(user.id);
 

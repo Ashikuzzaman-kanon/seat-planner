@@ -660,6 +660,122 @@
   margin-top: 0;
 }
 
+/* ---- App versions ---- */
+
+.sub-versions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.sub-versions__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.sub-versions__rules {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 0.75rem 1.5rem;
+}
+.sub-versions__rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding-top: 1.4rem;
+}
+.sub-versions__rule .p-inputswitch {
+  flex-shrink: 0;
+}
+.sub-versions__rule label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  cursor: pointer;
+}
+.sub-versions__rule strong {
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.sub-versions__rule small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.sub-versions__minimum .sub-field {
+  margin-bottom: 0;
+}
+.sub-versions__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+.sub-versions__section h3 {
+  margin: 0;
+}
+.sub-versions__none {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.sub-versions__blocked,
+.sub-versions__inuse {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sub-versions__blocked li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0.35rem 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--bad-soft);
+}
+.sub-versions__blocked li > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.6rem;
+  min-width: 0;
+}
+.sub-versions__blocked small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.sub-versions__note {
+  color: var(--ink-2);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.sub-versions .sub-code {
+  margin-top: 0;
+}
+.sub-versions__block-form {
+  display: grid;
+  grid-template-columns: minmax(0, 10rem) minmax(0, 1fr) auto;
+  gap: 0.5rem;
+}
+.sub-versions__inuse li {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, auto) 6rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.sub-versions__inuse small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 /* ---- Dialogs ---- */
 
 .sub-dialog {
@@ -764,6 +880,20 @@
   }
   .sub-platform .sub-request__actions {
     justify-content: flex-start;
+  }
+  .sub-versions__rules,
+  .sub-versions__block-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sub-versions__rule {
+    padding-top: 0;
+  }
+  .sub-versions__inuse li {
+    grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr) auto;
+  }
+  .sub-versions__inuse small {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
   /* A device's id is long and unbroken; give it the full width, with what can
      be done to the device underneath. */

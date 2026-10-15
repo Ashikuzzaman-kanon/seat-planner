@@ -142,6 +142,15 @@ const AUDIT_ACTIONS = Object.freeze({
   SUBSCRIPTION_DEVICE_UPDATE: "subscription.device_update",
   SUBSCRIPTION_DEVICE_DELETE: "subscription.device_delete",
 
+  // Which versions of the apps may make a subscription check, per platform.
+  SUBSCRIPTION_VERSION_POLICY: "subscription.version_policy",
+  SUBSCRIPTION_VERSION_BLOCK: "subscription.version_block",
+  SUBSCRIPTION_VERSION_UNBLOCK: "subscription.version_unblock",
+
+  // An account stopped from signing in at all, and that lifted again.
+  ACCOUNT_RESTRICT: "account.restrict",
+  ACCOUNT_UNRESTRICT: "account.unrestrict",
+
   // Sign-in paused on an account after too many wrong passwords in a row.
   AUTH_LOCKED: "auth.locked",
 });
