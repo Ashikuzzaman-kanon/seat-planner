@@ -316,7 +316,7 @@ super admin holds every permission):
 |---|---|
 | `subscription:manage` | Create a subscription, rename it, close it to new requests, reopen it, delete one nobody has asked for. Create the platforms subscriptions are used on, rename them, switch them off |
 | `subscription:approve` | See the requests, approve one for a period and a number of devices, or decline it. Change a running subscription's last day or device counts, cancel anyone's. See an account's devices and why any were turned away; note, block or remove a device |
-| `subscription:versions` | Decide, for each subscription and platform, which versions of the app it accepts: require a version, set the oldest accepted, block single versions |
+| `subscription:versions` (*Manage apps*) | Look after each subscription's app: which versions it accepts on each platform (require a version, set the oldest accepted, block single versions), the link subscribers get it from, and notices to subscribers about a new version or one going away |
 
 Everyone signed in sees the *Subscriptions* page and can ask for one. A
 subscription is valid from approval **through the end of its last day in
@@ -359,6 +359,17 @@ subscribers' devices last checked in with, so a minimum is raised knowing who
 it turns away. A new subscription has no rules: any version, or none, is
 accepted.
 
+**The app's link, and notices about its versions.** On the *Versions* tab a
+subscription gets an **app link** (an https address): subscribers whose
+subscription is running see an **Open the app** button on its card that goes
+there. Under each platform, **Send a notice** tells everyone currently
+subscribed with a device on that platform that a new version is out, or that
+an old one is going away — in the app at once, and by email too if the sender
+ticks *Email them too* (each email a queued job, retried if the mail server
+refuses). The message starts from ready-made words and can be changed. Raising
+the minimum or blocking a version offers a "going away" notice ready-filled.
+Every notice is listed under its platform, with who sent it and to how many.
+
 **Checking from outside the app.** One endpoint takes an email and password,
 and the device the call is made from, and says for every subscription there is
 whether that account's is valid on that device now:
@@ -380,7 +391,20 @@ curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
 }
 ```
 
-- It opens no session and returns no tokens or dates.
+- It returns no dates. With the right password from a named device, it also
+  returns a **sign-in token** for the app:
+
+  ```json
+  { "user": { … }, "subscriptions": [ … ], "token": "spa_…", "tokenExpiresAt": "2026-10-23T09:00:00.000Z" }
+  ```
+
+  The app sends it as `Authorization: Bearer <token>` in place of the email
+  and password — on the check and on seat plans — so it need not keep the
+  password. It lasts a week by default (*Settings → Subscriptions → App sign-in
+  lasts*), is tied to the account and that device, and still needs `version`
+  on each call. Signing in again from the device replaces it; a new password, a
+  restriction, or staff removing or blocking the device end it early. A token
+  that no longer works answers `401` "Sign in again".
 - `deviceId` is the caller's own stable id for the installation — 4 to 128
   letters, digits and `. _ : -` — and `platform` is a platform's value. Send
   the same id every time: a new id is a new device. `version` is the app's
@@ -448,6 +472,8 @@ curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/seat-pla
 }
 ```
 
+- Signed in with the app's token instead, send `Authorization: Bearer <token>`,
+  `version` and `train` — no email or password.
 - `train` is its name or its number (`705`). Leave out `class` and `coach`
   for every coach of the train, front to back. Only approved plans are sent;
   `updatedAt` says when a plan last changed, for caching.

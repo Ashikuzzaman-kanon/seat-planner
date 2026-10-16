@@ -8,6 +8,7 @@ const { PERMISSIONS } = require("../constants/permissions");
 const { loginRules } = require("../validators/authValidators");
 const { SUBSCRIPTION_STATUS } = require("../models/UserSubscription");
 const { MAX_DAYS, isCalendarDate } = require("../utils/subscriptionPeriod");
+const { bearerOf } = require("../services/appTokenService");
 
 /**
  * Subscriptions.
@@ -28,8 +29,22 @@ const { MAX_DAYS, isCalendarDate } = require("../utils/subscriptionPeriod");
  */
 const router = express.Router();
 
-// Before `authenticate`: their callers are outside the app and have no token.
-router.post("/check", loginRules, validate, c.check);
+/**
+ * The email and password are required — unless the call carries the app's
+ * sign-in token (`Authorization: Bearer`) from an earlier check instead.
+ */
+async function signInRules(req, _res, next) {
+  if (bearerOf(req)) return next();
+  try {
+    for (const rule of loginRules) await rule.run(req);
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Before `authenticate`: their callers are outside the app, with no session of the site's.
+router.post("/check", signInRules, validate, c.check);
 
 const SAY = Object.freeze({
   train: "Name the train, or give its number",
@@ -38,7 +53,7 @@ const SAY = Object.freeze({
 });
 router.post(
   "/seat-plans",
-  loginRules,
+  signInRules,
   [
     // One message per field, however it is wrong: missing, not text, or too long.
     body("train").isString().withMessage(SAY.train).bail().trim().isLength({ min: 1, max: 100 }).withMessage(SAY.train),
@@ -170,6 +185,29 @@ router.post(
   ],
   validate,
   c.blockVersion
+);
+// Where the app is got from — the button its subscribers see. Empty clears it.
+router.patch(
+  "/:id/app-link",
+  versionsPermission,
+  [...id, body("appUrl").optional({ values: "null" }).isString().isLength({ max: 500 }).withMessage("appUrl is an https:// address of up to 500 characters")],
+  validate,
+  c.setAppLink
+);
+// Tell the subscribers on a platform about a version: a new one out, or an old one going away.
+router.post(
+  "/:id/versions/:platformId/notices",
+  versionsPermission,
+  [
+    ...id,
+    platformId,
+    body("kind").isIn(["released", "retiring"]).withMessage("kind is released or retiring"),
+    body("version").isString().withMessage("A version such as 1.4.2 is required").bail().isLength({ min: 1, max: 40 }).withMessage("A version such as 1.4.2 is required"),
+    body("message").isString().withMessage("Write the message subscribers will read").bail().trim().isLength({ min: 1, max: 1000 }).withMessage("The message is 1 to 1000 characters"),
+    body("email").optional().isBoolean().withMessage("email is true or false").toBoolean(),
+  ],
+  validate,
+  c.sendNotice
 );
 router.delete(
   "/:id/versions/:platformId/blocked/:blockedId",

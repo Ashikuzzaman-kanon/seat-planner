@@ -150,6 +150,20 @@ jobs.define("notify.departure_cancelled", {
   },
 });
 
+/**
+ * Email one subscriber a notice about their subscription's app. The in-app
+ * notification went out when the notice was sent; this is the email, retried
+ * with backoff if the mail server refuses.
+ */
+jobs.define("notify.app_notice", {
+  priority: 0,
+  describe: "Email one subscriber a notice about a version of their app",
+  handler: async (payload) => {
+    const sent = await notify.appNotice(payload, { strict: true });
+    return sent ? { sent: true } : { sent: false, reason: "no email address on the account" };
+  },
+});
+
 /*
  * Demo data (see services/demoService). Required here, not at the top: the
  * demo service builds on nearly every other service, and nothing above needs it.

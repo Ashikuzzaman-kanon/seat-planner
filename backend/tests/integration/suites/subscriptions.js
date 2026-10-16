@@ -152,7 +152,10 @@ const validOf = (response, code) => response.body?.subscriptions?.find((s) => s.
   check("with every subscription, each only a code and a yes or no",
     before.body.subscriptions.length === 4 && before.body.subscriptions.every((s) => Object.keys(s).sort().join() === "code,valid"),
     JSON.stringify(before.body.subscriptions));
-  check("no dates or times anywhere", !/\d{4}-\d{2}-\d{2}/.test(JSON.stringify(before.body)), JSON.stringify(before.body));
+  // The one date is when the app's own sign-in token runs out — nothing about a subscription.
+  const { tokenExpiresAt, ...rest } = before.body;
+  check("no dates or times about any subscription", !/\d{4}-\d{2}-\d{2}/.test(JSON.stringify(rest)), JSON.stringify(rest));
+  check("only when the app's sign-in token runs out, if one was given", !tokenExpiresAt || "token" in before.body);
   check("a pending request is not valid", validOf(before, "premium") === false);
   check("and nothing is cached", before.headers.get("cache-control") === "no-store");
 

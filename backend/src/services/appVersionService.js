@@ -13,6 +13,7 @@ const { AUDIT_ACTIONS } = require("../constants/auditActions");
 const rules = require("../utils/subscriptionDevices");
 const { VERSION_REFUSAL, cleanVersion, sentAVersion, compareVersions, judgeVersion } = require("../utils/appVersion");
 const audit = require("./auditService");
+const notices = require("./appNoticeService");
 
 /**
  * Which versions of the apps each subscription accepts on the subscription
@@ -120,7 +121,7 @@ const subscribersOf = (subscriptionId) =>
   );
 
 async function subscriptionOr404(id) {
-  const subscription = await Subscription.findByPk(id, { attributes: ["id", "code", "name"] });
+  const subscription = await Subscription.findByPk(id, { attributes: ["id", "code", "name", "appUrl"] });
   if (!subscription) throw ApiError.notFound("No such subscription");
   return subscription;
 }
@@ -136,11 +137,13 @@ const entityOf = (subscription) => ({ type: "subscription", id: subscription.id,
 /**
  * One subscription's rules on every platform, and the versions its
  * subscribers' devices last checked in with — so a minimum is set knowing who
- * it would turn away.
+ * it would turn away. With what the Versions tab needs besides: the app's
+ * link, how many a notice on each platform would reach, the words a notice
+ * starts from, and the notices already sent.
  */
 async function policies(subscriptionId) {
   const subscription = await subscriptionOr404(subscriptionId);
-  const [platforms, held, seen] = await Promise.all([
+  const [platforms, held, seen, reach, sent] = await Promise.all([
     SubscriptionPlatform.findAll({ order: [["id", "ASC"]] }),
     SubscriptionVersionRule.findAll({
       where: { subscriptionId: subscription.id },
@@ -153,14 +156,23 @@ async function policies(subscriptionId) {
       group: ["platformId", "appVersion"],
       raw: true,
     }),
+    notices.reachOf(subscription.id),
+    notices.history(subscription.id),
   ]);
   return {
-    subscription: { id: subscription.id, code: subscription.code, name: subscription.name },
+    subscription: { id: subscription.id, code: subscription.code, name: subscription.name, appUrl: subscription.appUrl },
+    notices: sent,
     platforms: platforms.map((p) => {
       const rule = held.find((r) => r.platformId === p.id);
+      const words = { subscription: subscription.name, platform: p.name, version: "{version}" };
       return {
         ...p.toPublicJSON(),
         ...policyOf(rule),
+        reach: reach[p.id] || 0,
+        noticeTemplates: {
+          released: notices.suggestedMessage(notices.NOTICE_KIND.RELEASED, words),
+          retiring: notices.suggestedMessage(notices.NOTICE_KIND.RETIRING, words),
+        },
         blocked: rule ? rule.blocks.map((b) => b.toPublicJSON()) : [],
         inUse: seen
           .filter((r) => r.platformId === p.id)
@@ -257,4 +269,41 @@ async function unblock(subscriptionId, platformId, blockedId) {
   return { unblocked: true };
 }
 
-module.exports = { MESSAGE, WORDS, gate, refusals, policies, setPolicy, block, unblock };
+/**
+ * Where a subscription's app is got from: the button its subscribers see. A
+ * full https:// address; empty or null clears it.
+ */
+async function setAppLink(subscriptionId, appUrl) {
+  const subscription = await Subscription.findByPk(subscriptionId);
+  if (!subscription) throw ApiError.notFound("No such subscription");
+
+  let next = null;
+  if (appUrl !== undefined && appUrl !== null && String(appUrl).trim() !== "") {
+    let url;
+    try {
+      url = new URL(String(appUrl).trim());
+    } catch {
+      url = null;
+    }
+    if (!url || url.protocol !== "https:" || !url.hostname.includes(".")) {
+      throw ApiError.badRequest("The app link must be a full https:// address, such as https://example.com/app");
+    }
+    next = url.href;
+    if (next.length > 500) throw ApiError.badRequest("The app link is at most 500 characters");
+  }
+  if ((subscription.appUrl || null) === next) throw ApiError.badRequest("Nothing would change — it is already like that");
+
+  const before = subscription.appUrl || null;
+  subscription.appUrl = next;
+  await subscription.save();
+  await audit.record({
+    action: AUDIT_ACTIONS.SUBSCRIPTION_APP_LINK,
+    entity: entityOf(subscription),
+    before: { appUrl: before },
+    after: { appUrl: next },
+    message: next ? `${subscription.name}: app link set to ${next}` : `${subscription.name}: app link removed`,
+  });
+  return { appUrl: next };
+}
+
+module.exports = { MESSAGE, WORDS, gate, refusals, policies, setPolicy, block, unblock, setAppLink };

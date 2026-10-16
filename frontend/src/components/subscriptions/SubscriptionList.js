@@ -221,6 +221,17 @@ export default function SubscriptionList({
               )}
 
               <footer className="sub-card__actions">
+                {mine?.valid && subscription.appUrl && (
+                  <a
+                    className="p-button p-component p-button-sm sub-app-link"
+                    href={subscription.appUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <i className="pi pi-external-link" aria-hidden="true" />
+                    <span>Open the app</span>
+                  </a>
+                )}
                 {!live && subscription.isOpen && (
                   <Button
                     label={mine ? "Subscribe again" : "Subscribe"}

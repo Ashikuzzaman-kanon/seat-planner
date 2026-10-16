@@ -491,6 +491,19 @@ const SETTING_DEFINITIONS = Object.freeze([
     min: 0,
     max: 60,
   },
+  {
+    key: "subscription.app_token_hours",
+    group: "Subscriptions",
+    label: "App sign-in lasts (hours)",
+    description:
+      "After a subscriber's app checks in with the right password, it gets a token to use instead of the " +
+      "password for this many hours. Then it signs in with the password again. A new password, a " +
+      "restriction, or the device being removed or blocked ends it sooner. 168 hours is a week.",
+    type: SETTING_TYPES.INTEGER,
+    default: 168,
+    min: 1,
+    max: 8760,
+  },
 ]);
 
 const DEFINITIONS_BY_KEY = Object.freeze(

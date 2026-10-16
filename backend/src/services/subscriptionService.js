@@ -291,11 +291,16 @@ async function list(userId, { staff = false } = {}) {
   return {
     subscriptions: subscriptions
       .filter((s) => staff || s.isOpen || mine.has(s.id))
-      .map((s) => ({
-        ...s.toPublicJSON(),
-        mine: mine.has(s.id) ? shape(mine.get(s.id).row, platformRows, now) : null,
-        ...(staff ? { counts: counts.get(s.id) || { pending: 0, active: 0 } } : {}),
-      })),
+      .map((s) => {
+        const own = mine.has(s.id) ? shape(mine.get(s.id).row, platformRows, now) : null;
+        return {
+          ...s.toPublicJSON(),
+          // The app's link is for those it is for: whoever is subscribed now, and staff.
+          appUrl: staff || own?.valid ? s.appUrl : null,
+          mine: own,
+          ...(staff ? { counts: counts.get(s.id) || { pending: 0, active: 0 } } : {}),
+        };
+      }),
   };
 }
 
@@ -835,9 +840,11 @@ async function sweep({ now = new Date() } = {}) {
     });
   }
 
-  // While here: forget the turned-away device checks that are too old to matter.
+  // While here: forget the turned-away device checks that are too old to matter,
+  // and app sign-ins that ended a week ago.
   const refusalsPruned = await devices.pruneRefusals(now);
-  return { expired, reminded, refusalsPruned };
+  const appTokensPruned = await require("./appTokenService").prune(now);
+  return { expired, reminded, refusalsPruned, appTokensPruned };
 }
 
 module.exports = {
