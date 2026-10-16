@@ -106,6 +106,7 @@ module.exports = {
     { name: "After the sale", description: "Returning a ticket, moving it to another passenger, and the decisions a person has to make" },
     { name: "Background jobs", description: "Work done after the request that asked for it — mass refunds and the messages about them" },
     { name: "Demo data", description: "Filling the system with demonstration data, and removing exactly that again" },
+    { name: "Seat plans", description: "Coach seat layouts, their approval, and changing one that is already approved" },
     { name: "Railway data", description: "Loading Bangladesh Railway's timetable and the seat plans transcribed for it" },
     { name: "Notifications", description: "Each person's in-app inbox: what happened, and what is waiting on them" },
     {
@@ -580,7 +581,31 @@ module.exports = {
         name: str(),
         description: { ...str(), nullable: true },
         isOpen: bool("Whether it takes new requests. Closing leaves running subscriptions alone"),
+        includesSeatPlans: bool("Whether its subscribers' apps may fetch seat plans (POST /subscriptions/seat-plans)"),
         createdAt: { type: "string", format: "date-time" },
+      }),
+
+      SeatPlan: obj({
+        id: int(),
+        coachNo: { ...str("The railway's coach letter — KA, KHA, GA… A train has one plan per coach"), nullable: true },
+        status: { type: "string", enum: ["draft", "pending", "approved", "rejected"] },
+        rejectionReason: { ...str(), nullable: true },
+        trainNameId: { ...int(), nullable: true },
+        coachTypeId: { ...int(), nullable: true },
+        coachClassId: { ...int("A class named with the railway's code: S_CHAIR, SNIGDHA, AC_B…"), nullable: true },
+        trainName: { ...obj({ id: int(), name: str() }), nullable: true },
+        coachType: { ...obj({ id: int(), name: str() }), nullable: true },
+        coachClass: { ...obj({ id: int(), name: str() }), nullable: true },
+        layout: { type: "object", description: "The seat grid. Left out of lists" },
+        approvedAt: { type: "string", format: "date-time", nullable: true },
+        revisionOfId: { ...int("Set on an editable copy of an approved plan: the plan it changes"), nullable: true },
+        revision: {
+          ...obj({ id: int(), status: str(), rejectionReason: { ...str(), nullable: true } }),
+          nullable: true,
+          description: "On an approved plan: its editable copy, while one is open",
+        },
+        createdAt: { type: "string", format: "date-time" },
+        updatedAt: { type: "string", format: "date-time" },
       }),
 
       UserSubscription: obj({
@@ -685,7 +710,9 @@ module.exports = {
           fetchedAt: str("When the committed snapshot was taken"),
           trains: int(),
           stations: int(),
-          plans: int("Transcribed layouts"),
+          plans: int("Plans a load makes: one per coach of every line-up, plus the drafts"),
+          coachPlans: int("Coaches the line-ups put on trains, each with a plan of its own"),
+          layouts: int("Transcribed layouts the plans are built from"),
           draftPlans: int("Layouts whose source names no train, saved as drafts"),
           readyTrains: int("Trains a seat-plan source names, made ready for departures"),
         }),
@@ -2866,6 +2893,182 @@ module.exports = {
       },
     },
 
+    "/subscriptions/seat-plans": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "A train's seat plans, for an app signed in as a subscriber",
+        description:
+          "The same sign-in as the check — email, password, deviceId, platform, version — and answered only when " +
+          "the account holds a subscription that includes seat plans and is valid on this device, under that " +
+          "subscription's device limits and version rules. Asking takes a new device's place, as a check does. " +
+          "Answers from any origin, compressed.\n\n" +
+          "Name the train, or give its number; add `class` for one class, `coach` for one coach. Only approved " +
+          "plans are sent, front to back as the train's line-up runs. A refused call says nothing about the device: " +
+          "a 403, unless the app's version is the one thing in the way — then 400 \"A version is required\" or 426 " +
+          "\"This version is no longer supported. Please update.\" Every call is in the audit log as " +
+          "`subscription.seat_plans`.",
+        requestBody: body(
+          obj(
+            {
+              email: str(),
+              password: str(),
+              deviceId: str("As for the check"),
+              platform: str("As for the check"),
+              version: str("As for the check"),
+              train: str("The train's name, such as EKOTA EXPRESS (705), or its number, 705"),
+              class: str("Optional: a class code, such as S_CHAIR"),
+              coach: str("Optional: a coach letter, such as KA"),
+            },
+            ["email", "password", "train"]
+          )
+        ),
+        responses: {
+          200: response(
+            "The plans",
+            obj({
+              train: obj({ name: str(), number: { ...str(), nullable: true } }),
+              coaches: arr(
+                obj({
+                  coach: str("The coach letter"),
+                  class: { ...str(), nullable: true },
+                  type: { ...str(), nullable: true },
+                  planId: int(),
+                  updatedAt: { type: "string", format: "date-time", description: "When the plan last changed; cache by it" },
+                  layout: { type: "object", description: "The seat grid, as stored" },
+                })
+              ),
+            })
+          ),
+          400: response("Missing fields, a version that is not one, or one the subscription requires and none was sent", ref("Error")),
+          401: errors[401],
+          403: response("No subscription that includes seat plans is valid on this device, or the account is restricted", ref("Error")),
+          404: response("No such train, or no plan matches", ref("Error")),
+          426: response("This version of the app is no longer supported by the subscription", ref("Error")),
+          429: response("Paused after too many wrong passwords; see Retry-After", ref("Error")),
+        },
+      },
+    },
+
+    "/plans": {
+      get: {
+        tags: ["Seat plans"],
+        summary: "Seat plans you may see",
+        description:
+          "Holders of plan:create see every plan; everyone else only approved ones. An editable copy of an approved " +
+          "plan is listed too, with `revisionOfId`; `templates=1` leaves copies out.",
+        ...secured("plan:view"),
+        parameters: [
+          queryParam("status", "draft, pending, approved or rejected"),
+          queryParam("search", "Part of a coach number"),
+          queryParam("trainNameId", "One train's plans", "integer"),
+          queryParam("mine", "1 for your own"),
+          queryParam("templates", "1 for plans to start a new one from"),
+        ],
+        responses: { 200: response("Plans, without their layouts", obj({ plans: arr(ref("SeatPlan")) })) },
+      },
+      post: {
+        tags: ["Seat plans"],
+        summary: "Start a plan, as a draft",
+        description: "Anything may be left out of a draft. A train has one plan per coach number: a second is a 409.",
+        ...secured("plan:create"),
+        requestBody: body(obj({
+            coachNo: str("The railway's coach letter: KA, KHA, GA…"),
+            trainNameId: { ...int(), nullable: true },
+            coachTypeId: { ...int(), nullable: true },
+            coachClassId: { ...int(), nullable: true },
+            layout: { type: "object", description: "The seat grid: rows of cells" },
+          })),
+        responses: { 201: response("Created", obj({ plan: ref("SeatPlan") })), 400: errors[400], 409: errors[409] },
+      },
+    },
+
+    "/plans/{id}": {
+      get: {
+        tags: ["Seat plans"],
+        summary: "One plan, with its layout",
+        ...secured("plan:view"),
+        parameters: [pathParam("id", "Plan id")],
+        responses: { 200: response("The plan", obj({ plan: ref("SeatPlan") })), 404: errors[404] },
+      },
+      put: {
+        tags: ["Seat plans"],
+        summary: "Change a plan that is not approved yet",
+        description:
+          "An approved plan is refused with 409: it is changed through an editable copy (POST /plans/{id}/revise), " +
+          "so it keeps being used until the changes are approved.",
+        ...secured("plan:update"),
+        parameters: [pathParam("id", "Plan id")],
+        requestBody: body(obj({
+            coachNo: str("The railway's coach letter: KA, KHA, GA…"),
+            trainNameId: { ...int(), nullable: true },
+            coachTypeId: { ...int(), nullable: true },
+            coachClassId: { ...int(), nullable: true },
+            layout: { type: "object", description: "The seat grid: rows of cells" },
+          })),
+        responses: { 200: response("Saved", obj({ plan: ref("SeatPlan") })), 400: errors[400], 404: errors[404], 409: errors[409] },
+      },
+      delete: {
+        tags: ["Seat plans"],
+        summary: "Delete a plan — or throw a copy's changes away",
+        description: "Deleting a plan deletes its open copy with it.",
+        ...secured("plan:delete"),
+        parameters: [pathParam("id", "Plan id")],
+        responses: { 200: response("Deleted", obj({ message: str() })), 404: errors[404] },
+      },
+    },
+
+    "/plans/{id}/revise": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Open an editable copy of an approved plan",
+        description:
+          "Or the one already open (200). The plan keeps being used — new departures, coaches added on the day — " +
+          "while the copy is drafted and reviewed. Approving the copy puts its content into the plan, under the " +
+          "plan's own id, and removes the copy. Departures already generated keep their seats.",
+        ...secured("plan:update"),
+        parameters: [pathParam("id", "The approved plan's id")],
+        responses: {
+          201: response("Opened", obj({ message: str(), plan: ref("SeatPlan") })),
+          200: response("Already open", obj({ message: str(), plan: ref("SeatPlan") })),
+          400: response("The plan is not approved, or is itself a copy", ref("Error")),
+          404: errors[404],
+        },
+      },
+    },
+
+    "/plans/{id}/submit": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Send a draft or sent-back plan for approval",
+        description: "Someone who may approve plans approves it as they submit it; a copy goes straight into its plan.",
+        ...secured("plan:update"),
+        parameters: [pathParam("id", "Plan id")],
+        responses: { 200: response("Submitted, or approved", obj({ plan: ref("SeatPlan") })), 400: errors[400], 409: errors[409] },
+      },
+    },
+
+    "/plans/{id}/approve": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Approve a plan waiting for it",
+        description: "An editable copy is folded into the plan it changes, and the answer is that plan.",
+        ...secured("plan:approve"),
+        parameters: [pathParam("id", "Plan id")],
+        responses: { 200: response("Approved", obj({ plan: ref("SeatPlan") })), 400: errors[400], 409: errors[409] },
+      },
+    },
+
+    "/plans/{id}/reject": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Send a plan back, with a reason",
+        ...secured("plan:approve"),
+        parameters: [pathParam("id", "Plan id")],
+        requestBody: body(obj({ reason: str() }, ["reason"])),
+        responses: { 200: response("Sent back", obj({ plan: ref("SeatPlan") })), 400: errors[400] },
+      },
+    },
+
     "/subscriptions": {
       get: {
         tags: ["Subscriptions"],
@@ -2902,6 +3105,7 @@ module.exports = {
               name: str(),
               description: str(),
               code: str("Optional; made from the name when left out. Lowercase letters, digits and hyphens"),
+              includesSeatPlans: bool("Optional, false by default"),
             },
             ["name"]
           )
@@ -2934,7 +3138,7 @@ module.exports = {
         description: "Closing declines whatever requests are still waiting. The code never changes.",
         ...secured("subscription:manage"),
         parameters: [pathParam("id", "Subscription id")],
-        requestBody: body(obj({ name: str(), description: str(), isOpen: bool() })),
+        requestBody: body(obj({ name: str(), description: str(), isOpen: bool(), includesSeatPlans: bool() })),
         responses: {
           200: response("Updated", obj({ subscription: ref("Subscription") })),
           400: errors[400],
@@ -3292,9 +3496,9 @@ module.exports = {
         summary: "Load the timetable and seat plans",
         description: [
           "Queues a background job that adds whatever is missing of: every station and train in the snapshot",
-          "with its route, running days and estimated distances; the transcribed seat plans — an approved copy",
-          "for each train a source names, a draft for each source that names none; and coaches, running days",
-          "and per-kilometre fares for the trains that have plans. It never generates departures.",
+          "with its route, running days and estimated distances; an approved seat plan for every coach of every",
+          "train with a line-up, numbered with the coach's letter, and a draft for each source that names no",
+          "train; and coaches, running days and per-kilometre fares for those trains. It never generates departures.",
           "",
           "Anything already there is used as it is. A route is replaced only where the timetable differs, and",
           "never on a train with departures. Refused with 409 while demo data exists.",

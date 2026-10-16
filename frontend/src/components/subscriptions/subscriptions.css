@@ -212,6 +212,27 @@
 .sub-card__closed {
   align-self: flex-start;
 }
+.sub-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+/* A switch with its label and what it means beside it. */
+.sub-switch {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.sub-switch .p-inputswitch {
+  flex-shrink: 0;
+}
+.sub-switch label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  cursor: pointer;
+}
 
 .sub-empty {
   display: flex;

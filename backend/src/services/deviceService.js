@@ -493,4 +493,6 @@ module.exports = {
   removeDevice,
   pruneRefusals,
   REFUSALS_KEPT,
+  REASON,
+  REASON_WORDS,
 };

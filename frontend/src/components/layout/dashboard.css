@@ -496,6 +496,28 @@
   font-style: italic;
 }
 
+/* On a plan being changed through a copy, and on the copy itself. */
+.plan-revision-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  background: var(--brand-50);
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.plan-revision-note > .pi {
+  color: var(--brand-700);
+}
+.plan-revision-note > span {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
 @media (max-width: 640px) {
   .plans-toolbar {
     flex-wrap: wrap;

@@ -1,5 +1,6 @@
 const { Op } = require("sequelize");
 const {
+  sequelize,
   SeatPlan,
   TrainName,
   CoachType,
@@ -29,6 +30,7 @@ const INCLUDES = [
   { model: CoachClass, as: "coachClass" },
   { model: User, as: "createdBy" },
   { model: User, as: "approvedBy" },
+  { model: SeatPlan, as: "revision", attributes: ["id", "status", "rejectionReason"] },
 ];
 
 // Visibility follows permissions, not role names — `permissions` is the Set
@@ -86,6 +88,23 @@ function assertComplete(plan, action) {
 const listInWords = (items) =>
   items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 
+/**
+ * A train has one plan per coach number: EKOTA EXPRESS (705), coach KA. An
+ * editable copy of a plan stands for that plan, so it is not a second one.
+ */
+async function assertCoachFree(plan) {
+  const coachNo = coachNoOrNull(plan.coachNo);
+  if (!plan.trainNameId || !coachNo) return;
+  const self = plan.revisionOfId || plan.id || 0;
+  const other = await SeatPlan.findOne({
+    where: { trainNameId: plan.trainNameId, coachNo, revisionOfId: null, id: { [Op.ne]: self } },
+    include: [{ model: TrainName, as: "trainName", attributes: ["name"] }],
+  });
+  if (other) {
+    throw ApiError.conflict(`${other.trainName?.name || "That train"} already has a seat plan for coach ${coachNo}`);
+  }
+}
+
 async function findPlanOr404(id) {
   const plan = await SeatPlan.findByPk(id, { include: INCLUDES });
   if (!plan) throw ApiError.notFound("Plan not found");
@@ -100,8 +119,10 @@ async function listPlans({ user, permissions, status, search = "", mine, templat
     // Regular users only ever see approved plans.
     where.status = PLAN_STATUS.APPROVED;
   } else if (templates) {
-    // Templates = any approved plan OR the planner's own (any status).
+    // Templates = any approved plan OR the planner's own (any status) — not
+    // an editable copy, which is a plan being changed rather than one to start from.
     where[Op.or] = [{ status: PLAN_STATUS.APPROVED }, { createdById: user.id }];
+    where.revisionOfId = null;
   } else {
     if (status) where.status = status;
     if (mine) where.createdById = user.id;
@@ -141,6 +162,7 @@ async function createPlan({ user, permissions, data }) {
     coachClassId: data.coachClassId ?? null,
   };
   await assertRefsExist(fields);
+  await assertCoachFree(fields);
   const plan = await SeatPlan.create({
     ...fields,
     layout: normalizeLayout(data.layout),
@@ -152,6 +174,11 @@ async function createPlan({ user, permissions, data }) {
 
 async function updatePlan({ user, permissions, id, data }) {
   const plan = await findPlanOr404(id);
+  if (plan.status === PLAN_STATUS.APPROVED) {
+    throw ApiError.conflict(
+      "An approved plan is changed through an editable copy, so it keeps working until the changes are approved. Open one with Edit."
+    );
+  }
 
   const next = {
     trainNameId: data.trainNameId !== undefined ? data.trainNameId : plan.trainNameId,
@@ -165,13 +192,7 @@ async function updatePlan({ user, permissions, id, data }) {
   if (data.coachTypeId !== undefined) plan.coachTypeId = data.coachTypeId;
   if (data.coachClassId !== undefined) plan.coachClassId = data.coachClassId;
   if (data.layout !== undefined) plan.layout = normalizeLayout(data.layout);
-
-  // Editing an already-approved plan sends it back for re-approval.
-  if (plan.status === PLAN_STATUS.APPROVED) {
-    plan.status = PLAN_STATUS.PENDING;
-    plan.approvedById = null;
-    plan.approvedAt = null;
-  }
+  if (data.trainNameId !== undefined || data.coachNo !== undefined) await assertCoachFree(plan);
 
   // A draft or a sent-back plan may be left incomplete; one in the approval
   // queue may not be emptied out from under the reviewer.
@@ -181,6 +202,79 @@ async function updatePlan({ user, permissions, id, data }) {
   return getPlan({ user, permissions, id: plan.id });
 }
 
+/**
+ * Open an editable copy of an approved plan — or the one already open.
+ *
+ * The approved plan keeps being used (new departures, coaches added on the
+ * day) while the copy is drafted and reviewed; approving the copy puts its
+ * content into the plan, under the plan's own id, and the copy goes.
+ */
+async function revise({ user, permissions, id }) {
+  const plan = await findPlanOr404(id);
+  if (plan.revisionOfId) throw ApiError.badRequest("This is already an editable copy of an approved plan");
+  if (plan.status !== PLAN_STATUS.APPROVED) {
+    throw ApiError.badRequest("Only an approved plan is changed through a copy. This one can be edited as it is.");
+  }
+  if (plan.revision) return { plan: await getPlan({ user, permissions, id: plan.revision.id }), opened: false };
+
+  let copy;
+  try {
+    copy = await SeatPlan.create({
+      coachNo: plan.coachNo,
+      trainNameId: plan.trainNameId,
+      coachTypeId: plan.coachTypeId,
+      coachClassId: plan.coachClassId,
+      layout: plan.layout,
+      status: PLAN_STATUS.DRAFT,
+      createdById: user.id,
+      revisionOfId: plan.id,
+    });
+  } catch (err) {
+    // Opened by somebody else a moment ago: that one is the copy.
+    if (err.name !== "SequelizeUniqueConstraintError") throw err;
+    copy = await SeatPlan.findOne({ where: { revisionOfId: plan.id } });
+    return { plan: await getPlan({ user, permissions, id: copy.id }), opened: false };
+  }
+  return { plan: await getPlan({ user, permissions, id: copy.id }), opened: true };
+}
+
+/**
+ * Put a plan into service. A plan of its own is simply approved. An editable
+ * copy is folded into the plan it copies — same id, so every train and
+ * departure that uses the plan keeps pointing at it — and then removed.
+ * Returns the plan now in service.
+ */
+async function putIntoService(plan, approver) {
+  if (!plan.revisionOfId) {
+    plan.status = PLAN_STATUS.APPROVED;
+    plan.approvedById = approver.id;
+    plan.approvedAt = new Date();
+    plan.rejectionReason = null;
+    await plan.save();
+    return plan;
+  }
+
+  await assertCoachFree(plan);
+  return sequelize.transaction(async (transaction) => {
+    const original = await SeatPlan.findByPk(plan.revisionOfId, { transaction, lock: transaction.LOCK.UPDATE });
+    if (!original) throw ApiError.notFound("The plan this copy changes no longer exists");
+    original.set({
+      coachNo: plan.coachNo,
+      trainNameId: plan.trainNameId,
+      coachTypeId: plan.coachTypeId,
+      coachClassId: plan.coachClassId,
+      layout: plan.layout,
+      status: PLAN_STATUS.APPROVED,
+      approvedById: approver.id,
+      approvedAt: new Date(),
+      rejectionReason: null,
+    });
+    await original.save({ transaction });
+    await plan.destroy({ transaction });
+    return original;
+  });
+}
+
 /** Planner submits a draft/rejected plan for approval (admins auto-approve). */
 async function submitPlan({ user, permissions, id }) {
   const plan = await findPlanOr404(id);
@@ -188,32 +282,30 @@ async function submitPlan({ user, permissions, id }) {
     throw ApiError.badRequest("Only draft or rejected plans can be submitted");
   }
   assertComplete(plan, "submitted");
+  await assertCoachFree(plan);
 
   plan.rejectionReason = null;
   if (canApprove(permissions)) {
-    plan.status = PLAN_STATUS.APPROVED;
-    plan.approvedById = user.id;
-    plan.approvedAt = new Date();
-  } else {
-    plan.status = PLAN_STATUS.PENDING;
+    const inService = await putIntoService(plan, user);
+    return getPlan({ user, permissions, id: inService.id });
   }
 
+  plan.status = PLAN_STATUS.PENDING;
   await plan.save();
 
-  if (plan.status === PLAN_STATUS.PENDING) {
-    await inbox.toHolders(
-      PERMISSIONS.PLAN_APPROVE,
-      {
-        type: "plan.submitted",
-        category: inbox.CATEGORY.PLAN,
-        tone: "info",
-        title: `Seat plan waiting for approval — ${planLabel(plan)}`,
-        body: `${user.fullName || user.email} submitted it${plan.coachClass ? ` (${plan.coachClass.name})` : ""}.`,
-        link: "/dashboard/approvals",
-      },
-      { except: [user.id] }
-    );
-  }
+  const changes = Boolean(plan.revisionOfId);
+  await inbox.toHolders(
+    PERMISSIONS.PLAN_APPROVE,
+    {
+      type: "plan.submitted",
+      category: inbox.CATEGORY.PLAN,
+      tone: "info",
+      title: `${changes ? "Changes to a seat plan" : "Seat plan"} waiting for approval — ${planLabel(plan)}`,
+      body: `${user.fullName || user.email} submitted ${changes ? "changes to an approved plan" : "it"}${plan.coachClass ? ` (${plan.coachClass.name})` : ""}.`,
+      link: "/dashboard/approvals",
+    },
+    { except: [user.id] }
+  );
 
   return getPlan({ user, permissions, id: plan.id });
 }
@@ -224,18 +316,18 @@ async function approvePlan({ user, permissions, id }) {
     throw ApiError.badRequest("Only pending plans can be approved");
   }
   assertComplete(plan, "approved");
-  plan.status = PLAN_STATUS.APPROVED;
-  plan.approvedById = user.id;
-  plan.approvedAt = new Date();
-  plan.rejectionReason = null;
-  await plan.save();
+  const changes = Boolean(plan.revisionOfId);
+  const inService = await putIntoService(plan, user);
   await tellAuthor(plan, user, {
     type: "plan.approved",
     tone: "success",
-    title: `Seat plan approved — ${planLabel(plan)}`,
-    body: `Approved by ${user.fullName || user.email}. Coaches built from it now carry its seats on new departures.`,
+    title: `${changes ? "Changes to a seat plan" : "Seat plan"} approved — ${planLabel(plan)}`,
+    body: changes
+      ? `Approved by ${user.fullName || user.email}. The plan now has your changes; new departures carry them, and departures already generated keep their seats.`
+      : `Approved by ${user.fullName || user.email}. Coaches built from it now carry its seats on new departures.`,
+    link: `/dashboard/plans/${inService.id}`,
   });
-  return getPlan({ user, permissions, id: plan.id });
+  return getPlan({ user, permissions, id: inService.id });
 }
 
 async function rejectPlan({ user, permissions, id, reason }) {
@@ -271,6 +363,7 @@ module.exports = {
   getPlan,
   createPlan,
   updatePlan,
+  revise,
   submitPlan,
   approvePlan,
   rejectPlan,

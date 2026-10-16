@@ -55,7 +55,7 @@ const WORDS = Object.freeze({
  * Before the password: let the version through if it is one, or none was
  * sent. Returns it cleaned ("v1.04" → "1.4"), or null when none was sent.
  */
-async function gate(sent, { email } = {}) {
+async function gate(sent, { email, action = AUDIT_ACTIONS.SUBSCRIPTION_CHECK } = {}) {
   if (!sentAVersion(sent.version)) return null;
   const version = cleanVersion(sent.version);
   if (version) return version;
@@ -64,7 +64,7 @@ async function gate(sent, { email } = {}) {
   // password has not been checked, so all that is known is the address typed.
   const typed = String(email || "").toLowerCase().trim() || null;
   await audit.record({
-    action: AUDIT_ACTIONS.SUBSCRIPTION_CHECK,
+    action,
     actor: { id: null, email: typed },
     entity: { type: "user", id: null, label: typed },
     after: {
@@ -74,7 +74,7 @@ async function gate(sent, { email } = {}) {
       reason: VERSION_REFUSAL.INVALID,
     },
     outcome: "failure",
-    message: `subscription check refused before the password was checked: ${WORDS[VERSION_REFUSAL.INVALID]}`,
+    message: `${action === AUDIT_ACTIONS.SUBSCRIPTION_CHECK ? "subscription check" : "seat plans"} refused before the password was checked: ${WORDS[VERSION_REFUSAL.INVALID]}`,
   });
   throw ApiError.badRequest(INVALID);
 }

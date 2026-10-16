@@ -23,6 +23,7 @@ class Subscription extends Model {
       name: this.name,
       description: this.description,
       isOpen: this.isOpen,
+      includesSeatPlans: this.includesSeatPlans,
       createdAt: this.createdAt,
     };
   }
@@ -35,6 +36,11 @@ Subscription.init(
     name: { type: DataTypes.STRING(100), allowNull: false, unique: true },
     description: { type: DataTypes.STRING(500), allowNull: true },
     isOpen: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    /**
+     * Whether holding it lets an app outside fetch seat plans, through
+     * POST /subscriptions/seat-plans with the same sign-in as the check.
+     */
+    includesSeatPlans: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     createdById: { type: DataTypes.INTEGER, allowNull: true },
   },
   { sequelize, modelName: "Subscription", tableName: "subscriptions" }

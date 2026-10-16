@@ -14,7 +14,7 @@ import { confirmDialog, ConfirmDialog } from "primereact/confirmdialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/constants/permissions";
 import { PLAN_STATUS, PLAN_STATUS_LABELS, PLAN_STATUS_SEVERITY } from "@/constants/planStatus";
-import { listPlans, deletePlan, submitPlan } from "@/lib/plans";
+import { listPlans, deletePlan, submitPlan, idToEdit, REVISION_WORDS } from "@/lib/plans";
 
 import { TIP } from "@/components/ui/tip";
 const STATUS_FILTER = [
@@ -67,7 +67,8 @@ export default function PlansPage() {
   const load = useCallback(async (statusValue) => {
     setLoading(true);
     try {
-      setPlans(await listPlans(statusValue ? { status: statusValue } : {}));
+      // An editable copy shows on the plan it changes, not as a second row.
+      setPlans((await listPlans(statusValue ? { status: statusValue } : {})).filter((p) => !p.revisionOfId));
     } catch (err) {
       toast.current?.show({ severity: "error", summary: "Error", detail: err.message });
     } finally {
@@ -132,8 +133,25 @@ export default function PlansPage() {
   };
 
   const statusBody = (row) => (
-    <Tag value={PLAN_STATUS_LABELS[row.status]} severity={PLAN_STATUS_SEVERITY[row.status]} />
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+      <Tag value={PLAN_STATUS_LABELS[row.status]} severity={PLAN_STATUS_SEVERITY[row.status]} />
+      {row.revision && (
+        <Tag
+          value={REVISION_WORDS[row.revision.status] || "Changes open"}
+          severity={row.revision.status === PLAN_STATUS.REJECTED ? "danger" : "info"}
+          icon="pi pi-pencil"
+        />
+      )}
+    </div>
   );
+
+  const edit = async (row) => {
+    try {
+      router.push(`/dashboard/plans/${await idToEdit(row)}/edit`);
+    } catch (err) {
+      toast.current?.show({ severity: "error", summary: "Could not open it for editing", detail: err.message });
+    }
+  };
 
   // A draft may not have these yet; say so rather than leave a gap that looks like a fault.
   const trainBody = (row) =>
@@ -143,13 +161,19 @@ export default function PlansPage() {
   const updatedBody = (row) => <When value={row.updatedAt} />;
 
   const actionBody = (row) => {
-    const editable = [PLAN_STATUS.DRAFT, PLAN_STATUS.PENDING, PLAN_STATUS.REJECTED].includes(row.status);
+    // An approved plan is edited too — through a copy, so it keeps working meanwhile.
+    const editTip =
+      row.status === PLAN_STATUS.APPROVED
+        ? row.revision
+          ? "Open the changes"
+          : "Edit — it keeps being used until your changes are approved"
+        : "Edit";
     const submittable = [PLAN_STATUS.DRAFT, PLAN_STATUS.REJECTED].includes(row.status);
     return (
       <div style={{ display: "flex", gap: "0.25rem", justifyContent: "flex-end" }}>
         <Button aria-label="View" tooltipOptions={TIP} icon="pi pi-eye" rounded text tooltip="View" onClick={() => router.push(`/dashboard/plans/${row.id}`)} />
-        {canUpdate && editable && (
-          <Button aria-label="Edit" tooltipOptions={TIP} icon="pi pi-pencil" rounded text tooltip="Edit" onClick={() => router.push(`/dashboard/plans/${row.id}/edit`)} />
+        {canUpdate && (
+          <Button aria-label={editTip} tooltipOptions={TIP} icon="pi pi-pencil" rounded text tooltip={editTip} onClick={() => edit(row)} />
         )}
         {canUpdate && submittable && (
           <Button aria-label="Submit for approval" tooltipOptions={TIP} icon="pi pi-send" rounded text severity="success" tooltip="Submit for approval" onClick={() => onSubmit(row)} />

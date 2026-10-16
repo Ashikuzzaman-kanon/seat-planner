@@ -41,7 +41,7 @@ const msg = (r) => r.body?.error?.message || r.body?.message || JSON.stringify(r
   check("and say whether they sell standing at all",
     classes.every((c) => typeof c.sellsStanding === "boolean"));
 
-  const target = classes.find((c) => c.name === "Shovon Chair");
+  const target = classes.find((c) => c.name === "S_CHAIR");
   const original = target.standingCapacity;
   console.log(`  ${target.name}: ${original} per coach`);
 

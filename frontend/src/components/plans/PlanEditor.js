@@ -11,7 +11,7 @@ import { Toast } from "primereact/toast";
 import { ProgressSpinner } from "primereact/progressspinner";
 import SeatGrid from "./SeatGrid";
 import { fetchAllReferences } from "@/lib/reference";
-import { listPlans, getPlan, createPlan, updatePlan, submitPlan } from "@/lib/plans";
+import { listPlans, getPlan, createPlan, updatePlan, submitPlan, deletePlan, revisePlan } from "@/lib/plans";
 import * as L from "@/lib/layout";
 
 const refOptions = (items) => items.map((i) => ({ label: i.name, value: i.id }));
@@ -30,6 +30,8 @@ export default function PlanEditor({ planId }) {
   const [meta, setMeta] = useState({ coachNo: "", trainNameId: null, coachTypeId: null, coachClassId: null });
   const [layout, setLayout] = useState(() => L.createEmptyLayout());
   const [selected, setSelected] = useState(null); // { rowIdx, cellIdx }
+  // Set when this is an editable copy of an approved plan: the plan's id.
+  const [revisionOf, setRevisionOf] = useState(null);
 
   // Initial load: references, (edit) plan, (new) template options.
   useEffect(() => {
@@ -42,7 +44,13 @@ export default function PlanEditor({ planId }) {
         setRefs(r);
         setTemplates(tpls);
         if (isEdit) {
-          const plan = await getPlan(planId);
+          let plan = await getPlan(planId);
+          // An approved plan is never edited in place: go to its copy.
+          if (plan.status === "approved" && !plan.revisionOfId) {
+            plan = await revisePlan(plan.id);
+            router.replace(`/dashboard/plans/${plan.id}/edit`);
+          }
+          setRevisionOf(plan.revisionOfId || null);
           setMeta({
             coachNo: plan.coachNo || "",
             trainNameId: plan.trainNameId,
@@ -57,7 +65,7 @@ export default function PlanEditor({ planId }) {
         setLoading(false);
       }
     })();
-  }, [isEdit, planId]);
+  }, [isEdit, planId, router]);
 
   const applyTemplate = useCallback(async (id) => {
     setTemplateId(id);
@@ -142,9 +150,14 @@ export default function PlanEditor({ planId }) {
     try {
       const plan = await persist();
       if (thenSubmit) {
-        await submitPlan(plan.id);
-        toast.current?.show({ severity: "success", summary: "Saved & submitted" });
-        router.push("/dashboard/plans");
+        const after = await submitPlan(plan.id);
+        // An approver's changes go straight into the plan.
+        const applied = revisionOf && after.id === revisionOf;
+        toast.current?.show({
+          severity: "success",
+          summary: applied ? "Approved — the plan now has your changes" : "Saved & submitted",
+        });
+        router.push(applied ? `/dashboard/plans/${after.id}` : "/dashboard/plans");
       } else {
         toast.current?.show({ severity: "success", summary: "Saved as draft" });
         if (!isEdit) router.replace(`/dashboard/plans/${plan.id}/edit`);
@@ -152,6 +165,18 @@ export default function PlanEditor({ planId }) {
     } catch (e) {
       toast.current?.show({ severity: "error", summary: "Save failed", detail: e.message });
     } finally {
+      setSaving(false);
+    }
+  };
+
+  const discard = async () => {
+    setSaving(true);
+    try {
+      await deletePlan(planId);
+      toast.current?.show({ severity: "info", summary: "Changes thrown away" });
+      router.push(`/dashboard/plans/${revisionOf}`);
+    } catch (e) {
+      toast.current?.show({ severity: "error", summary: "Could not throw them away", detail: e.message });
       setSaving(false);
     }
   };
@@ -173,12 +198,17 @@ export default function PlanEditor({ planId }) {
 
       <div className="page-head">
         <div>
-          <h1 className="page-title">{isEdit ? "Edit Seat Plan" : "New Seat Plan"}</h1>
+          <h1 className="page-title">{revisionOf ? "Change Seat Plan" : isEdit ? "Edit Seat Plan" : "New Seat Plan"}</h1>
           <p className="page-subtitle">
-            A draft saves with anything still unknown. Submitting needs a train, coach type, class and coach number.
+            {revisionOf
+              ? "These are changes to an approved plan. It keeps being used as it is until they are approved."
+              : "A draft saves with anything still unknown. Submitting needs a train, coach type, class and coach number."}
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          {revisionOf && (
+            <Button label="Throw changes away" icon="pi pi-trash" severity="danger" text disabled={saving} onClick={discard} />
+          )}
           <Button label="Save draft" icon="pi pi-save" outlined loading={saving} onClick={() => save(false)} />
           <Button label="Save & submit" icon="pi pi-send" loading={saving} onClick={() => save(true)} />
         </div>

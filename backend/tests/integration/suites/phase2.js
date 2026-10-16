@@ -142,7 +142,7 @@ const login = async (email, password) =>
   console.log("\n== fare rule chain ==");
   const classes = (await call("GET", "/reference/coach-classes", { token: suToken })).body;
   const classList = classes?.items || classes?.coachClasses || classes?.data || [];
-  const shovonChair = classList.find?.((c) => c.name === "Shovon Chair");
+  const shovonChair = classList.find?.((c) => c.name === "S_CHAIR");
 
   const quote = async (from, to, coachClassId = shovonChair?.id) =>
     call("GET", `/fares/quote?trainId=${madhumati.id}&coachClassId=${coachClassId}&fromStationId=${byCode[from].id}&toStationId=${byCode[to].id}`,

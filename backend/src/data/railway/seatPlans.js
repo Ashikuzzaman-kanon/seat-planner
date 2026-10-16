@@ -15,8 +15,9 @@
  * `seats` is the count the source shows; building a layout fails if the rows
  * do not produce exactly that many, which is what catches a mis-read number.
  *
- * `trains` lists the train numbers a source names. Each of those trains gets
- * its own approved copy of the plan. A source that names no train — only a
+ * `trains` lists the train numbers a source names. Each coach of those trains
+ * (RAKES, below) gets an approved plan of its own built from the layout,
+ * numbered with the coach's letter. A source that names no train — only a
  * route, or nothing — has an empty list: its plan is saved once as a draft
  * with no train, for a person to assign. Coach type and class are filled in
  * only where the source states them (or, for a gauge, where the route leaves
@@ -41,7 +42,7 @@ const LAYOUTS = [
     key: "vacuum-shovon-104",
     coachNo: "SHOVON-104",
     coachType: "Vacuum Coach",
-    coachClass: "Shovon",
+    coachClass: "SHOVAN",
     seats: 104,
     splitRow: 11,
     source:
@@ -81,7 +82,7 @@ const LAYOUTS = [
     key: "madhumati-chair-41",
     coachNo: "S_CHAIR-41",
     coachType: "Vacuum Coach",
-    coachClass: "Shovon Chair",
+    coachClass: "S_CHAIR",
     seats: 41,
     splitRow: 5,
     source:
@@ -106,7 +107,7 @@ const LAYOUTS = [
     key: "madhumati-cabin-24",
     coachNo: "CABIN-24",
     coachType: "Vacuum Coach",
-    coachClass: "Non-AC Cabin",
+    coachClass: "F_BERTH",
     seats: 24,
     source: "755/756 Madhumati Express — cabin section of the cabin-fitted Shovon Chair coach, three cabins.",
     trains: [755, 756],
@@ -127,7 +128,7 @@ const LAYOUTS = [
     key: "titumir-cabin-24",
     coachNo: "CABIN-24",
     coachType: "Vacuum Coach",
-    coachClass: "Non-AC Cabin",
+    coachClass: "F_BERTH",
     seats: 24,
     source:
       "Titumir Express (Rajshahi–Chilahati) cabin door plates — seats by day, berths by night: berths 1–2 " +
@@ -156,7 +157,7 @@ const LAYOUTS = [
     key: "mg-ac-chair-55",
     coachNo: "AC_CHAIR-55",
     coachType: "Meter Gauge (MG)",
-    coachClass: "AC Chair",
+    coachClass: "AC_CHAIR",
     from: "Dhaka",
     seats: 55,
     splitRow: 8,
@@ -189,7 +190,7 @@ const LAYOUTS = [
     key: "lhb-board-ac-cabin-48",
     coachNo: "AC_CABIN-48",
     coachType: "Broad Gauge (BG)",
-    coachClass: "AC Cabin",
+    coachClass: "AC_B",
     seats: 48,
     source:
       "Station board for Silk City (754), Padma (760) and Dhumketu (770): coaches KA, KHA, GA — 48 AC " +
@@ -232,7 +233,7 @@ const LAYOUTS = [
     key: "lhb-board-snigdha-78",
     coachNo: "SNIGDHA-78",
     coachType: "Broad Gauge (BG)",
-    coachClass: "Snigdha",
+    coachClass: "SNIGDHA",
     seats: 78,
     splitRow: 8,
     source:
@@ -264,7 +265,7 @@ const LAYOUTS = [
     key: "lhb-board-shovon-chair-105",
     coachNo: "S_CHAIR-105",
     coachType: "Broad Gauge (BG)",
-    coachClass: "Shovon Chair",
+    coachClass: "S_CHAIR",
     seats: 105,
     splitRow: 11,
     source:
@@ -301,7 +302,7 @@ const LAYOUTS = [
     key: "ekota-ac-chair-80",
     coachNo: "AC_CHAIR-80",
     coachType: "PT Inka Red-Green (BG)",
-    coachClass: "AC Chair",
+    coachClass: "AC_CHAIR",
     from: "Dinajpur",
     to: "Dhaka",
     seats: 80,
@@ -333,7 +334,7 @@ const LAYOUTS = [
     key: "ekota-cabin-48",
     coachNo: "CABIN-48",
     coachType: "PT Inka Red-Green (BG)",
-    coachClass: "Non-AC Cabin",
+    coachClass: "F_BERTH",
     from: "Dhaka",
     to: "Dinajpur",
     seats: 48,
@@ -368,7 +369,7 @@ const LAYOUTS = [
     key: "ekota-shovon-chair-92",
     coachNo: "S_CHAIR-92",
     coachType: "PT Inka Red-Green (BG)",
-    coachClass: "Shovon Chair",
+    coachClass: "S_CHAIR",
     from: "Dinajpur",
     to: "Dhaka",
     seats: 92,
@@ -404,7 +405,7 @@ const LAYOUTS = [
     key: "sundarban-shovon-chair-92",
     coachNo: "S_CHAIR-92",
     coachType: "Broad Gauge (BG)",
-    coachClass: "Shovon Chair",
+    coachClass: "S_CHAIR",
     from: "Khulna",
     to: "Dhaka",
     seats: 92,
@@ -440,7 +441,7 @@ const LAYOUTS = [
     key: "sundarban-snigdha-80",
     coachNo: "SNIGDHA-80",
     coachType: "Broad Gauge (BG)",
-    coachClass: "Snigdha",
+    coachClass: "SNIGDHA",
     from: "Khulna",
     to: "Dhaka",
     seats: 80,
@@ -472,7 +473,7 @@ const LAYOUTS = [
     key: "rupsha-shovon-chair-92",
     coachNo: "S_CHAIR-92",
     coachType: "Broad Gauge (BG)",
-    coachClass: "Shovon Chair",
+    coachClass: "S_CHAIR",
     seats: 92,
     splitRow: 10,
     source:
@@ -509,7 +510,7 @@ const LAYOUTS = [
     key: "ptinka-mg-snigdha-55",
     coachNo: "PTINKA-MG-SNIGDHA-55",
     coachType: "Indonesian PT Inka MG",
-    coachClass: "Snigdha",
+    coachClass: "SNIGDHA",
     from: "Lalmonirhat / Kaunia / Chattogram / Sylhet / Mymensingh",
     to: "Dhaka / Rangpur",
     seats: 55,
@@ -543,7 +544,7 @@ const LAYOUTS = [
     key: "ptinka-mg-shovon-chair-60",
     coachNo: "PTINKA-MG-S_CHAIR-60",
     coachType: "Indonesian PT Inka MG",
-    coachClass: "Shovon Chair",
+    coachClass: "S_CHAIR",
     from: "Lalmonirhat / Kaunia / Chattogram / Sylhet / Mymensingh",
     to: "Dhaka / Rangpur",
     seats: 60,
@@ -576,7 +577,7 @@ const LAYOUTS = [
     key: "mg-white-redgreen-ac-55",
     coachNo: "MG-AC_CHAIR-55",
     coachType: "MG (White / Red-Green)",
-    coachClass: "AC Chair",
+    coachClass: "AC_CHAIR",
     from: "Mymensingh / Sylhet / Kaunia / Chattogram",
     to: "Dhaka / Rangpur",
     seats: 55,
@@ -607,7 +608,7 @@ const LAYOUTS = [
     key: "mg-ac-cabin-33",
     coachNo: "MG-AC_CABIN-33",
     coachType: "PT Inka MG (Red-Green / White)",
-    coachClass: "AC Cabin",
+    coachClass: "AC_B",
     from: "Mymensingh / Sylhet / Kaunia / Chattogram",
     to: "Dhaka / Rangpur",
     seats: 33,
@@ -720,7 +721,7 @@ const LAYOUTS = [
     key: "lhb-ac-chair-78",
     coachNo: "LHB-AC_CHAIR-78",
     coachType: "LHB",
-    coachClass: "AC Chair",
+    coachClass: "AC_CHAIR",
     from: "Rajshahi / Khulna",
     to: "Dhaka",
     seats: 78,
@@ -801,9 +802,10 @@ const RAKE_SEATS = Object.freeze({ min: 300, max: 400 });
  *
  * A shortened rake of each train's own coaches, every class it has kept, and
  * 300–400 seats in all: each seat of each departure is a database row, and the
- * production database is a free tier. A coach is a pointer to a plan, so two
- * Shovon Chair coaches share one layout. The Silk City / Padma / Dhumketu rake
- * keeps the coach letters its station board gives each class.
+ * production database is a free tier. Each coach gets a plan of its own,
+ * numbered with its letter; coaches built alike start from the same layout.
+ * The Silk City / Padma / Dhumketu rake keeps the coach letters its station
+ * board gives each class.
  */
 const RAKES = [
   {

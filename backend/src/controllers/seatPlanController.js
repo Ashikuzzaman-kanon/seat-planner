@@ -36,6 +36,12 @@ const updatePlan = asyncHandler(async (req, res) => {
   res.json({ message: "Plan updated", plan });
 });
 
+/** An editable copy of an approved plan: 201 when it was just opened, 200 when it already was. */
+const revise = asyncHandler(async (req, res) => {
+  const { plan, opened } = await seatPlanService.revise({ ...actor(req), id: req.params.id });
+  res.status(opened ? 201 : 200).json({ message: opened ? "Copy opened" : "Copy already open", plan });
+});
+
 const submitPlan = asyncHandler(async (req, res) => {
   const plan = await seatPlanService.submitPlan({ ...actor(req), id: req.params.id });
   res.json({ message: "Plan submitted", plan });
@@ -65,6 +71,7 @@ module.exports = {
   getPlan,
   createPlan,
   updatePlan,
+  revise,
   submitPlan,
   approvePlan,
   rejectPlan,

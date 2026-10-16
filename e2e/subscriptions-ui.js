@@ -200,6 +200,22 @@ const clickLabelled = (page, within, mention, label) =>
   }, NAME);
   check("with its code shown to staff", /^browser-check-/.test(code || ""), code);
 
+  const seatPlanTag = () =>
+    manager.page.evaluate((name) => {
+      const el = [...document.querySelectorAll(".sub-card")].find((c) => c.querySelector("h3")?.textContent === name);
+      return /Includes seat plans/.test(el?.querySelector(".sub-card__tags")?.textContent || "");
+    }, NAME);
+  check("it does not include seat plans to begin with", !(await seatPlanTag()));
+  await clickInCard(manager.page, NAME, "Rename or re-describe");
+  await manager.page.waitForSelector("#sub-seat-plans");
+  await manager.page.evaluate(() => document.querySelector("#sub-seat-plans").click());
+  await clickInDialog(manager.page, "^Save$");
+  await dialogGone(manager.page);
+  check("the editor can include them, and the card says so", Boolean(await waitFor(manager.page, (name) => {
+    const el = [...document.querySelectorAll(".sub-card")].find((c) => c.querySelector("h3")?.textContent === name);
+    return /Includes seat plans/.test(el?.querySelector(".sub-card__tags")?.textContent || "");
+  }, NAME)));
+
   /* ---------------- A passenger asks ---------------- */
   console.log("\n== a passenger asks for it, saying on how many devices ==");
   const passenger = await signedIn(browser, PASSENGER, laptop);
