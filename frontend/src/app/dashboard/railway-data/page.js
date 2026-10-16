@@ -128,8 +128,9 @@ export default function RailwayDataPage() {
               timetable published {date(status?.snapshot.fetchedAt)};
             </li>
             <li>
-              the transcribed seat plans — approved for the {status?.snapshot.readyTrains} trains their sources name,
-              and {status?.snapshot.draftPlans} drafts for sources that name no train;
+              a seat plan of its own for each of the {status?.snapshot.coachPlans} coaches of the{" "}
+              {status?.snapshot.readyTrains} trains the transcribed sources name, numbered with the coach&rsquo;s letter and
+              approved, and {status?.snapshot.draftPlans} drafts for sources that name no train;
             </li>
             <li>coaches, running days and per-kilometre fares for those {status?.snapshot.readyTrains} trains.</li>
           </ul>

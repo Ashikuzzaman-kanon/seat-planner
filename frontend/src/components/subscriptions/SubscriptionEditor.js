@@ -5,6 +5,7 @@ import { Dialog } from "primereact/dialog";
 import { Button } from "primereact/button";
 import { InputText } from "primereact/inputtext";
 import { InputTextarea } from "primereact/inputtextarea";
+import { InputSwitch } from "primereact/inputswitch";
 import { createSubscription, updateSubscription } from "@/lib/subscriptions";
 
 const CODE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -30,6 +31,7 @@ export default function SubscriptionEditor({ subscription, visible, onHide, onSa
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [code, setCode] = useState("");
+  const [seatPlans, setSeatPlans] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -38,6 +40,7 @@ export default function SubscriptionEditor({ subscription, visible, onHide, onSa
     setName(subscription?.name || "");
     setDescription(subscription?.description || "");
     setCode("");
+    setSeatPlans(Boolean(subscription?.includesSeatPlans));
     setError(null);
   }, [visible, subscription]);
 
@@ -50,8 +53,12 @@ export default function SubscriptionEditor({ subscription, visible, onHide, onSa
     setError(null);
     try {
       const saved = editing
-        ? await updateSubscription(subscription.id, { name: cleanName, description: description.trim() || null })
-        : await createSubscription({ name: cleanName, description: description.trim(), code: cleanCode });
+        ? await updateSubscription(subscription.id, {
+            name: cleanName,
+            description: description.trim() || null,
+            includesSeatPlans: seatPlans,
+          })
+        : await createSubscription({ name: cleanName, description: description.trim(), code: cleanCode, includesSeatPlans: seatPlans });
       notify("success", editing ? "Saved" : "Created", `${saved.name} — code ${saved.code}`);
       onSaved(saved);
     } catch (err) {
@@ -127,6 +134,17 @@ export default function SubscriptionEditor({ subscription, visible, onHide, onSa
                 : "How outside callers name this subscription. Left empty, it is made from the name. It cannot be changed later."
               : "Lowercase letters, digits and single hyphens only."}
           </small>
+        </div>
+
+        <div className="sub-field sub-switch">
+          <InputSwitch inputId="sub-seat-plans" checked={seatPlans} onChange={(e) => setSeatPlans(e.value)} />
+          <label htmlFor="sub-seat-plans">
+            <strong>Includes seat plans</strong>
+            <small className="sub-field__hint">
+              Its subscribers&rsquo; apps can fetch the trains&rsquo; seat plans, with the same sign-in, devices and versions as the
+              check.
+            </small>
+          </label>
         </div>
 
         {error && (

@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const compression = require("compression");
 const morgan = require("morgan");
 const env = require("./config/env");
 const { originPolicy } = require("./utils/allowedOrigin");
@@ -22,8 +23,9 @@ const siteCors = cors({
 });
 
 /*
- * The subscription check is called from anywhere — a page on any other site
- * included — so it alone answers every origin.
+ * The subscription check, and the seat plans a subscriber's app fetches, are
+ * called from anywhere — a page on any other site included — so they alone
+ * answer every origin.
  *
  * That is safe to open where the rest of the API is not, because nothing of
  * the browser's own goes with the call: no cookie, no stored token. The
@@ -31,7 +33,7 @@ const siteCors = cors({
  * nothing it was not already given. Credentials mode stays off, and
  * Retry-After is exposed so a page can read how long a pause lasts.
  */
-const OPEN_TO_ANY_ORIGIN = /^\/api(?:\/v1)?\/subscriptions\/check\/?$/;
+const OPEN_TO_ANY_ORIGIN = /^\/api(?:\/v1)?\/subscriptions\/(?:check|seat-plans)\/?$/;
 const openCors = cors({
   origin: "*",
   methods: ["POST"],
@@ -41,6 +43,10 @@ const openCors = cors({
 });
 
 app.use((req, res, next) => (OPEN_TO_ANY_ORIGIN.test(req.path) ? openCors : siteCors)(req, res, next));
+
+// Seat layouts are large and repetitive JSON: a whole train's plans shrink
+// from tens of kilobytes to a few.
+app.use(compression());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

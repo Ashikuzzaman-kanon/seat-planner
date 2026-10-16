@@ -8,6 +8,7 @@ import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { InputTextarea } from "primereact/inputtextarea";
 import { Toast } from "primereact/toast";
+import { Tag } from "primereact/tag";
 import PersonLink from "@/components/people/PersonLink";
 import { confirmDialog, ConfirmDialog } from "primereact/confirmdialog";
 import { useAuth } from "@/contexts/AuthContext";
@@ -107,7 +108,17 @@ export default function ApprovalsPage() {
       <div className="card">
         <DataTable value={plans} loading={loading} dataKey="id" emptyMessage="Nothing awaiting approval" stripedRows paginator rows={10}>
           <Column field="trainName.name" header="Train" body={(r) => r.trainName?.name || "—"} sortable />
-          <Column field="coachNo" header="Coach No" sortable />
+          <Column
+            field="coachNo"
+            header="Coach No"
+            sortable
+            body={(r) => (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.4rem" }}>
+                {r.coachNo || "—"}
+                {r.revisionOfId && <Tag value="Changes to an approved plan" severity="info" icon="pi pi-copy" />}
+              </div>
+            )}
+          />
           <Column header="Type" body={(r) => r.coachType?.name || "—"} />
           <Column header="Class" body={(r) => r.coachClass?.name || "—"} />
           <Column header="Submitted by" body={(r) => (r.createdBy ? <PersonLink id={r.createdBy.id} name={r.createdBy.fullName} /> : "—")} />

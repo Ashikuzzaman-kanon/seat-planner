@@ -16,8 +16,13 @@ export async function fetchMySubscriptions() {
   return data.subscriptions;
 }
 
-export async function createSubscription({ name, description, code }) {
-  const { data } = await api.post("/subscriptions", { name, description: description || null, code: code || undefined });
+export async function createSubscription({ name, description, code, includesSeatPlans = false }) {
+  const { data } = await api.post("/subscriptions", {
+    name,
+    description: description || null,
+    code: code || undefined,
+    includesSeatPlans,
+  });
   return data.subscription;
 }
 

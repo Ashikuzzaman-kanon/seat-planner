@@ -28,8 +28,19 @@ const { MAX_DAYS, isCalendarDate } = require("../utils/subscriptionPeriod");
  */
 const router = express.Router();
 
-// Before `authenticate`: its callers are outside the app and have no token.
+// Before `authenticate`: their callers are outside the app and have no token.
 router.post("/check", loginRules, validate, c.check);
+router.post(
+  "/seat-plans",
+  loginRules,
+  [
+    body("train").isString().trim().isLength({ min: 1, max: 100 }).withMessage("Name the train, or give its number"),
+    body("class").optional({ values: "null" }).isString().isLength({ max: 40 }).withMessage("class is a class code, such as S_CHAIR"),
+    body("coach").optional({ values: "null" }).isString().isLength({ max: 40 }).withMessage("coach is a coach letter, such as KA"),
+  ],
+  validate,
+  c.seatPlans
+);
 
 router.use(authenticate);
 
@@ -77,6 +88,7 @@ router.post(
   [
     body("name").isString().trim().isLength({ min: 1, max: 100 }).withMessage("A name of up to 100 characters is required"),
     text("description", 500),
+    body("includesSeatPlans").optional().isBoolean().withMessage("includesSeatPlans must be true or false").toBoolean(),
     body("code")
       .optional({ values: "falsy" })
       .isLength({ max: 40 })
@@ -233,9 +245,10 @@ router.patch(
     body("name").optional().isString().trim().isLength({ min: 1, max: 100 }).withMessage("A name of up to 100 characters"),
     text("description", 500),
     body("isOpen").optional().isBoolean().withMessage("isOpen must be true or false").toBoolean(),
+    body("includesSeatPlans").optional().isBoolean().withMessage("includesSeatPlans must be true or false").toBoolean(),
     // Not `given`: a description may be sent empty, to clear it.
     body().custom((value) => {
-      if (!["name", "description", "isOpen"].some((key) => value?.[key] !== undefined)) {
+      if (!["name", "description", "isOpen", "includesSeatPlans"].some((key) => value?.[key] !== undefined)) {
         throw new Error("Nothing to change");
       }
       return true;

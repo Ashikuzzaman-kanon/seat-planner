@@ -41,9 +41,10 @@ const settings = require("./settingService");
  *
  * Loading builds, from the committed snapshot (data/railway/timetable.json):
  * every station and train with its route, running days and estimated
- * distances; every transcribed seat plan — an approved copy for each train a
- * source names, a draft for each source that names none; and, for the trains
- * that have plans, a coach line-up, running days and per-kilometre fares, so
+ * distances; a seat plan of its own for every coach of every train with a
+ * line-up, numbered with the coach's letter (KA, KHA…) and approved, and a
+ * draft for each transcribed source that names no train; and, for those
+ * trains, the line-up itself, running days and per-kilometre fares, so
  * departures can be generated and sold.
  *
  * Like the demo data, it fills in what is missing and leaves what is there
@@ -103,6 +104,8 @@ const hours = (minutes) => `${Math.floor(minutes / 60)}:${String(minutes % 60).p
 
 const layoutByKey = new Map(LAYOUTS.map((l) => [l.key, l]));
 const readyNumbers = [...new Set(RAKES.flatMap((r) => r.trains))];
+/** How many coaches the line-ups put on trains — each its own plan. */
+const coachSlots = RAKES.reduce((n, r) => n + r.trains.length * r.coaches.length, 0);
 
 /** "Dhaka" -> "DHA"; "Biman_Bandar" -> "BIMB"; a number on the end when taken. */
 function stationCode(name, taken) {
@@ -249,58 +252,62 @@ async function loadPlans(report, trainIds) {
   };
 
   // Every layout is built — and its seat count checked — before any is saved.
-  const built = LAYOUTS.map((l) => ({ l, layout: buildLayout({ ...l, train: l.key }) }));
+  const layouts = new Map(LAYOUTS.map((l) => [l.key, buildLayout({ ...l, train: l.key })]));
   const planIds = new Map();
 
-  for (const { l, layout } of built) {
-    const coachTypeId = await ref(CoachType, l.coachType);
-    const coachClassId = await ref(CoachClass, l.coachClass);
-
-    if (!l.trains.length) {
-      const existing = await SeatPlan.findOne({ where: { coachNo: l.coachNo, trainNameId: null } });
-      if (existing) {
-        report.plans.existing++;
-        continue;
-      }
-      await SeatPlan.create({
-        coachNo: l.coachNo,
-        trainNameId: null,
-        coachTypeId,
-        coachClassId,
-        layout,
-        status: PLAN_STATUS.DRAFT,
-        createdById: author,
-      });
-      report.plans.drafts++;
+  // A source that names no train: one draft, under the source's own label,
+  // for a person to give a train and a coach.
+  for (const l of LAYOUTS.filter((source) => !source.trains.length)) {
+    const existing = await SeatPlan.findOne({ where: { coachNo: l.coachNo, trainNameId: null, revisionOfId: null } });
+    if (existing) {
+      report.plans.existing++;
       continue;
     }
+    await SeatPlan.create({
+      coachNo: l.coachNo,
+      trainNameId: null,
+      coachTypeId: await ref(CoachType, l.coachType),
+      coachClassId: await ref(CoachClass, l.coachClass),
+      layout: layouts.get(l.key),
+      status: PLAN_STATUS.DRAFT,
+      createdById: author,
+    });
+    report.plans.drafts++;
+  }
 
-    for (const number of l.trains) {
+  // Every coach of every train with a line-up: a plan of its own, numbered
+  // with the coach's letter. Coaches built alike start from the same layout,
+  // and each can be changed on its own afterwards.
+  for (const rake of RAKES) {
+    for (const number of rake.trains) {
       const trainNameId = trainIds.get(number);
-      let plan = await SeatPlan.findOne({ where: { coachNo: l.coachNo, trainNameId } });
-      if (plan) {
-        report.plans.existing++;
-        if (plan.status !== PLAN_STATUS.APPROVED) {
-          report.notes.push(
-            `${prepare().byNumber.get(number).name}: seat plan ${l.coachNo} is ${plan.status}, so its coaches ` +
-              "will have no seats until it is approved."
-          );
+      for (const [coachCode, key] of rake.coaches) {
+        const l = layoutByKey.get(key);
+        let plan = await SeatPlan.findOne({ where: { coachNo: coachCode, trainNameId, revisionOfId: null } });
+        if (plan) {
+          report.plans.existing++;
+          if (plan.status !== PLAN_STATUS.APPROVED) {
+            report.notes.push(
+              `${prepare().byNumber.get(number).name}: the seat plan of coach ${coachCode} is ${plan.status}, so the ` +
+                "coach will have no seats until it is approved."
+            );
+          }
+        } else {
+          plan = await SeatPlan.create({
+            coachNo: coachCode,
+            trainNameId,
+            coachTypeId: await ref(CoachType, l.coachType),
+            coachClassId: await ref(CoachClass, l.coachClass),
+            layout: layouts.get(key),
+            status: PLAN_STATUS.APPROVED,
+            createdById: author,
+            approvedById: author,
+            approvedAt: new Date(),
+          });
+          report.plans.approved++;
         }
-      } else {
-        plan = await SeatPlan.create({
-          coachNo: l.coachNo,
-          trainNameId,
-          coachTypeId,
-          coachClassId,
-          layout,
-          status: PLAN_STATUS.APPROVED,
-          createdById: author,
-          approvedById: author,
-          approvedAt: new Date(),
-        });
-        report.plans.approved++;
+        planIds.set(`${coachCode}:${number}`, plan.id);
       }
-      planIds.set(`${l.key}:${number}`, plan.id);
     }
   }
   return planIds;
@@ -316,7 +323,7 @@ async function loadRakes(report, trainIds, planIds) {
       } else {
         await compositionService.set(
           trainId,
-          rake.coaches.map(([coachCode, key]) => ({ coachCode, seatPlanId: planIds.get(`${key}:${number}`) }))
+          rake.coaches.map(([coachCode]) => ({ coachCode, seatPlanId: planIds.get(`${coachCode}:${number}`) }))
         );
         report.compositions.set++;
       }
@@ -519,13 +526,13 @@ async function status() {
   const ids = loaded.map((t) => t.id);
 
   const draftCoachNos = LAYOUTS.filter((l) => !l.trains.length).map((l) => l.coachNo);
-  const trainCoachNos = [...new Set(LAYOUTS.filter((l) => l.trains.length).map((l) => l.coachNo))];
+  const coachLetters = [...new Set(RAKES.flatMap((r) => r.coaches.map(([letter]) => letter)))];
 
   const [withRoutes, stations, approvedPlans, draftPlans, demoRecords, live, last, ready] = await Promise.all([
     ids.length ? RouteStop.count({ where: { trainId: ids }, distinct: true, col: "trainId" }) : 0,
     Station.count({ where: { name: cities } }),
-    ids.length ? SeatPlan.count({ where: { trainNameId: ids, coachNo: trainCoachNos } }) : 0,
-    SeatPlan.count({ where: { trainNameId: null, coachNo: draftCoachNos } }),
+    ids.length ? SeatPlan.count({ where: { trainNameId: ids, coachNo: coachLetters, status: PLAN_STATUS.APPROVED, revisionOfId: null } }) : 0,
+    SeatPlan.count({ where: { trainNameId: null, coachNo: draftCoachNos, revisionOfId: null } }),
     DemoRecord.count(),
     Job.findOne({ where: { type: JOB_TYPE, status: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING] }, order: [["id", "DESC"]] }),
     Job.findOne({ where: { type: JOB_TYPE, status: FINISHED }, order: [["id", "DESC"]] }),
@@ -538,7 +545,10 @@ async function status() {
       fetchedAt: timetable.fetchedAt,
       trains: trains.length,
       stations: cities.length,
-      plans: LAYOUTS.length,
+      // One plan per coach of every train with a line-up, plus the drafts.
+      plans: coachSlots + draftCoachNos.length,
+      coachPlans: coachSlots,
+      layouts: LAYOUTS.length,
       draftPlans: draftCoachNos.length,
       readyTrains: readyNumbers.length,
     },

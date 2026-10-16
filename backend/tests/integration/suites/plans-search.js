@@ -57,9 +57,9 @@ function filter(rows, search) {
     ["pending", 14],
     ["105", 1],
     ["cabin", 3],
-    // 2, not 1: "Non-AC Cabin" also contains "ac".
-    ["ekota ac", 2],          // two terms, different columns
-    ["AC EKOTA", 2],          // order and case independent
+    // Only the AC_CHAIR coach: Ekota's cabin is F_BERTH, which has no "ac" in it.
+    ["ekota ac", 1],          // two terms, different columns
+    ["AC EKOTA", 1],          // order and case independent
     ["planner", 18],          // matches the author field
     ["zzzz", 0],
   ];

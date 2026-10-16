@@ -4,6 +4,8 @@ const subscriptions = require("../services/subscriptionService");
 const devices = require("../services/deviceService");
 const auth = require("../services/authService");
 const versions = require("../services/appVersionService");
+const feed = require("../services/seatPlanFeedService");
+const { AUDIT_ACTIONS } = require("../constants/auditActions");
 
 const can = (req, permission) => req.permissions.has(permission);
 const reviewer = (req) => can(req, PERMISSIONS.SUBSCRIPTION_APPROVE);
@@ -47,6 +49,21 @@ const check = asyncHandler(async (req, res) => {
 });
 
 // Whoever sets version rules picks from every subscription too, closed ones included.
+/**
+ * A train's seat plans — all of them, one class (`class`), or one coach
+ * (`coach`) — for an app signed in as a subscriber whose subscription
+ * includes seat plans. The same sign-in, device and version rules as `check`
+ * (seatPlanFeedService).
+ */
+const seatPlans = asyncHandler(async (req, res) => {
+  const sent = { deviceId: req.body.deviceId, platform: req.body.platform, version: req.body.version };
+  sent.version = await versions.gate(sent, { email: req.body.email, action: AUDIT_ACTIONS.SUBSCRIPTION_SEAT_PLANS });
+  const user = await auth.checkCredentials(req.body, { purpose: "seat plans", detail: devices.asRecorded(sent) });
+  const answer = await feed.forSubscriber(user, sent, { train: req.body.train, className: req.body.class, coach: req.body.coach });
+  res.set("Cache-Control", "no-store");
+  res.json(answer);
+});
+
 const list = asyncHandler(async (req, res) => {
   res.json(await subscriptions.list(req.user.id, { staff: staff(req) || can(req, PERMISSIONS.SUBSCRIPTION_VERSIONS) }));
 });
@@ -162,6 +179,7 @@ const unblockVersion = asyncHandler(async (req, res) => {
 
 module.exports = {
   check,
+  seatPlans,
   list,
   mine,
   create,

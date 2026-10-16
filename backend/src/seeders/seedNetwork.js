@@ -144,12 +144,12 @@ const ROUTES = [
 
 /** Per-kilometre fallbacks, one per class. These catch every pair no table lists. */
 const DISTANCE_RATES = [
-  ["Shovon", 1.1, 35],
-  ["Shovon Chair", 1.3, 45],
-  ["Non-AC Cabin", 2.0, 100],
-  ["Snigdha", 2.5, 120],
-  ["AC Chair", 2.6, 130],
-  ["AC Cabin", 3.9, 200],
+  ["SHOVAN", 1.1, 35],
+  ["S_CHAIR", 1.3, 45],
+  ["F_BERTH", 2.0, 100],
+  ["SNIGDHA", 2.5, 120],
+  ["AC_CHAIR", 2.6, 130],
+  ["AC_B", 3.9, 200],
 ];
 
 /**
@@ -159,7 +159,7 @@ const DISTANCE_RATES = [
 const PUBLISHED_TABLE = {
   name: "Madhumati — published Shovon Chair fares",
   train: "Madhumati Express",
-  coachClass: "Shovon Chair",
+  coachClass: "S_CHAIR",
   pairs: [
     ["RJS", "ISD", 120],
     ["RJS", "KTC", 210],

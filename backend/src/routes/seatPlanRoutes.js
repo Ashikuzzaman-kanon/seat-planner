@@ -23,6 +23,9 @@ router.post("/", requirePermission(PERMISSIONS.PLAN_CREATE), createPlanRules, va
 router.put("/:id", requirePermission(PERMISSIONS.PLAN_UPDATE), idRule, updatePlanRules, validate, ctrl.updatePlan);
 router.delete("/:id", requirePermission(PERMISSIONS.PLAN_DELETE), idRule, validate, ctrl.deletePlan);
 
+// Change an approved plan: open an editable copy of it (or the one already open).
+router.post("/:id/revise", requirePermission(PERMISSIONS.PLAN_UPDATE), idRule, validate, ctrl.revise);
+
 // Submit a draft/rejected plan for approval.
 router.post("/:id/submit", requirePermission(PERMISSIONS.PLAN_UPDATE), idRule, validate, ctrl.submitPlan);
 

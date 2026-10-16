@@ -50,6 +50,7 @@ const ACTION_SEVERITY = {
   "subscription.device_update": "info",
   "subscription.check": "success",
   "subscription.device_delete": "danger",
+  "subscription.seat_plans": "success",
   "subscription.version_policy": "warning",
   "subscription.version_block": "danger",
   "subscription.version_unblock": "info",
@@ -64,6 +65,7 @@ const ACTION_SEVERITY = {
  */
 const WHEN_IT_FAILED = {
   "subscription.check": { severity: "warning", note: "not valid" },
+  "subscription.seat_plans": { severity: "warning", note: "refused" },
 };
 
 export default function AuditPage() {

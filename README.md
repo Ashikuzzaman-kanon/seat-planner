@@ -70,6 +70,11 @@ defined as data.
   showing who holds each seat and for which stretch; quota holds for specific
   pairs.
 - Seat plans: a grid designer for coach layouts, with an approval workflow.
+  A train has one plan per coach, numbered with the railway's coach letter
+  (KA, KHA, GA…), and classes carry the railway's codes (S_CHAIR, SNIGDHA,
+  AC_B…). An approved plan is changed through an editable copy: the plan
+  keeps being used until the copy is approved, then takes its changes under
+  its own id. Departures already generated keep their seats.
 
 **For administrators**
 - Roles and permissions are data: create roles, grant any of 54 permissions,
@@ -231,7 +236,11 @@ npm run railway:fetch           # refresh the timetable snapshot from the railwa
 
 Loading adds what is missing and never changes what is there. Trains whose seat
 plans are known (50 of them) get coaches, running days and per-kilometre fares,
-ready for departures; diagrams that name no train become draft plans. It never
+ready for departures — and each of their 226 coaches a plan of its own,
+numbered with its letter, in the railway's class codes (AC_B, AC_S, SNIGDHA,
+F_BERTH, F_SEAT, F_CHAIR, S_CHAIR, SHOVAN, SHULOV, AC_CHAIR). Coaches built
+alike start from the same layout, and each can be changed on its own. Diagrams
+that name no train become draft plans. It never
 generates departures — do that on *Departures → Generate…*. It refuses while
 demo data exists, since the demo's stations share names with the real ones.
 Distances are estimated from running times (the timetable publishes none) and
@@ -417,6 +426,40 @@ curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
   also works while the API is awake, but while it sleeps that route answers a
   bare `429` (no JSON body) and does not wake it. A `429` that *does* carry a
   JSON `error` is the pause after wrong passwords.
+
+**Seat plans for subscribers' apps.** A subscription can include seat plans
+(*Includes seat plans* in its editor). An app signed in as one of its
+subscribers fetches a train's plans with the same sign-in as the check, plus
+the train — and, to narrow it, a class or a coach:
+
+```bash
+curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/seat-plans \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"...","deviceId":"458c70e0bd45dc3676dc6d83c5ccec4e","platform":"windows","version":"1.4.2","train":"EKOTA EXPRESS (705)","class":"S_CHAIR"}'
+```
+
+```json
+{
+  "train": { "name": "EKOTA EXPRESS (705)", "number": "705" },
+  "coaches": [
+    { "coach": "GA", "class": "S_CHAIR", "type": "PT Inka Red-Green (BG)", "planId": 41, "updatedAt": "2026-10-16T…", "layout": { "rows": [ … ] } },
+    { "coach": "GHA", "class": "S_CHAIR", "type": "PT Inka Red-Green (BG)", "planId": 42, "updatedAt": "2026-10-16T…", "layout": { "rows": [ … ] } }
+  ]
+}
+```
+
+- `train` is its name or its number (`705`). Leave out `class` and `coach`
+  for every coach of the train, front to back. Only approved plans are sent;
+  `updatedAt` says when a plan last changed, for caching.
+- It answers only when the account holds a subscription that includes seat
+  plans and is valid on this device — that subscription's device limits and
+  version rules apply, and asking takes a new device's place as a check does.
+- Refused, it says nothing about the device: `403`. The exception is the app's
+  version, when that is the only thing in the way: `400` "A version is
+  required", or `426` "This version is no longer supported. Please update."
+  No such train, or no plan matching, is a `404`.
+- Answers come compressed (a whole train is a few kilobytes), from any origin,
+  and every call is in the audit log as `subscription.seat_plans`.
 
 ## Tests
 

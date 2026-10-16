@@ -183,7 +183,12 @@ export default function SubscriptionList({
                 )}
               </header>
 
-              {!subscription.isOpen && <Tag value="Closed to new requests" severity="secondary" className="sub-card__closed" />}
+              {(!subscription.isOpen || subscription.includesSeatPlans) && (
+                <div className="sub-card__tags">
+                  {!subscription.isOpen && <Tag value="Closed to new requests" severity="secondary" className="sub-card__closed" />}
+                  {subscription.includesSeatPlans && <Tag value="Includes seat plans" severity="info" icon="pi pi-th-large" />}
+                </div>
+              )}
 
               {subscription.description && <p className="sub-card__about">{subscription.description}</p>}
 

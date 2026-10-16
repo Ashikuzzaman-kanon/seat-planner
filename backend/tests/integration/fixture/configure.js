@@ -21,7 +21,7 @@ const { loadSettings } = require("../../../src/services/settingService");
 const { todayInDhaka, addDays } = require("../../../src/utils/dhakaTime");
 const money = require("../../../src/utils/money");
 
-const STANDING = { "Shovon Chair": 20 };
+const STANDING = { "S_CHAIR": 20 };
 
 const PROFILES = [
   ["unittest-super1@example.com", "1985000000011", "1985-01-11"],

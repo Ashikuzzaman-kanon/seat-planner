@@ -147,6 +147,9 @@ const AUDIT_ACTIONS = Object.freeze({
   SUBSCRIPTION_VERSION_BLOCK: "subscription.version_block",
   SUBSCRIPTION_VERSION_UNBLOCK: "subscription.version_unblock",
 
+  // An app outside, signed in as a subscriber, asking for seat plans.
+  SUBSCRIPTION_SEAT_PLANS: "subscription.seat_plans",
+
   // An account stopped from signing in at all, and that lifted again.
   ACCOUNT_RESTRICT: "account.restrict",
   ACCOUNT_UNRESTRICT: "account.unrestrict",

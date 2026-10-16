@@ -125,7 +125,7 @@ async function nameTaken(name, exceptId) {
   return Boolean(await Subscription.findOne({ where, attributes: ["id"] }));
 }
 
-async function create({ name, description, code }, actor) {
+async function create({ name, description, code, includesSeatPlans }, actor) {
   const title = clean(name);
   if (!title) throw ApiError.badRequest("A subscription needs a name");
   if (await nameTaken(title)) throw ApiError.conflict("There is already a subscription with that name");
@@ -139,6 +139,7 @@ async function create({ name, description, code }, actor) {
     name: title,
     description: clean(description),
     code: given || (await freeCode(title)),
+    includesSeatPlans: Boolean(includesSeatPlans),
     createdById: actor?.id ?? null,
   });
 
@@ -158,7 +159,7 @@ async function create({ name, description, code }, actor) {
  * a request that can no longer be approved — and leaves running subscriptions
  * alone.
  */
-async function update(id, { name, description, isOpen }, actor) {
+async function update(id, { name, description, isOpen, includesSeatPlans }, actor) {
   const declined = [];
 
   const { before, subscription } = await sequelize.transaction(async (transaction) => {
@@ -175,6 +176,7 @@ async function update(id, { name, description, isOpen }, actor) {
     }
     if (description !== undefined) found.description = clean(description);
     if (isOpen !== undefined) found.isOpen = Boolean(isOpen);
+    if (includesSeatPlans !== undefined) found.includesSeatPlans = Boolean(includesSeatPlans);
     await found.save({ transaction });
 
     if (was.isOpen && !found.isOpen) {
@@ -743,11 +745,7 @@ async function pendingCount() {
  * `noteCheck`) — a device's hundredth check as much as its first.
  */
 async function validityFor(user, sent = {}, now = new Date()) {
-  const [subscriptions, held] = await Promise.all([
-    Subscription.findAll({ attributes: ["id", "code"], order: [["code", "ASC"]] }),
-    UserSubscription.findAll({ where: { userId: user.id, status: STATUS.ACTIVE, expiresAt: { [Op.gt]: now } } }),
-  ]);
-  const verdict = await devices.admit(user, sent, held, now);
+  const { subscriptions, verdict } = await standingOn(user, sent, now);
   const onVersion = {};
   const answer = subscriptions.map((s) => {
     const refusal = verdict.versionRefused.get(s.id);
@@ -757,6 +755,21 @@ async function validityFor(user, sent = {}, now = new Date()) {
   });
   await devices.noteCheck(user, sent, verdict, answer.filter((a) => a.valid).map((a) => a.code), onVersion);
   return answer;
+}
+
+/**
+ * What an account holds on the device a call came from, right now: every
+ * subscription there is, the account's running ones (`held`), and the
+ * device's verdict (deviceService `admit` — which may give a new device a
+ * place). The check and the seat-plan feed both decide from this, so they can
+ * never disagree about what is valid.
+ */
+async function standingOn(user, sent = {}, now = new Date()) {
+  const [subscriptions, held] = await Promise.all([
+    Subscription.findAll({ attributes: ["id", "code", "includesSeatPlans"], order: [["code", "ASC"]] }),
+    UserSubscription.findAll({ where: { userId: user.id, status: STATUS.ACTIVE, expiresAt: { [Op.gt]: now } } }),
+  ]);
+  return { subscriptions, held, verdict: await devices.admit(user, sent, held, now) };
 }
 
 /* ------------------------------------------------------------------ *
@@ -841,5 +854,6 @@ module.exports = {
   mine,
   pendingCount,
   validityFor,
+  standingOn,
   sweep,
 };
