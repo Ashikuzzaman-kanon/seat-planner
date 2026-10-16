@@ -30,13 +30,20 @@ const router = express.Router();
 
 // Before `authenticate`: their callers are outside the app and have no token.
 router.post("/check", loginRules, validate, c.check);
+
+const SAY = Object.freeze({
+  train: "Name the train, or give its number",
+  class: "class is a class code, such as S_CHAIR",
+  coach: "coach is a coach letter, such as KA",
+});
 router.post(
   "/seat-plans",
   loginRules,
   [
-    body("train").isString().trim().isLength({ min: 1, max: 100 }).withMessage("Name the train, or give its number"),
-    body("class").optional({ values: "null" }).isString().isLength({ max: 40 }).withMessage("class is a class code, such as S_CHAIR"),
-    body("coach").optional({ values: "null" }).isString().isLength({ max: 40 }).withMessage("coach is a coach letter, such as KA"),
+    // One message per field, however it is wrong: missing, not text, or too long.
+    body("train").isString().withMessage(SAY.train).bail().trim().isLength({ min: 1, max: 100 }).withMessage(SAY.train),
+    body("class").optional({ values: "null" }).isString().withMessage(SAY.class).bail().isLength({ max: 40 }).withMessage(SAY.class),
+    body("coach").optional({ values: "null" }).isString().withMessage(SAY.coach).bail().isLength({ max: 40 }).withMessage(SAY.coach),
   ],
   validate,
   c.seatPlans

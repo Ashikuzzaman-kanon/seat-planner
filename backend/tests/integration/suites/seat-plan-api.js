@@ -91,6 +91,9 @@ const NOT_VALID = "No subscription that includes seat plans is valid on this dev
   const unknown = await ask({ train: "No Such Express (0)" });
   check("a train that does not exist is a 404", unknown.status === 404 && message(unknown) === "No such train", say(unknown));
   check("and naming no train is a 400", (await ask({ train: "" })).status === 400);
+  const noTrain = await ask({ train: undefined });
+  check("saying once what is missing", noTrain.status === 400 &&
+    JSON.stringify(noTrain.body?.error?.details) === JSON.stringify([{ field: "train", message: "Name the train, or give its number" }]), say(noTrain));
   const gzip = await call("POST", "/subscriptions/seat-plans", {
     headers: { "Accept-Encoding": "gzip" },
     body: { email: USER, password: PASSWORD, deviceId: "feed-windows-01", platform: "windows", train: train.name },
