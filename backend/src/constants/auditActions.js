@@ -150,6 +150,10 @@ const AUDIT_ACTIONS = Object.freeze({
   // An app outside, signed in as a subscriber, asking for seat plans.
   SUBSCRIPTION_SEAT_PLANS: "subscription.seat_plans",
 
+  // A subscription's app: where it is got from, and notices about its versions.
+  SUBSCRIPTION_APP_LINK: "subscription.app_link",
+  SUBSCRIPTION_APP_NOTICE: "subscription.app_notice",
+
   // An account stopped from signing in at all, and that lifted again.
   ACCOUNT_RESTRICT: "account.restrict",
   ACCOUNT_UNRESTRICT: "account.unrestrict",

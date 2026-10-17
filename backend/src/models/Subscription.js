@@ -24,6 +24,7 @@ class Subscription extends Model {
       description: this.description,
       isOpen: this.isOpen,
       includesSeatPlans: this.includesSeatPlans,
+      appUrl: this.appUrl,
       createdAt: this.createdAt,
     };
   }
@@ -41,6 +42,8 @@ Subscription.init(
      * POST /subscriptions/seat-plans with the same sign-in as the check.
      */
     includesSeatPlans: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    /** Where its app is got from: the button its subscribers see. https only. */
+    appUrl: { type: DataTypes.STRING(500), allowNull: true },
     createdById: { type: DataTypes.INTEGER, allowNull: true },
   },
   { sequelize, modelName: "Subscription", tableName: "subscriptions" }

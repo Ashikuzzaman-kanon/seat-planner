@@ -484,10 +484,11 @@ const PERMISSION_CATALOGUE = Object.freeze([
   {
     key: PERMISSIONS.SUBSCRIPTION_VERSIONS,
     group: "Subscriptions",
-    label: "Manage app versions",
+    label: "Manage apps",
     description:
-      "Decide, per platform, which versions of the apps may use the subscription check: whether a " +
-      "version must be sent, the oldest one still allowed, and single versions to turn away.",
+      "Look after each subscription's app: which versions of it each platform accepts (whether one must be " +
+      "sent, the oldest allowed, single versions turned away), the link subscribers get it from, and notices " +
+      "to subscribers about a new version or one going away.",
   },
 ]);
 

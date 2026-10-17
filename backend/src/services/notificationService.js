@@ -686,7 +686,58 @@ async function waitlistOfferExpired({ userId, entry, stillQueued, offersMade, li
   });
 }
 
+/* ---------------- A subscription's app ---------------- */
+
+/**
+ * A notice about a version of a subscription's app: a new one is out, or an
+ * old one is going away (appNoticeService). Its words are the sender's own;
+ * the email adds a button to the app's link when there is one.
+ */
+function appNoticeMessage({ noticeId, kind, version, message, subscription, platform, appUrl }) {
+  const released = kind === "released";
+  const subject = released
+    ? `${subscription} for ${platform}: version ${version} is out`
+    : `${subscription} for ${platform}: version ${version} is going away`;
+  return {
+    subject,
+    inApp: {
+      type: released ? "subscription.app_released" : "subscription.app_retiring",
+      category: CATEGORY.SUBSCRIPTION,
+      tone: released ? "info" : "warning",
+      title: subject,
+      body: message,
+      link: "/dashboard/subscriptions",
+      key: `app-notice:${noticeId}`,
+    },
+    html: ui.page({
+      subject,
+      preheader: message.slice(0, 140),
+      eyebrow: released ? "A new version" : "A version going away",
+      tone: released ? "brand" : "warning",
+      title: released ? `Version ${version} is out` : `Version ${version} is going away`,
+      intro: `${subscription} — the ${platform} app`,
+      body: ui.paragraph(message) + (appUrl ? ui.button("Get the app", appUrl) : ""),
+    }),
+  };
+}
+
+/**
+ * Tell one subscriber about their app. `inAppOnly` writes the notification
+ * alone — the notice does that for everyone at once; `strict` is for the
+ * queued job that emails it, which retries a mail server that refuses.
+ */
+async function appNotice(details, { inAppOnly = false, strict = false } = {}) {
+  const { subject, html, inApp } = appNoticeMessage(details);
+  if (inAppOnly) {
+    await inbox.tryAdd(details.userId, inApp);
+    return true;
+  }
+  return deliver(details.userId, { subject, html }, { strict });
+}
+
 module.exports = {
+  appNotice,
+  appNoticeMessage,
   rolesChanged,
   rolesChangedMessage,
   ticketReturned,

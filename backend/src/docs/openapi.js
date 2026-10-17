@@ -119,6 +119,13 @@ module.exports = {
   components: {
     securitySchemes: {
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+      appToken: {
+        type: "http",
+        scheme: "bearer",
+        description:
+          "A subscriber's app's sign-in token, from an earlier POST /subscriptions/check with the password: " +
+          "`spa_…`. In place of the email and password, on the check and on seat plans.",
+      },
     },
 
     schemas: {
@@ -582,6 +589,10 @@ module.exports = {
         description: { ...str(), nullable: true },
         isOpen: bool("Whether it takes new requests. Closing leaves running subscriptions alone"),
         includesSeatPlans: bool("Whether its subscribers' apps may fetch seat plans (POST /subscriptions/seat-plans)"),
+        appUrl: {
+          ...str("Where its app is got from — an https address. In the list, sent only to staff and to whoever is subscribed now"),
+          nullable: true,
+        },
         createdAt: { type: "string", format: "date-time" },
       }),
 
@@ -651,6 +662,19 @@ module.exports = {
         value: str("What a caller sends as `platform`. Set when it is created and never changed"),
         name: str("What it is called on screen"),
         isActive: bool("Switched off, nobody can ask for devices on it and no check from it is valid"),
+      }),
+
+      AppNotice: obj({
+        id: int(),
+        subscriptionId: int(),
+        platformId: int(),
+        kind: { type: "string", enum: ["released", "retiring"] },
+        version: str(),
+        message: str(),
+        emailed: bool(),
+        recipients: int("How many it went to"),
+        sentAt: { type: "string", format: "date-time" },
+        sentBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
       }),
 
       BlockedVersion: obj({
@@ -2855,20 +2879,28 @@ module.exports = {
           "place — its entry is `valid: false` with a `message` the app can show (\"A version is required\", or " +
           "\"This version is no longer supported. Please update.\"); the others are answered as usual. A version " +
           "that is not numbers and dots at all is a 400 for the whole call, before the password. A subscription " +
-          "without rules ignores `version`; the device remembers the last one sent.",
+          "without rules ignores `version`; the device remembers the last one sent.\n\n" +
+          "**Signing in.** Answered with the right password from a named device (`deviceId` and `platform` " +
+          "well-formed), the answer also carries `token` and `tokenExpiresAt`. Send the token as " +
+          "`Authorization: Bearer <token>` in place of the email and password, here and on seat plans, until it " +
+          "expires (setting `subscription.app_token_hours`, a week by default). It is tied to the account and the " +
+          "device it was issued for — a call with it uses that device whatever the body says — and `version` " +
+          "is still sent each time. A new sign-in from the same device replaces it; a new password, a restriction, " +
+          "or staff removing or blocking the device end it. A token that no longer works is a 401 \"Sign in " +
+          "again\": sign in with the password once more.",
+        security: [{}, { appToken: [] }],
         requestBody: body(
           obj(
             {
-              email: str(),
-              password: str(),
+              email: str("Required unless the call carries the app's token"),
+              password: str("Required unless the call carries the app's token"),
               deviceId: str(
                 "The caller's own stable id for this installation: 4 to 128 letters, digits and . _ : -. Send the " +
-                  "same one every time; a new id is a new device"
+                  "same one every time; a new id is a new device. Ignored with a token: the token's device is used"
               ),
               platform: str("A platform's value, such as windows or android"),
               version: str("The app's version, such as 1.4.2: one to four numbers joined by dots, optionally after a v"),
-            },
-            ["email", "password"]
+            }
           )
         ),
         responses: {
@@ -2883,10 +2915,12 @@ module.exports = {
                   message: str("Only when this subscription turns the app's version away, and nothing else stood in the way"),
                 })
               ),
+              token: str("Only when signed in with the password from a named device: the app's sign-in token"),
+              tokenExpiresAt: { type: "string", format: "date-time", description: "When the token stops working" },
             })
           ),
           400: response("Missing email or password, or a version that is not numbers and dots", ref("Error")),
-          401: errors[401],
+          401: response("Wrong password or unknown email (\"Invalid credentials\"), or a token that no longer works (\"Sign in again\")", ref("Error")),
           403: response("Email not yet verified, or the account is restricted", ref("Error")),
           429: response("Paused after too many wrong passwords; see Retry-After", ref("Error")),
         },
@@ -2898,7 +2932,8 @@ module.exports = {
         tags: ["Subscriptions"],
         summary: "A train's seat plans, for an app signed in as a subscriber",
         description:
-          "The same sign-in as the check — email, password, deviceId, platform, version — and answered only when " +
+          "The same sign-in as the check — email, password, deviceId, platform, version, or the app's token from " +
+          "the check as `Authorization: Bearer` with `version` — and answered only when " +
           "the account holds a subscription that includes seat plans and is valid on this device, under that " +
           "subscription's device limits and version rules. Asking takes a new device's place, as a check does. " +
           "Answers from any origin, compressed.\n\n" +
@@ -2919,9 +2954,10 @@ module.exports = {
               class: str("Optional: a class code, such as S_CHAIR"),
               coach: str("Optional: a coach letter, such as KA"),
             },
-            ["email", "password", "train"]
+            ["train"]
           )
         ),
+        security: [{}, { appToken: [] }],
         responses: {
           200: response(
             "The plans",
@@ -2940,7 +2976,7 @@ module.exports = {
             })
           ),
           400: response("Missing fields, a version that is not one, or one the subscription requires and none was sent", ref("Error")),
-          401: errors[401],
+          401: response("Wrong password or unknown email, or a token that no longer works (\"Sign in again\")", ref("Error")),
           403: response("No subscription that includes seat plans is valid on this device, or the account is restricted", ref("Error")),
           404: response("No such train, or no plan matches", ref("Error")),
           426: response("This version of the app is no longer supported by the subscription", ref("Error")),
@@ -3345,12 +3381,18 @@ module.exports = {
           200: response(
             "The rules",
             obj({
-              subscription: obj({ id: int(), code: str(), name: str() }),
+              subscription: obj({ id: int(), code: str(), name: str(), appUrl: { ...str(), nullable: true } }),
+              notices: arr(ref("AppNotice")),
               platforms: arr({
                 allOf: [
                   ref("SubscriptionPlatform"),
                   obj({
                     blocked: arr(ref("BlockedVersion")),
+                    reach: int("How many current subscribers have a device on this platform — whom a notice would reach"),
+                    noticeTemplates: obj({
+                      released: str("The words a release notice starts from, with {version} to fill in"),
+                      retiring: str("The words a retirement notice starts from"),
+                    }),
                     versionRequired: bool("A check must send `version` to be valid for this subscription"),
                     minVersion: { ...str("The oldest app version this subscription accepts"), nullable: true },
                     inUse: arr(obj({ version: { ...str(), nullable: true }, devices: int(), lastSeenAt: { type: "string", format: "date-time" } })),
@@ -3375,6 +3417,55 @@ module.exports = {
         requestBody: body(obj({ versionRequired: bool(), minVersion: { ...str(), nullable: true } })),
         responses: {
           200: response("Updated", obj({ policy: obj({ versionRequired: bool(), minVersion: { ...str(), nullable: true } }) })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+    },
+
+    "/subscriptions/{id}/app-link": {
+      patch: {
+        tags: ["Subscriptions"],
+        summary: "Set where a subscription's app is got from",
+        description:
+          "A full https:// address; empty or null removes it. Subscribers whose subscription is running get a button " +
+          "that goes there. Setting it to what it already is, is a 400.",
+        ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Subscription id")],
+        requestBody: body(obj({ appUrl: { ...str(), nullable: true } })),
+        responses: {
+          200: response("Saved", obj({ appUrl: { ...str(), nullable: true } })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+    },
+
+    "/subscriptions/{id}/versions/{platformId}/notices": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Tell a platform's subscribers about a version of the app",
+        description:
+          "To everyone currently subscribed with a device on that platform: in the app at once, and by email too " +
+          "when `email` is true — each email a queued job of its own, retried if the mail server refuses. " +
+          "`released`: a new version is out. `retiring`: an old one is going away. Nobody to tell is a 400.",
+        ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Subscription id"), pathParam("platformId", "Platform id")],
+        requestBody: body(
+          obj(
+            {
+              kind: { type: "string", enum: ["released", "retiring"] },
+              version: str("Such as 2.0.1"),
+              message: str("What subscribers read, up to 1000 characters"),
+              email: bool("Email them too. False by default"),
+            },
+            ["kind", "version", "message"]
+          )
+        ),
+        responses: {
+          201: response("Sent", obj({ notice: ref("AppNotice") })),
           400: errors[400],
           403: errors[403],
           404: errors[404],

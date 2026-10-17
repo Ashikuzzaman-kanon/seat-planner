@@ -6,6 +6,7 @@ const { AUDIT_ACTIONS } = require("../constants/auditActions");
 const rules = require("../utils/subscriptionDevices");
 const audit = require("./auditService");
 const versions = require("./appVersionService");
+const appTokens = require("./appTokenService");
 
 const { REASON } = rules;
 
@@ -52,6 +53,8 @@ const asRecorded = (sent = {}) => ({
   platform: rules.asSent(sent.platform, 40).toLowerCase() || null,
   deviceId: rules.asSent(sent.deviceId, 128) || null,
   version: rules.asSent(sent.version, 40) || null,
+  // How the caller signed in: with the password, or the app's token.
+  ...(sent.via ? { via: sent.via } : {}),
 });
 
 /* ------------------------------------------------------------------ *
@@ -436,6 +439,10 @@ async function updateDevice(id, { note, isBlocked }) {
   if (note !== undefined) device.note = clean(note);
   if (isBlocked !== undefined) device.isBlocked = Boolean(isBlocked);
   await device.save();
+  // A blocked device's app is signed out too.
+  if (!before.isBlocked && device.isBlocked) {
+    await appTokens.revokeForDevice(device.userId, device.deviceId, device.platform?.value);
+  }
 
   await audit.record({
     action: AUDIT_ACTIONS.SUBSCRIPTION_DEVICE_UPDATE,
@@ -459,6 +466,7 @@ async function removeDevice(id) {
   const device = await deviceOr404(id);
   const before = deviceOut(device, { staff: true });
   await device.destroy();
+  await appTokens.revokeForDevice(device.userId, device.deviceId, device.platform?.value);
 
   await audit.record({
     action: AUDIT_ACTIONS.SUBSCRIPTION_DEVICE_DELETE,

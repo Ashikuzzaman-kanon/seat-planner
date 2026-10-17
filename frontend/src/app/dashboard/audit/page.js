@@ -51,6 +51,8 @@ const ACTION_SEVERITY = {
   "subscription.check": "success",
   "subscription.device_delete": "danger",
   "subscription.seat_plans": "success",
+  "subscription.app_link": "info",
+  "subscription.app_notice": "info",
   "subscription.version_policy": "warning",
   "subscription.version_block": "danger",
   "subscription.version_unblock": "info",

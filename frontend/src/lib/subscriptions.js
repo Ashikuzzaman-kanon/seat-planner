@@ -151,6 +151,18 @@ export async function blockVersion(subscriptionId, platformId, { version, note }
   return data.blocked;
 }
 
+/** Where the subscription's app is got from. Empty or null clears it. */
+export async function setAppLink(subscriptionId, appUrl) {
+  const { data } = await api.patch(`/subscriptions/${subscriptionId}/app-link`, { appUrl: appUrl || null });
+  return data.appUrl;
+}
+
+/** Tell the subscribers on a platform about a version: `{ kind, version, message, email }`. */
+export async function sendNotice(subscriptionId, platformId, notice) {
+  const { data } = await api.post(`/subscriptions/${subscriptionId}/versions/${platformId}/notices`, notice);
+  return data.notice;
+}
+
 export async function unblockVersion(subscriptionId, platformId, blockedId) {
   await api.delete(`/subscriptions/${subscriptionId}/versions/${platformId}/blocked/${blockedId}`);
 }

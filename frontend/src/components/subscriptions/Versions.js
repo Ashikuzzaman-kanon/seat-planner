@@ -7,6 +7,7 @@ import { InputText } from "primereact/inputtext";
 import { Tag } from "primereact/tag";
 import { ProgressSpinner } from "primereact/progressspinner";
 import PersonLink from "@/components/people/PersonLink";
+import NoticeForm from "./NoticeForm";
 import Select from "@/components/ui/Select";
 import { tip } from "@/components/ui/tip";
 import {
@@ -14,6 +15,7 @@ import {
   cleanVersion,
   compareVersions,
   fetchVersionPolicies,
+  setAppLink,
   setVersionPolicy,
   unblockVersion,
 } from "@/lib/subscriptions";
@@ -29,6 +31,66 @@ function refusedBy(platform, version) {
   if (platform.minVersion && compareVersions(version, platform.minVersion) < 0) return "Older than the minimum";
   if (platform.blocked.some((b) => compareVersions(b.version, version) === 0)) return "Blocked";
   return null;
+}
+
+/**
+ * Where the subscription's app is got from. Subscribers whose subscription is
+ * running see a button that goes here.
+ */
+function AppLinkField({ subscription, onSaved, notify }) {
+  const saved = subscription.appUrl || "";
+  const [link, setLink] = useState(saved);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setLink(saved), [saved]);
+
+  const typed = link.trim();
+  const looksRight = !typed || /^https:\/\/[^\s/]+\.[^\s]+$/i.test(typed);
+  const changed = typed !== saved;
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const appUrl = await setAppLink(subscription.id, typed);
+      notify("success", appUrl ? "App link saved" : "App link removed", subscription.name);
+      await onSaved();
+    } catch (err) {
+      notify("error", "Could not save the link", err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form
+      className="sub-field sub-versions-pick__link"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (looksRight && changed) save();
+      }}
+    >
+      <label htmlFor="versions-app-link">
+        App link <span className="sub-field__optional">optional</span>
+      </label>
+      <div className="sub-dev__note-form">
+        <InputText
+          id="versions-app-link"
+          type="url"
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+          maxLength={500}
+          placeholder="https://…"
+          className={looksRight ? "" : "p-invalid"}
+          aria-describedby="versions-app-link-hint"
+        />
+        <Button type="submit" label={typed || !saved ? "Save" : "Remove"} size="small" loading={busy} disabled={!looksRight || !changed} />
+      </div>
+      <small id="versions-app-link-hint" className={`sub-field__hint${looksRight ? "" : " is-error"}`}>
+        {looksRight
+          ? "Subscribers whose subscription is running get an Open the app button that goes here."
+          : "A full https:// address, such as https://example.com/app"}
+      </small>
+    </form>
+  );
 }
 
 /**
@@ -90,6 +152,7 @@ export default function Versions({ subscriptions, chosenId, onChoose, notify }) 
           Each subscription has its own rules for each platform. A check is answered subscription by subscription: one that
           turns the app&rsquo;s version away says so on its own entry, and the rest are answered as usual.
         </p>
+        {rules?.subscription && <AppLinkField subscription={rules.subscription} onSaved={load} notify={notify} />}
       </div>
 
       {!rules ? (
@@ -104,7 +167,14 @@ export default function Versions({ subscriptions, chosenId, onChoose, notify }) 
       ) : (
         <ul className="sub-queue">
           {rules.platforms.map((platform) => (
-            <PlatformVersions key={`${chosen.id}-${platform.id}`} subscription={chosen} platform={platform} reload={load} notify={notify} />
+            <PlatformVersions
+              key={`${chosen.id}-${platform.id}`}
+              subscription={chosen}
+              platform={platform}
+              notices={(rules.notices || []).filter((n) => n.platformId === platform.id)}
+              reload={load}
+              notify={notify}
+            />
           ))}
         </ul>
       )}
@@ -112,11 +182,13 @@ export default function Versions({ subscriptions, chosenId, onChoose, notify }) 
   );
 }
 
-function PlatformVersions({ subscription, platform, reload, notify }) {
+function PlatformVersions({ subscription, platform, notices, reload, notify }) {
   const [minimum, setMinimum] = useState(platform.minVersion || "");
   const [version, setVersion] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(null); // "required" | "minimum" | "block" | blocked id
+  // A notice offered after a change that turns older apps away.
+  const [offer, setOffer] = useState(null);
 
   // A reload brings the minimum as saved.
   useEffect(() => setMinimum(platform.minVersion || ""), [platform.minVersion]);
@@ -146,22 +218,35 @@ function PlatformVersions({ subscription, platform, reload, notify }) {
   const typedVersion = version.trim();
   const versionOk = !typedVersion || Boolean(cleanVersion(typedVersion));
 
-  const saveMinimum = () =>
-    run(
+  const saveMinimum = async () => {
+    const raised = cleanMinimum && (!platform.minVersion || compareVersions(cleanMinimum, platform.minVersion) > 0);
+    const done = await run(
       "minimum",
       () => setVersionPolicy(subscription.id, platform.id, { minVersion: typedMinimum || null }),
       typedMinimum ? `Minimum is now ${cleanMinimum}` : "Minimum removed"
     );
+    if (done && raised) {
+      setOffer({
+        kind: "retiring",
+        version: cleanMinimum,
+        message:
+          `Versions of the ${subscription.name} app for ${platform.name} older than ${cleanMinimum} are going away and will ` +
+          "stop working. Please update to the latest version.",
+      });
+    }
+  };
 
   const block = async () => {
+    const blocked = cleanVersion(typedVersion);
     const done = await run(
       "block",
       () => blockVersion(subscription.id, platform.id, { version: typedVersion, note: note.trim() }),
-      `Version ${cleanVersion(typedVersion)} blocked`
+      `Version ${blocked} blocked`
     );
     if (done) {
       setVersion("");
       setNote("");
+      setOffer({ kind: "retiring", version: blocked });
     }
   };
 
@@ -286,6 +371,8 @@ function PlatformVersions({ subscription, platform, reload, notify }) {
           <Button type="submit" label="Block" icon="pi pi-ban" size="small" severity="danger" outlined loading={busy === "block"} disabled={!typedVersion || !versionOk} />
         </form>
       </section>
+
+      <NoticeForm subscription={subscription} platform={platform} notices={notices} offer={offer} onSent={reload} notify={notify} />
 
       <section className="sub-versions__section" aria-label={`Versions of ${platform.name} in use`}>
         <h3 className="sub-request__label">In use by its subscribers</h3>

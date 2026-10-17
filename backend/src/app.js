@@ -37,7 +37,9 @@ const OPEN_TO_ANY_ORIGIN = /^\/api(?:\/v1)?\/subscriptions\/(?:check|seat-plans)
 const openCors = cors({
   origin: "*",
   methods: ["POST"],
-  allowedHeaders: ["Content-Type"],
+  // Authorization carries the app's own sign-in token, which the caller sends
+  // itself — still nothing of the browser's.
+  allowedHeaders: ["Content-Type", "Authorization"],
   exposedHeaders: ["Retry-After"],
   maxAge: 86_400,
 });

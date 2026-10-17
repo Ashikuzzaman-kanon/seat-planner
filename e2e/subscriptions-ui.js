@@ -27,6 +27,7 @@ const NAME = `Browser check ${STAMP}`;
 const DEVICE_A = `browser-check-${STAMP}-a`;
 const DEVICE_B = `browser-check-${STAMP}-b`;
 const PLATFORM = `e2e-${STAMP}`;
+const APP_URL = `https://apps.example.com/browser-check-${STAMP}`;
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail = "") => {
@@ -300,8 +301,10 @@ const clickLabelled = (page, within, mention, label) =>
   check("the first Windows device is valid", first.status === 200 && first.entry?.valid === true, JSON.stringify(first.body));
   const second = await checkFrom(DEVICE_B);
   check("a second is not", second.status === 200 && second.entry?.valid === false, JSON.stringify(second.body));
+  // No reason anywhere: just who, yes or no for each, and the app's sign-in token.
   check("and is told nothing but that",
-    Object.keys(second.body).sort().join() === "subscriptions,user" && second.body.subscriptions.every((s) => Object.keys(s).sort().join() === "code,valid"),
+    Object.keys(second.body).sort().join() === "subscriptions,token,tokenExpiresAt,user" &&
+      second.body.subscriptions.every((s) => Object.keys(s).sort().join() === "code,valid"),
     JSON.stringify(second.body));
 
   await clickLabelled(manager.page, ".sub-table tbody tr", NAME, "Devices");
@@ -441,7 +444,30 @@ const clickLabelled = (page, within, mention, label) =>
   res = await checkFrom(DEVICE_A, "windows", "2.1.0");
   check("which is then refused, however it is written", entryOf(res).message === "This version is no longer supported. Please update.", JSON.stringify(res.body));
   check("while the next one is valid", (await checkFrom(DEVICE_A, "windows", "2.2")).entry?.valid === true);
+
+  /** The notice form under the Windows rules, or null. */
+  const windowsNotice = () =>
+    manager.page.evaluate(() => {
+      const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+      const form = el?.querySelector(".sub-notice");
+      return form ? { version: form.querySelector("input[id^=notice-version]")?.value, message: form.querySelector("textarea")?.value } : null;
+    });
+  const inNotice = (label) =>
+    manager.page.evaluate((label) => {
+      const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+      const button = [...(el?.querySelectorAll(".sub-notice button, .sub-notice__head button") || [])].find((b) => b.textContent.trim().startsWith(label));
+      if (button) button.click();
+      return Boolean(button);
+    }, label);
+  const offered = await waitFor(manager.page, () => {
+    const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+    const form = el?.querySelector(".sub-notice");
+    return form?.querySelector("input[id^=notice-version]")?.value === "2.1";
+  });
+  const filled = await windowsNotice();
+  check("blocking it offers a going-away notice, ready-filled", Boolean(offered) && /going away/.test(filled?.message || ""), JSON.stringify(filled));
   await manager.page.screenshot({ path: path.join(OUT, "subs-5b-versions.png") });
+  await inNotice("Cancel");
 
   await inCard("click", '.sub-versions__blocked button[aria-label^="Unblock"]');
   await savedToast("Version 2.1 unblocked");
@@ -459,12 +485,46 @@ const clickLabelled = (page, within, mention, label) =>
   await savedToast("A version is no longer required");
   check("and the rules can be cleared", (await checkFrom(DEVICE_A, "windows", "")).entry?.valid === true);
 
+  /* ---------------- The app's link, and a notice ---------------- */
+  console.log("\n== the app's link, and a notice to subscribers ==");
+  await manager.page.click("#versions-app-link", { clickCount: 3 });
+  await manager.page.type("#versions-app-link", APP_URL);
+  await manager.page.evaluate(() => document.querySelector(".sub-versions-pick__link button[type=submit]").click());
+  check("an app link can be set", Boolean(await savedToast("App link saved")));
+
+  check("a notice says whom it reaches", /reaches 1 current subscriber with a Windows device/.test(await cardText()), await cardText());
+  await inNotice("Send a notice");
+  await waitFor(manager.page, () => document.querySelector(".sub-notice"));
+  await manager.page.evaluate(() => {
+    const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+    el.querySelector(".sub-notice input[id^=notice-version]").focus();
+  });
+  await manager.page.keyboard.type("3.0");
+  const words = await windowsNotice();
+  check("its words follow the version typed", /3\.0/.test(words?.message || "") && /is out/.test(words?.message || ""), JSON.stringify(words));
+  await inNotice("Send to 1 subscriber");
+  check("it can be sent", Boolean(await savedToast("Sent to 1 subscriber")));
+  check("and is listed under the platform", Boolean(await waitFor(manager.page, () => {
+    const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+    const item = el?.querySelector(".sub-notice__history li");
+    return item && /New version/.test(item.textContent) && /3\.0/.test(item.textContent) && /in the app/.test(item.textContent);
+  })));
+  await manager.page.screenshot({ path: path.join(OUT, "subs-5c-notice.png") });
+  const told = (await api("GET", "/notifications?limit=20", { token: subscriber.accessToken })).body?.notifications || [];
+  check("the subscriber has it in the app", told.some((n) => /version 3\.0 is out/.test(n.title)), JSON.stringify(told.map((n) => n.title).slice(0, 5)));
+
   /* ---------------- The passenger sees it, and cancels ---------------- */
   console.log("\n== the passenger sees it running, and cancels ==");
   await passenger.page.goto(PAGE, { waitUntil: "networkidle0" });
   const active = await card(passenger.page, NAME);
-  check("the card says until when", /^Active until \d{1,2} \w{3} \d{4}$/.test(active?.standing || "") && active.buttons.join() === "Cancel subscription",
+  check("the card says until when", /^Active until \d{1,2} \w{3} \d{4}$/.test(active?.standing || "") && active.buttons.join() === "Open the app,Cancel subscription",
     JSON.stringify(active));
+  check("with a button to the app",
+    (await passenger.page.evaluate((name) => {
+      const el = [...document.querySelectorAll(".sub-card")].find((c) => c.querySelector("h3")?.textContent === name);
+      const link = el?.querySelector("a.sub-app-link");
+      return link ? [link.getAttribute("href"), link.getAttribute("target"), link.getAttribute("rel")].join(" ") : null;
+    }, NAME)) === `${APP_URL} _blank noopener noreferrer`);
   check("and on how many devices", active?.devices === "On 2 Windows, 1 Android", active?.devices);
   const mine = await passenger.page.evaluate(() => {
     const section = document.querySelector("#sub-devices-title")?.closest("section");
