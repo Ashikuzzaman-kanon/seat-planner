@@ -148,7 +148,11 @@ async function policies(subscriptionId) {
     SubscriptionVersionRule.findAll({
       where: { subscriptionId: subscription.id },
       include: [{ ...WITH_BLOCKS, include: [{ model: User, as: "createdBy", attributes: ["id", "fullName"] }] }],
-      order: [[WITH_BLOCKS, "createdAt", "ASC"]],
+      // Oldest first; the id settles two blocked within the same second.
+      order: [
+        [WITH_BLOCKS, "createdAt", "ASC"],
+        [WITH_BLOCKS, "id", "ASC"],
+      ],
     }),
     UserDevice.findAll({
       attributes: ["platformId", "appVersion", [fn("COUNT", col("id")), "devices"], [fn("MAX", col("last_seen_at")), "lastSeenAt"]],
