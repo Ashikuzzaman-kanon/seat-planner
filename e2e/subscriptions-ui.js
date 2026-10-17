@@ -525,6 +525,16 @@ const clickLabelled = (page, within, mention, label) =>
       const link = el?.querySelector("a.sub-app-link");
       return link ? [link.getAttribute("href"), link.getAttribute("target"), link.getAttribute("rel")].join(" ") : null;
     }, NAME)) === `${APP_URL} _blank noopener noreferrer`);
+  const appButton = await passenger.page.evaluate((name) => {
+    const el = [...document.querySelectorAll(".sub-card")].find((c) => c.querySelector("h3")?.textContent === name);
+    const link = el?.querySelector("a.sub-app-link");
+    if (!link) return null;
+    const style = getComputedStyle(link);
+    return { color: style.color, background: style.backgroundColor, text: link.textContent.trim() };
+  }, NAME);
+  check("whose words can be read on it",
+    appButton?.text === "Open the app" && appButton.color === "rgb(255, 255, 255)" && appButton.color !== appButton.background,
+    JSON.stringify(appButton));
   check("and on how many devices", active?.devices === "On 2 Windows, 1 Android", active?.devices);
   const mine = await passenger.page.evaluate(() => {
     const section = document.querySelector("#sub-devices-title")?.closest("section");
