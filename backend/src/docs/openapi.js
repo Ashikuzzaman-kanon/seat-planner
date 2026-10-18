@@ -771,6 +771,70 @@ module.exports = {
         ),
         job: { ...ref("Job"), nullable: true, description: "A load still running" },
         lastJob: { ...ref("Job"), nullable: true, description: "The last load that finished, with its report" },
+        sync: obj({
+          pending: { ...ref("RailwayTimetable"), nullable: true, description: "A check waiting to be applied" },
+          lastApplied: { ...ref("RailwayTimetable"), nullable: true, description: "The timetable the server works from now" },
+          job: { ...ref("Job"), nullable: true, description: "A check or apply still running" },
+          lastJob: { ...ref("Job"), nullable: true, description: "The last check or apply that finished" },
+        }),
+      }),
+
+      RailwayTimetable: obj({
+        id: int(),
+        status: { type: "string", enum: ["checked", "applied"] },
+        requestedFor: { type: "string", format: "date", description: "The day the railway was asked for" },
+        fetchedAt: { type: "string", format: "date-time" },
+        unpublished: arr(int("Train numbers the railway said it has no timetable for")),
+        failed: arr(obj({ number: int(), error: str() })),
+        diff: obj({
+          counts: obj({
+            published: int(),
+            newStations: int(),
+            newTrains: int(),
+            renamed: int(),
+            times: int(),
+            stations: int(),
+            days: int(),
+            unpublished: int(),
+            failed: int(),
+            unchanged: int(),
+          }),
+          upToDate: bool("Nothing to apply"),
+          newStations: arr(str()),
+          newTrains: arr(obj({ number: int(), name: str(), stops: int(), from: str(), to: str(), runsOn: arr(int()) })),
+          renamed: arr(obj({ trainId: int(), number: int(), from: str(), to: str() })),
+          times: arr(obj({ trainId: int(), number: int(), name: str(), stops: arr(obj({ station: str(), from: obj({}), to: obj({}) })) })),
+          stations: arr(
+            obj({
+              trainId: int(),
+              number: int(),
+              name: str(),
+              added: arr(str()),
+              removed: arr(str()),
+              reordered: bool(),
+              newRoute: bool(),
+              upcoming: int("Departures still to run"),
+              willApply: bool("False while departures are still to run: the route is left and named"),
+            })
+          ),
+          days: arr(
+            obj({
+              trainId: int(),
+              number: int(),
+              name: str(),
+              from: arr(int()),
+              to: arr(int()),
+              willApply: bool("False when its running days were set by hand"),
+              stranded: arr(str("Departures already generated on a day it will no longer run")),
+            })
+          ),
+          unpublished: arr(obj({ trainId: int(), number: int(), name: str() })),
+          failed: arr(int()),
+        }),
+        report: { type: "object", nullable: true, description: "What applying did, skipped and why — once applied" },
+        checkedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        appliedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        appliedAt: { type: "string", format: "date-time", nullable: true },
       }),
 
       AccountHold: obj({
@@ -3571,8 +3635,9 @@ module.exports = {
         tags: ["Railway data"],
         summary: "What of the real railway is loaded",
         description:
-          "The committed timetable snapshot, how much of it is loaded, the trains ready for departures with " +
-          "their line-ups and seats, whether departures are generated automatically, and the load in progress.",
+          "The current timetable (the newest applied from the railway, else the one committed with the code), " +
+          "how much of it is loaded, the trains ready for departures with their line-ups and seats, whether " +
+          "departures are generated automatically, the load in progress, and the sync with the railway.",
         ...secured("railway:manage"),
         responses: {
           200: response("Status", ref("RailwayStatus")),
@@ -3599,6 +3664,50 @@ module.exports = {
           202: response("Queued — follow it at /jobs/{id}", obj({ message: str(), job: ref("Job") })),
           403: errors[403],
           409: response("Demo data has to be deleted first", ref("Error")),
+        },
+      },
+    },
+
+    "/railway-data/check": {
+      post: {
+        tags: ["Railway data"],
+        summary: "Check the server against what the railway publishes now",
+        description: [
+          "Queues a background job that asks the railway for every train on its list, for the timetable two days",
+          "ahead, and compares it with the server: new trains and stations, renamed trains, moved times, changed",
+          "stations, changed running days, trains no longer published, and trains it could not fetch. Nothing",
+          "changes; the result waits under `sync.pending` for someone to apply it, and replaces a check never applied.",
+          "",
+          "If the railway does not answer for more than half the trains, the job fails and nothing is kept.",
+          "One railway job at a time: 409 while a load, check or apply runs.",
+        ].join("\n"),
+        ...secured("railway:manage"),
+        responses: {
+          202: response("Queued — follow it at /jobs/{id}", obj({ message: str(), job: ref("Job") })),
+          403: errors[403],
+          409: response("Another railway job is running", ref("Error")),
+        },
+      },
+    },
+
+    "/railway-data/sync/{id}/apply": {
+      post: {
+        tags: ["Railway data"],
+        summary: "Apply a check",
+        description: [
+          "Queues a background job that compares the check again as things are now, then: adds new stations and",
+          "trains with their routes; renames renamed trains; takes moved times on the same stations, even on trains",
+          "with departures, keeping the distances saved; replaces changed stations only on trains with no departures",
+          "still to run (the others are named); and updates running days where they are the single undated schedule",
+          "loading gives, listing departures already generated on a day no longer run. Coaches, seat plans and fares",
+          "are not touched and nothing is deleted. The applied timetable becomes the one Load works from.",
+        ].join("\n"),
+        ...secured("railway:manage"),
+        parameters: [pathParam("id", "The check's id (sync.pending.id)")],
+        responses: {
+          202: response("Queued — follow it at /jobs/{id}", obj({ message: str(), job: ref("Job") })),
+          403: errors[403],
+          409: response("Replaced or already applied, another railway job is running, or demo data is present", ref("Error")),
         },
       },
     },

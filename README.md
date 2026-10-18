@@ -234,6 +234,21 @@ npm run railway:load            # or Administration → Railway Data → Load
 npm run railway:fetch           # refresh the timetable snapshot from the railway (then review the diff)
 ```
 
+**Keeping it current.** *Railway Data → Check with the railway* asks the
+railway for every train's timetable as it is now and lists what differs here —
+new trains and stations, renamed trains, moved times, changed stations,
+changed running days, trains no longer published, trains it could not fetch.
+Nothing changes until **Apply changes**, which compares again and then takes
+new trains and stations, new names, and moved times (even on trains with
+departures, keeping the distances saved, so fares stay put); it replaces
+changed stations only on trains with no departures still to run, and updates
+running days unless they were set by hand, listing departures already made on
+a day the train no longer runs. Nothing is deleted, and coaches, seat plans
+and fares are untouched. The applied timetable is the one **Load** works from
+afterwards. The railway's API is not an official public one: if it stops
+answering, the check says so and nothing changes. (`RAILWAY_SOURCE_URL` points
+it elsewhere; the tests use a stand-in.)
+
 Loading adds what is missing and never changes what is there. Trains whose seat
 plans are known (50 of them) get coaches, running days and per-kilometre fares,
 ready for departures — and each of their 226 coaches a plan of its own,

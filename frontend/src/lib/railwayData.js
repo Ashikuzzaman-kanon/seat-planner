@@ -16,6 +16,18 @@ export async function loadRailway() {
   return data;
 }
 
+/** Ask the railway for its timetable now and compare. A background job: `{ job }`. */
+export async function checkRailway() {
+  const { data } = await api.post("/railway-data/check");
+  return data;
+}
+
+/** Apply a check. A background job: `{ job }`. */
+export async function applyRailwaySync(id) {
+  const { data } = await api.post(`/railway-data/sync/${id}/apply`);
+  return data;
+}
+
 /** "Daily", "Daily except Saturday", or "Sun, Tue, Thu". */
 export function runsOnLabel(days = []) {
   const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
