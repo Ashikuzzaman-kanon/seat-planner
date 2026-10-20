@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/constants/permissions";
 import { followJob } from "@/lib/jobs";
 import { fetchRailwayStatus, loadRailway, runsOnLabel } from "@/lib/railwayData";
+import RailwaySync from "@/components/railway/RailwaySync";
 import "./railway-data.css";
 
 /** Bytes one seat takes on one departure, indexes included — measured on the real tables. */
@@ -33,6 +34,9 @@ const when = (value) =>
  * trains that have plans ready for departures. It says what it will and will
  * not do before anyone presses the button: it fills in what is missing, it
  * never changes what is there, and it never generates departures itself.
+ *
+ * Below it, syncing with the railway checks the server against what the
+ * railway publishes now, and applies what changed after a review.
  */
 export default function RailwayDataPage() {
   const { hasPermission } = useAuth();
@@ -166,7 +170,8 @@ export default function RailwayDataPage() {
   const s = status?.snapshot;
   const l = status?.loaded;
   const complete = Boolean(s && l && l.trains === s.trains && l.withRoutes === s.trains);
-  const busy = Boolean(job) || starting;
+  const syncing = Boolean(status?.sync?.job);
+  const busy = Boolean(job) || starting || syncing;
   const last = status?.lastJob;
   const seatsPerDay = ready.reduce((n, t) => n + t.seats * (t.runsOn.length / 7), 0);
   const generation = status?.generation;
@@ -190,7 +195,8 @@ export default function RailwayDataPage() {
           <h1 className="page-title">Railway Data</h1>
           <p className="page-subtitle">
             Bangladesh Railway&apos;s published timetable, and the seat plans transcribed for its trains. Loading adds
-            what is missing and never changes what is already there.
+            what is missing and never changes what is already there; syncing brings the trains in step with what the
+            railway publishes now.
           </p>
         </div>
       </div>
@@ -204,7 +210,7 @@ export default function RailwayDataPage() {
                 {loading ? "Loading…" : complete ? "The railway is loaded" : l?.trains ? "Partly loaded" : "Not loaded yet"}
               </strong>
               <small>
-                Timetable published {date(s?.fetchedAt)}
+                Timetable of {date(s?.fetchedAt)}{status?.sync?.lastApplied ? ", from the last sync" : ", as it came with the system"}
                 {last ? <> · last loaded {when(last.finishedAt)}{last.status === "failed" ? " (it stopped part-way)" : ""}</> : ""}
               </small>
             </div>
@@ -244,6 +250,8 @@ export default function RailwayDataPage() {
           ))}
         </div>
       </section>
+
+      <RailwaySync sync={status?.sync} otherJobRunning={Boolean(job) || starting} onChanged={refresh} toast={toast} />
 
       {generation && ready.length > 0 && (
         <section className={`card rd-banner ${generation.automatic ? "rd-banner--warn" : "rd-banner--info"}`}>

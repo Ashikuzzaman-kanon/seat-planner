@@ -65,6 +65,10 @@ const testEnv = {
   GMAIL_CLIENT_SECRET: "",
   GMAIL_REFRESH_TOKEN: "",
   EMAIL_OUTBOX: path.join(WORK, "outbox.jsonl"),
+  // No test asks the real railway: the railway-sync suite runs a stand-in here.
+  RAILWAY_SOURCE_URL: "http://127.0.0.1:47329/train-routes",
+  RAILWAY_RETRY_MS: "20",
+  RAILWAY_PAUSE_MS: "0",
 };
 
 if (!/_test$/.test(testEnv.DB_NAME)) {

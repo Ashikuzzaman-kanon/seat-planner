@@ -14,7 +14,9 @@ const {
   Role,
   DemoRecord,
   Job,
+  RailwayTimetable,
 } = require("../models");
+const { TIMETABLE_STATUS } = require("../models/RailwayTimetable");
 const { JOB_STATUS, FINISHED } = require("../models/Job");
 const { PLAN_STATUS } = require("../constants/planStatus");
 const { RESERVED_ROLES } = require("../constants/roles");
@@ -26,7 +28,8 @@ const { countSeats } = require("../utils/seatMaterializer");
 const { buildLayout } = require("../seeders/importSeatPlans");
 const { DISTANCE_RATES } = require("../seeders/seedNetwork");
 const { LAYOUTS, RAKES } = require("../data/railway/seatPlans");
-const timetable = require("../data/railway/timetable.json");
+/** The snapshot committed with the code — the timetable until one is applied from the railway. */
+const COMMITTED = require("../data/railway/timetable.json");
 const trainService = require("./trainService");
 const compositionService = require("./compositionService");
 const scheduleService = require("./scheduleService");
@@ -39,7 +42,9 @@ const settings = require("./settingService");
  * The real railway: Bangladesh Railway's published timetable, and the seat
  * plans transcribed for its trains.
  *
- * Loading builds, from the committed snapshot (data/railway/timetable.json):
+ * Loading builds, from the current timetable — the newest one applied from the
+ * railway (railwaySyncService), else the snapshot committed with the code
+ * (data/railway/timetable.json):
  * every station and train with its route, running days and estimated
  * distances; a seat plan of its own for every coach of every train with a
  * line-up, numbered with the coach's letter (KA, KHA…) and approved, and a
@@ -73,9 +78,10 @@ const DEMO_FIRST =
 
 let prepared = null;
 
-/** The timetable as route stops, with distances — worked out once per process. */
-function prepare() {
-  if (prepared) return prepared;
+/** The timetable as route stops, with distances — worked out once per timetable. */
+function prepare(timetable = COMMITTED) {
+  const key = `${timetable.fetchedAt}|${timetable.trains.length}`;
+  if (prepared?.key === key) return prepared;
 
   const trains = timetable.trains.map((t) => ({ ...t, ...buildStops(t.routes) }));
   const fastest = fastestSegments(trains.map((t) => t.stops));
@@ -96,8 +102,18 @@ function prepare() {
   }
 
   const cities = [...new Set(trains.flatMap((t) => t.stops.map((s) => s.city)))];
-  prepared = { trains, cities, byNumber: new Map(trains.map((t) => [t.number, t])) };
+  prepared = { key, timetable, trains, cities, byNumber: new Map(trains.map((t) => [t.number, t])) };
   return prepared;
+}
+
+/**
+ * The timetable this server works from: the newest one applied from the
+ * railway, else the snapshot committed with the code. So loading again after
+ * a sync never puts an older timetable back.
+ */
+async function currentTimetable() {
+  const latest = await RailwayTimetable.findOne({ where: { status: TIMETABLE_STATUS.APPLIED }, order: [["id", "DESC"]] });
+  return latest ? latest.asSnapshot() : COMMITTED;
 }
 
 const hours = (minutes) => `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
@@ -121,7 +137,7 @@ function stationCode(name, taken) {
  * Loading
  * ------------------------------------------------------------------ */
 
-function newReport() {
+function newReport(timetable) {
   return {
     snapshot: { fetchedAt: timetable.fetchedAt, trains: timetable.trains.length },
     stations: { created: 0, existing: 0, removed: 0 },
@@ -137,8 +153,7 @@ function newReport() {
   };
 }
 
-async function loadStations(report) {
-  const { cities } = prepare();
+async function loadStations(report, { cities }) {
   const existing = await Station.findAll({ attributes: ["id", "code", "name"] });
   const byName = new Map(existing.map((s) => [s.name.toLowerCase(), s]));
   const taken = new Set(existing.map((s) => s.code));
@@ -174,10 +189,10 @@ function sameRoute(current, stops) {
   });
 }
 
-async function loadTrains(report, stationIds) {
+async function loadTrains(report, stationIds, { trains }) {
   const ids = new Map();
 
-  for (const t of prepare().trains) {
+  for (const t of trains) {
     let train = await TrainName.findOne({ where: { name: t.name } });
     if (train) {
       report.trains.existing++;
@@ -238,7 +253,7 @@ async function authorId() {
   return admin.id;
 }
 
-async function loadPlans(report, trainIds) {
+async function loadPlans(report, trainIds, { byNumber }) {
   const author = await authorId();
   const refs = new Map();
   const ref = async (Model, name) => {
@@ -288,7 +303,7 @@ async function loadPlans(report, trainIds) {
           report.plans.existing++;
           if (plan.status !== PLAN_STATUS.APPROVED) {
             report.notes.push(
-              `${prepare().byNumber.get(number).name}: the seat plan of coach ${coachCode} is ${plan.status}, so the ` +
+              `${byNumber.get(number).name}: the seat plan of coach ${coachCode} is ${plan.status}, so the ` +
                 "coach will have no seats until it is approved."
             );
           }
@@ -313,7 +328,7 @@ async function loadPlans(report, trainIds) {
   return planIds;
 }
 
-async function loadRakes(report, trainIds, planIds) {
+async function loadRakes(report, trainIds, planIds, { byNumber }) {
   for (const rake of RAKES) {
     for (const number of rake.trains) {
       const trainId = trainIds.get(number);
@@ -331,7 +346,7 @@ async function loadRakes(report, trainIds, planIds) {
       if (await TrainSchedule.count({ where: { trainId } })) {
         report.schedules.existing++;
       } else {
-        const runsOn = runningDays(prepare().byNumber.get(number).days);
+        const runsOn = runningDays(byNumber.get(number).days);
         await scheduleService.set(trainId, [{ runsOn, isActive: true }]);
         report.schedules.set++;
       }
@@ -387,17 +402,18 @@ async function removeUnusedStations(report) {
 async function load(ctx = {}, { removeUnused = false } = {}) {
   if (await DemoRecord.count()) throw ApiError.conflict(DEMO_FIRST);
 
-  const report = newReport();
+  const p = prepare(await currentTimetable());
+  const report = newReport(p.timetable);
   const step = (i) => ctx.progress?.({ total: STEPS.length, done: i, step: STEPS[i] ?? "Done" });
 
   await step(0);
-  const stationIds = await loadStations(report);
+  const stationIds = await loadStations(report, p);
   await step(1);
-  const trainIds = await loadTrains(report, stationIds);
+  const trainIds = await loadTrains(report, stationIds, p);
   await step(2);
-  const planIds = await loadPlans(report, trainIds);
+  const planIds = await loadPlans(report, trainIds, p);
   await step(3);
-  await loadRakes(report, trainIds, planIds);
+  await loadRakes(report, trainIds, planIds, p);
   await step(4);
   await loadFares(report);
   if (removeUnused) await removeUnusedStations(report);
@@ -407,7 +423,7 @@ async function load(ctx = {}, { removeUnused = false } = {}) {
 
   await audit.record({
     action: AUDIT_ACTIONS.RAILWAY_LOAD,
-    entity: { type: "railway_data", id: null, label: `timetable of ${timetable.fetchedAt.slice(0, 10)}` },
+    entity: { type: "railway_data", id: null, label: `timetable of ${String(p.timetable.fetchedAt).slice(0, 10)}` },
     after: {
       stations: report.stations,
       trains: report.trains,
@@ -520,7 +536,8 @@ async function readyTrains() {
 }
 
 async function status() {
-  const { trains, cities } = prepare();
+  const p = prepare(await currentTimetable());
+  const { trains, cities, timetable } = p;
   const names = trains.map((t) => t.name);
   const loaded = await TrainName.findAll({ where: { name: names }, attributes: ["id"] });
   const ids = loaded.map((t) => t.id);
@@ -567,6 +584,9 @@ async function status() {
 async function start({ actorId }) {
   const live = await Job.findOne({ where: { dedupeKey: DEDUPE_KEY, status: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING] } });
   if (live) return { job: live, started: false };
+  // Not while the server is being checked or synced with the railway (railwaySyncService).
+  const syncing = await Job.findOne({ where: { type: ["railway.check", "railway.sync_apply"], status: [JOB_STATUS.QUEUED, JOB_STATUS.RUNNING] } });
+  if (syncing) throw ApiError.conflict(`A check with the railway is running (job #${syncing.id}). Load when it has finished.`);
   if (await DemoRecord.count()) throw ApiError.conflict(DEMO_FIRST);
 
   const job = await jobs.enqueue(JOB_TYPE, {}, {
@@ -579,4 +599,4 @@ async function start({ actorId }) {
   return { job, started: true };
 }
 
-module.exports = { JOB_TYPE, status, start, load, readyTrains, stationCode, prepare };
+module.exports = { JOB_TYPE, DEDUPE_KEY, DEMO_FIRST, status, start, load, readyTrains, stationCode, prepare, currentTimetable };

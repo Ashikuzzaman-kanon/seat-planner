@@ -197,6 +197,37 @@ jobs.define(demo.JOB_TYPES.CLEAR, {
 
 /* The real railway timetable and seat plans (see services/railwayService). */
 const railway = require("../services/railwayService");
+const railwaySync = require("../services/railwaySyncService");
+
+jobs.define(railwaySync.CHECK_JOB, {
+  priority: 0,
+  describe: "Ask the railway for its current timetable and compare it with the server's",
+  handler: (payload, ctx) => railwaySync.check(payload, ctx),
+  announce: (result) => ({
+    title: result?.upToDate
+      ? "Checked with the railway — the server is up to date"
+      : "Checked with the railway — changes are waiting to be applied",
+    body: result?.upToDate
+      ? `All ${result?.counts?.published ?? 0} trains match what the railway publishes for ${result?.requestedFor}.`
+      : `${result?.counts?.newTrains ?? 0} new train(s), ${result?.counts?.times ?? 0} with new times, ` +
+        `${result?.counts?.stations ?? 0} with changed stations, ${result?.counts?.days ?? 0} with changed running days. Review them on Railway Data.`,
+    link: "/dashboard/railway-data",
+  }),
+});
+
+jobs.define(railwaySync.APPLY_JOB, {
+  priority: 0,
+  describe: "Apply the railway's timetable to the server's trains",
+  handler: (payload, ctx) => railwaySync.apply(payload, ctx),
+  announce: (result) => ({
+    title: "The railway's timetable is applied",
+    body:
+      `${result?.trains?.created ?? 0} new train(s), ${result?.routes?.times ?? 0} with new times, ` +
+      `${result?.routes?.replaced ?? 0} route(s) replaced, ${result?.routes?.skipped ?? 0} skipped` +
+      (result?.warnings?.length ? `, ${result.warnings.length} note(s) to read.` : "."),
+    link: "/dashboard/railway-data",
+  }),
+});
 
 jobs.define(railway.JOB_TYPE, {
   priority: 0,

@@ -31,6 +31,8 @@ const ACTION_SEVERITY = {
   "demo.populate": "info",
   "demo.clear": "warning",
   "railway.load": "info",
+  "railway.sync_check": "info",
+  "railway.sync_apply": "warning",
   "trip.seats_cleared": "info",
   "auth.locked": "danger",
   "subscription.create": "success",
