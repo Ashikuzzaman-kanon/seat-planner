@@ -1,5 +1,6 @@
 const { PERMISSION_CATALOGUE } = require("../constants/permissions");
 const { AUDIT_ACTIONS } = require("../constants/auditActions");
+const { FEATURE_KEYS, SWITCH_STATES } = require("../constants/features");
 
 /**
  * The API contract, served at `GET /api/v1/openapi.json`.
@@ -24,7 +25,11 @@ const response = (description, schema) => ({
 const errors = {
   400: response("Validation failed", ref("Error")),
   401: response("Missing, invalid or expired credentials", ref("Error")),
-  403: response("Authenticated, but lacking the required permission", ref("Error")),
+  403: response(
+    "Authenticated, but lacking the required permission — or the feature is switched off for the caller " +
+      "(code FEATURE_UNAVAILABLE)",
+    ref("Error")
+  ),
   404: response("Not found", ref("Error")),
   409: response("Conflicts with existing data", ref("Error")),
 };
@@ -82,6 +87,12 @@ module.exports = {
       "re-resolved on every request, so revoking a role takes effect almost",
       "immediately. Clients exchange a refresh token for a new pair when the",
       "access token expires; the presented refresh token is rotated out.",
+      "",
+      "Feature switches: the super admin can turn any tab of the app off, for everyone or for chosen",
+      "users and roles (the super admin included). The API then refuses the calls only that tab makes,",
+      "with 403 and code FEATURE_UNAVAILABLE; a call another tab still needs keeps working. A session",
+      "and /auth/me list the caller's switched-off features in unavailableFeatures. Settings has no",
+      "switch, and the outside APIs (the subscription check and seat plans) are never switched.",
     ].join("\n"),
   },
 
@@ -95,6 +106,7 @@ module.exports = {
     { name: "Roles", description: "Runtime-created roles and the permission catalogue" },
     { name: "Users", description: "User directory and role assignment" },
     { name: "Settings", description: "Runtime-configurable values" },
+    { name: "Features", description: "Switching tabs of the app off, for everyone or for chosen users and roles" },
     { name: "Audit", description: "Record of privileged actions" },
     { name: "Network", description: "Stations, trains, routes, fares and seat attributes" },
     { name: "Departures", description: "Composition, schedules, and the trips generated from them" },
@@ -131,7 +143,35 @@ module.exports = {
     schemas: {
       Error: obj({
         message: str("Human-readable explanation"),
+        code: str("Set on some refusals: FEATURE_UNAVAILABLE when the feature is switched off for the caller"),
+        details: {
+          description:
+            "Validation: the fields at fault. FEATURE_UNAVAILABLE: { features, note } — the features the call " +
+            "serves, and the message the super admin left",
+        },
         errors: arr(obj({ field: str(), message: str() })),
+      }),
+
+      UnavailableFeature: obj({
+        key: { ...str("Feature key"), enum: FEATURE_KEYS },
+        message: { ...str("The message left for the people it is off for"), nullable: true },
+      }),
+
+      FeatureSwitch: obj({
+        key: { ...str(), enum: FEATURE_KEYS },
+        label: str("The tab's name"),
+        group: str("The menu group"),
+        path: str("The tab's address in the web app"),
+        state: {
+          type: "string",
+          enum: Object.values(SWITCH_STATES),
+          description: "off_some: off for the users and roles listed",
+        },
+        message: { ...str(), nullable: true },
+        users: arr(obj({ id: int(), fullName: str(), email: str() })),
+        roles: arr(obj({ id: int(), name: str() })),
+        updatedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        updatedAt: { type: "string", format: "date-time", nullable: true },
       }),
 
       Permission: obj({
@@ -209,6 +249,7 @@ module.exports = {
         user: ref("User"),
         roles: arr(obj({ id: int(), name: str() })),
         permissions: arr(str("Effective permission keys")),
+        unavailableFeatures: arr(ref("UnavailableFeature")),
       }),
 
       Setting: obj({
@@ -1362,6 +1403,7 @@ module.exports = {
               user: ref("User"),
               roles: arr(obj({ id: int(), name: str() })),
               permissions: arr(str()),
+              unavailableFeatures: arr(ref("UnavailableFeature")),
             })
           ),
           401: errors[401],
@@ -1599,6 +1641,71 @@ module.exports = {
           200: response("Updated", obj({ message: str(), setting: ref("Setting") })),
           400: errors[400],
           403: errors[403],
+        },
+      },
+    },
+
+    "/features": {
+      get: {
+        tags: ["Features"],
+        summary: "Every feature with its switch, and the roles one can be switched off for",
+        description: "Super admin only. A feature with no switch stored is on.",
+        security: [{ bearerAuth: [] }],
+        "x-required-permissions": [],
+        "x-super-admin-only": true,
+        responses: {
+          200: response(
+            "Features",
+            obj({ features: arr(ref("FeatureSwitch")), roles: arr(obj({ id: int(), name: str() })) })
+          ),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/features/people": {
+      get: {
+        tags: ["Features"],
+        summary: "People to switch a feature off for, by name or email (at most 20)",
+        security: [{ bearerAuth: [] }],
+        "x-required-permissions": [],
+        "x-super-admin-only": true,
+        parameters: [queryParam("search", "Part of a name or email")],
+        responses: {
+          200: response("People", obj({ people: arr(obj({ id: int(), fullName: str(), email: str() })) })),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/features/{key}": {
+      put: {
+        tags: ["Features"],
+        summary: "Switch a feature on, off for everyone, or off for chosen users and roles",
+        description: [
+          "Super admin only, and it applies to the super admin too. off_some needs at least one user or role.",
+          "The message is shown to the people it is off for, and cleared when it is switched on. Audited.",
+        ].join("\n"),
+        security: [{ bearerAuth: [] }],
+        "x-required-permissions": [],
+        "x-super-admin-only": true,
+        parameters: [pathParam("key", `One of: ${FEATURE_KEYS.join(", ")}`, "string")],
+        requestBody: body(
+          obj(
+            {
+              state: { type: "string", enum: Object.values(SWITCH_STATES) },
+              message: { ...str("At most 300 characters"), nullable: true },
+              userIds: arr(int()),
+              roleIds: arr(int()),
+            },
+            ["state"]
+          )
+        ),
+        responses: {
+          200: response("Switched", obj({ message: str(), feature: ref("FeatureSwitch") })),
+          400: errors[400],
+          403: errors[403],
+          404: response("No feature by that name (Settings has none)", ref("Error")),
         },
       },
     },

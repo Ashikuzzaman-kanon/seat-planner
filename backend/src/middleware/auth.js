@@ -2,6 +2,7 @@ const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { verifyAccessToken } = require("../services/tokenService");
 const { getAccess } = require("../services/permissionService");
+const features = require("../services/featureService");
 const { setContext } = require("../utils/requestContext");
 const { User } = require("../models");
 
@@ -17,6 +18,9 @@ const { User } = require("../models");
  *   req.user        the User row
  *   req.access      { isSuperAdmin, roles, permissions }
  *   req.permissions a Set of permission keys, for fast checks
+ *
+ * Then refuses the request if it serves only features switched off for the
+ * caller (services/featureService) — the super admin included.
  */
 const authenticate = asyncHandler(async (req, _res, next) => {
   const header = req.headers.authorization || "";
@@ -51,6 +55,8 @@ const authenticate = asyncHandler(async (req, _res, next) => {
   req.user = user;
   req.access = access;
   req.permissions = new Set(access.permissions);
+
+  features.guard(req);
 
   // Now that the caller is known, the audit log can attribute their actions
   // without every service having to be handed an actor.

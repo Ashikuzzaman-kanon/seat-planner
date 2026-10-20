@@ -27,6 +27,9 @@ function errorHandler(err, _req, res, _next) {
   const statusCode = err.statusCode || 500;
   const payload = { error: { message: err.message || "Internal server error" } };
   if (err.details) payload.error.details = err.details;
+  // Only our own errors carry a code meant for the app; a system error's
+  // code (ECONNREFUSED and the like) is nobody's business outside.
+  if (err.isOperational && typeof err.code === "string") payload.error.code = err.code;
   if (!env.isProduction && statusCode === 500) payload.error.stack = err.stack;
 
   if (statusCode >= 500) console.error(err);

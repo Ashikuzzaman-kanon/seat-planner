@@ -53,6 +53,56 @@
   font-size: 0.88rem;
 }
 
+/* ---------------- A tab switched off (Settings → Features) ---------------- */
+
+.feature-off {
+  display: grid;
+  place-items: center;
+  min-height: 50vh;
+  padding: 1rem 0;
+}
+.feature-off__card {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  max-width: 28rem;
+  padding: 2rem 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+}
+.feature-off__card > .pi {
+  font-size: 2rem;
+  color: var(--muted);
+}
+.feature-off__card h1 {
+  margin: 0.25rem 0 0;
+  font-size: 1.25rem;
+  text-wrap: balance;
+}
+.feature-off__card p {
+  margin: 0;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.feature-off__message {
+  margin-top: 0.35rem !important;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--brand-50);
+  color: var(--ink) !important;
+  overflow-wrap: anywhere;
+}
+.feature-off__home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  font-weight: 600;
+}
+
 /* ---------------- Sidebar ---------------- */
 
 .dash-sidebar {

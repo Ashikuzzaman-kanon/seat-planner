@@ -49,7 +49,7 @@ const MAX_TOASTS = 3;
 const CHANNEL = "sp-notifications";
 
 export function NotificationsProvider({ children }) {
-  const { user } = useAuth();
+  const { user, isAvailable } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const toast = useRef(null);
@@ -68,7 +68,9 @@ export function NotificationsProvider({ children }) {
   const alive = useRef(false);
   // Set below; read only when a toast is clicked, after render.
   const openNotification = useRef(null);
-  const userId = user?.id ?? null;
+  // Notifications switched off (Settings → Features): no polling, no toasts.
+  // They are still recorded, and there when it is switched back on.
+  const userId = user && isAvailable("notifications") ? user.id : null;
 
   const applySummary = useCallback(({ unreadCount: count }) => {
     unreadRef.current = count;

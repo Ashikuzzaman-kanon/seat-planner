@@ -12,6 +12,7 @@ const {
   generateOtp,
 } = require("./tokenService");
 const { getAccess, invalidateUser } = require("./permissionService");
+const features = require("./featureService");
 const { sendVerificationEmail, sendPasswordResetEmail } = require("./emailService");
 const settings = require("./settingService");
 const audit = require("./auditService");
@@ -71,6 +72,7 @@ async function buildSession(user, context = {}) {
     user: user.toPublicJSON(),
     roles: access.roles,
     permissions: access.permissions,
+    unavailableFeatures: features.unavailableFor(user, access),
   };
 }
 
@@ -374,6 +376,7 @@ async function refresh({ refreshToken }, context) {
     user: user.toPublicJSON(),
     roles: access.roles,
     permissions: access.permissions,
+    unavailableFeatures: features.unavailableFor(user, access),
   };
 }
 

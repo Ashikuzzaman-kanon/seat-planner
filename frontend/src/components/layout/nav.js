@@ -13,15 +13,20 @@ import { PERMISSIONS } from "@/constants/permissions";
  *
  * `permission` hides an entry from anybody who could not use it anyway — the
  * API is the real guard; this only stops showing people doors they cannot open.
+ *
+ * `feature` names the switch that can turn the tab off (Settings → Features),
+ * mirroring the backend's list in constants/features.js. Settings has none: it
+ * is where the switches are, so it is always there for the super admin.
  */
 export const NAV_GROUPS = [
   {
     key: "travel",
     label: "Travel",
     items: [
-      { href: "/dashboard", label: "Home", icon: "pi pi-home" },
+      { href: "/dashboard", feature: "home", label: "Home", icon: "pi pi-home" },
       {
         href: "/dashboard/book",
+        feature: "book",
         label: "Book a Ticket",
         icon: "pi pi-ticket",
         permission: PERMISSIONS.BOOKING_CREATE,
@@ -29,6 +34,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/bookings",
+        feature: "bookings",
         label: "My Bookings",
         icon: "pi pi-bookmark",
         permission: PERMISSIONS.BOOKING_CREATE,
@@ -36,6 +42,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/wallet",
+        feature: "wallet",
         label: "Wallet",
         icon: "pi pi-wallet",
         permission: PERMISSIONS.BOOKING_CREATE,
@@ -43,6 +50,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/refunds",
+        feature: "refunds",
         label: "My Returns",
         icon: "pi pi-undo",
         permission: PERMISSIONS.REFUND_REQUEST,
@@ -51,6 +59,7 @@ export const NAV_GROUPS = [
       {
         // No permission: a passenger sees their own requests, a reviewer the queue.
         href: "/dashboard/requests",
+        feature: "requests",
         label: "Requests",
         icon: "pi pi-inbox",
         blurb: "Transfers and withdrawals",
@@ -58,6 +67,7 @@ export const NAV_GROUPS = [
       {
         // No permission: anyone signed in can ask for one; reviewers get the queue too.
         href: "/dashboard/subscriptions",
+        feature: "subscriptions",
         label: "Subscriptions",
         icon: "pi pi-id-card",
         blurb: "Ask for one, and see how long yours runs",
@@ -65,12 +75,14 @@ export const NAV_GROUPS = [
       {
         // Everyone has an inbox.
         href: "/dashboard/notifications",
+        feature: "notifications",
         label: "Notifications",
         icon: "pi pi-bell",
         blurb: "Everything that happened, and what is waiting on you",
       },
       {
         href: "/dashboard/profile",
+        feature: "profile",
         label: "My Profile",
         icon: "pi pi-user",
         blurb: "Name, NID and date of birth",
@@ -83,6 +95,7 @@ export const NAV_GROUPS = [
     items: [
       {
         href: "/dashboard/checker",
+        feature: "checker",
         label: "Check Tickets",
         icon: "pi pi-qrcode",
         permission: PERMISSIONS.TICKET_VERIFY,
@@ -90,6 +103,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/departures",
+        feature: "departures",
         label: "Departures",
         icon: "pi pi-calendar-clock",
         permission: PERMISSIONS.TRIP_VIEW,
@@ -97,6 +111,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/inventory",
+        feature: "inventory",
         label: "Seat Inventory",
         icon: "pi pi-table",
         permission: PERMISSIONS.INVENTORY_VIEW,
@@ -104,6 +119,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/reports",
+        feature: "reports",
         label: "Reported Tickets",
         icon: "pi pi-flag",
         permission: PERMISSIONS.ABUSE_REVIEW,
@@ -111,6 +127,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/network",
+        feature: "network",
         label: "Network",
         icon: "pi pi-directions",
         permission: PERMISSIONS.NETWORK_VIEW,
@@ -118,12 +135,14 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/plans",
+        feature: "plans",
         label: "Seat Plans",
         icon: "pi pi-th-large",
         blurb: "Coach layouts",
       },
       {
         href: "/dashboard/approvals",
+        feature: "approvals",
         label: "Approvals",
         icon: "pi pi-check-square",
         permission: PERMISSIONS.PLAN_APPROVE,
@@ -137,6 +156,7 @@ export const NAV_GROUPS = [
     items: [
       {
         href: "/dashboard/users",
+        feature: "users",
         label: "Users",
         icon: "pi pi-users",
         permission: PERMISSIONS.USER_VIEW,
@@ -144,6 +164,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/roles",
+        feature: "roles",
         label: "Roles",
         icon: "pi pi-shield",
         permission: PERMISSIONS.ROLE_VIEW,
@@ -151,6 +172,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/reference",
+        feature: "reference",
         label: "Reference Data",
         icon: "pi pi-database",
         permission: PERMISSIONS.REFERENCE_MANAGE,
@@ -165,6 +187,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/audit",
+        feature: "audit",
         label: "Audit Log",
         icon: "pi pi-history",
         permission: PERMISSIONS.AUDIT_VIEW,
@@ -172,6 +195,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/jobs",
+        feature: "jobs",
         label: "Background Jobs",
         icon: "pi pi-server",
         permission: PERMISSIONS.JOB_VIEW,
@@ -179,6 +203,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/railway-data",
+        feature: "railway-data",
         label: "Railway Data",
         icon: "pi pi-directions",
         permission: PERMISSIONS.RAILWAY_MANAGE,
@@ -186,6 +211,7 @@ export const NAV_GROUPS = [
       },
       {
         href: "/dashboard/demo-data",
+        feature: "demo-data",
         label: "Demo Data",
         icon: "pi pi-box",
         permission: PERMISSIONS.DEMO_MANAGE,
@@ -196,11 +222,18 @@ export const NAV_GROUPS = [
 ];
 
 /** The groups a person can see, with empty groups dropped. */
-export function visibleGroups(hasPermission) {
+export function visibleGroups(hasPermission, isAvailable = () => true) {
   return NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => !item.permission || hasPermission(item.permission)),
+    items: group.items.filter(
+      (item) => (!item.permission || hasPermission(item.permission)) && (!item.feature || isAvailable(item.feature))
+    ),
   })).filter((group) => group.items.length);
+}
+
+/** Where to land when Home is switched off: the first tab still there. */
+export function firstVisibleHref(hasPermission, isAvailable) {
+  return visibleGroups(hasPermission, isAvailable)[0]?.items[0]?.href || null;
 }
 
 /**

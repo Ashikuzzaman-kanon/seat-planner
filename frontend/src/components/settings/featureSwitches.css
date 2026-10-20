@@ -1,0 +1,137 @@
+/* Settings → Features: each tab with its switch. */
+
+.fs__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.fs__intro {
+  max-width: 62ch;
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.fs__loading {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.fs__group h4 {
+  margin: 1.1rem 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.fs__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fs__row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--border);
+}
+.fs__row.is-off .fs__what strong {
+  color: var(--muted);
+}
+.fs__what {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+}
+.fs__detail {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  color: var(--ink-2);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.fs__detail small {
+  color: var(--faint);
+}
+.fs__message {
+  color: var(--ink);
+}
+
+/* The dialog */
+.fs-dialog {
+  display: grid;
+  gap: 1rem;
+}
+.fs-options {
+  display: grid;
+  gap: 0.5rem;
+}
+.fs-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.fs-option.is-on {
+  border-color: var(--brand-500);
+  background: var(--brand-50);
+}
+.fs-option span {
+  display: grid;
+  gap: 0.1rem;
+}
+.fs-option small {
+  color: var(--muted);
+}
+.fs-targets,
+.fs-message {
+  display: grid;
+  gap: 0.35rem;
+}
+.fs-targets label,
+.fs-message label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.fs-targets label:not(:first-child) {
+  margin-top: 0.4rem;
+}
+.fs-message label span {
+  color: var(--muted);
+  font-weight: 400;
+}
+.fs-hint {
+  color: var(--muted);
+}
+.fs-person small {
+  margin-left: 0.35rem;
+  color: var(--muted);
+}
+.fs-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* A phone: the switch's state and details under its name, the button below. */
+@media (max-width: 640px) {
+  .fs__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .fs__detail {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

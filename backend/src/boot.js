@@ -1,6 +1,7 @@
 const { sequelize } = require("./models");
 const { connectMongo } = require("./config/mongo");
 const { loadSettings } = require("./services/settingService");
+const { loadSwitches } = require("./services/featureService");
 const { syncPermissionCatalogue } = require("./services/permissionService");
 
 /**
@@ -34,6 +35,11 @@ async function boot({ log = console.log } = {}) {
   // memory once here rather than queried per request.
   const count = await loadSettings();
   log(`✅ Settings loaded (${count} values)`);
+
+  // Feature switches are checked on every signed-in request, so they too are
+  // held in memory.
+  const switched = await loadSwitches();
+  log(`✅ Feature switches loaded (${switched ? `${switched} switched` : "everything on"})`);
 
   // Connect MongoDB for document features (non-fatal if unavailable).
   await connectMongo();

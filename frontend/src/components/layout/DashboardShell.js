@@ -13,7 +13,8 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { roleLabel } from "@/constants/roles";
 import { isLocalHost } from "@/lib/localNetwork";
 import { inAndroidApp } from "@/lib/androidApp";
-import { visibleGroups, isActive, locate } from "./nav";
+import { visibleGroups, firstVisibleHref, isActive, locate } from "./nav";
+import FeatureUnavailable from "./FeatureUnavailable";
 import "./dashboard.css";
 
 /** Two letters to stand for a person when there is no photo. */
@@ -39,9 +40,15 @@ function initials(name = "") {
  *
  * On a phone the sidebar is a drawer (see dashboard.css), and everything else
  * here is the same component, so the two cannot drift apart.
+ *
+ * A tab switched off for this person (Settings → Features) leaves the menu and
+ * every shortcut to it here — the Book button, the bell, the account menu — and
+ * its address shows a notice in place of the page. With Home switched off, the
+ * first tab still there stands in for it.
  */
 export default function DashboardShell({ children }) {
-  const { user, roles, loading, unreachable, refresh, logout, hasPermission } = useAuth();
+  const { user, roles, loading, unreachable, refresh, recheck, logout, hasPermission, isAvailable, featureMessage } =
+    useAuth();
   const [retrying, setRetrying] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -53,8 +60,20 @@ export default function DashboardShell({ children }) {
     if (!loading && !user && !unreachable) router.replace("/login");
   }, [loading, user, unreachable, router]);
 
-  const groups = useMemo(() => visibleGroups(hasPermission), [hasPermission]);
+  const groups = useMemo(() => visibleGroups(hasPermission, isAvailable), [hasPermission, isAvailable]);
   const here = locate(pathname);
+  const offHere = Boolean(here.item?.feature) && !isAvailable(here.item.feature);
+  const homeHref = isAvailable("home") ? "/dashboard" : firstVisibleHref(hasPermission, isAvailable) || "/dashboard";
+
+  // Switches can change while the app is open: look again on moving between pages.
+  useEffect(() => {
+    recheck();
+  }, [pathname, recheck]);
+
+  // Home switched off: land on the first tab still there instead.
+  useEffect(() => {
+    if (user && pathname === "/dashboard" && homeHref !== "/dashboard") router.replace(homeHref);
+  }, [user, pathname, homeHref, router]);
 
   /*
    * The sidebar on a small screen is a drawer. An icon rail was tried first and
@@ -143,9 +162,13 @@ export default function DashboardShell({ children }) {
       ),
     },
     { separator: true },
-    { label: "My profile", icon: "pi pi-user", command: () => router.push("/dashboard/profile") },
-    { label: "Notifications", icon: "pi pi-bell", command: () => router.push("/dashboard/notifications") },
-    ...(canBook
+    ...(isAvailable("profile")
+      ? [{ label: "My profile", icon: "pi pi-user", command: () => router.push("/dashboard/profile") }]
+      : []),
+    ...(isAvailable("notifications")
+      ? [{ label: "Notifications", icon: "pi pi-bell", command: () => router.push("/dashboard/notifications") }]
+      : []),
+    ...(canBook && isAvailable("wallet")
       ? [{ label: "Wallet", icon: "pi pi-wallet", command: () => router.push("/dashboard/wallet") }]
       : []),
     ...(onDevComputer
@@ -163,7 +186,7 @@ export default function DashboardShell({ children }) {
 
         <aside className="dash-sidebar" id="dash-nav" aria-label="Main navigation">
           <div className="dash-brand">
-            <Link href="/dashboard" className="brand">
+            <Link href={homeHref} className="brand">
               <span className="brand__mark" aria-hidden="true">
                 <i className="pi pi-ticket" />
               </span>
@@ -241,7 +264,7 @@ export default function DashboardShell({ children }) {
               <span className="dash-crumbs__page">{here.item?.label || "Seat Planner"}</span>
             </div>
 
-            <Link href="/dashboard" className="brand brand--compact">
+            <Link href={homeHref} className="brand brand--compact">
               <span className="brand__mark" aria-hidden="true">
                 <i className="pi pi-ticket" />
               </span>
@@ -249,14 +272,14 @@ export default function DashboardShell({ children }) {
             </Link>
 
             <div className="dash-header__actions">
-              {canBook && !isActive("/dashboard/book", pathname) && (
+              {canBook && isAvailable("book") && !isActive("/dashboard/book", pathname) && (
                 <Link href="/dashboard/book" className="dash-cta" title="Book a ticket">
                   <i className="pi pi-plus" aria-hidden="true" />
                   <span>Book a ticket</span>
                 </Link>
               )}
 
-              <NotificationBell />
+              {isAvailable("notifications") && <NotificationBell />}
 
               <Menu model={accountItems} popup ref={account} className="acct-menu" popupAlignment="right" />
               <button
@@ -276,7 +299,17 @@ export default function DashboardShell({ children }) {
             </div>
           </header>
 
-          <main className="dash-content">{children}</main>
+          <main className="dash-content">
+            {pathname === "/dashboard" && homeHref !== "/dashboard" ? null : offHere ? (
+              <FeatureUnavailable
+                label={here.item.label}
+                message={featureMessage(here.item.feature)}
+                homeHref={homeHref !== pathname ? homeHref : null}
+              />
+            ) : (
+              children
+            )}
+          </main>
         </div>
       </div>
     </NotificationsProvider>

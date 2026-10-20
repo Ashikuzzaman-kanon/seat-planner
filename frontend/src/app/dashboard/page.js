@@ -52,10 +52,16 @@ const prettyDate = (iso) =>
  * A passenger sees their next journey, their wallet and a way to book. Staff
  * see their tools, drawn from the same navigation definition as the sidebar so
  * the two cannot describe different things. Somebody who is both sees both.
+ *
+ * A card stands for a tab, so a tab switched off (Settings → Features) takes
+ * its card with it — the wallet with Wallet, the next journey with My Bookings.
  */
 export default function DashboardHome() {
-  const { user, roles, permissions, hasPermission } = useAuth();
+  const { user, roles, permissions, hasPermission, isAvailable } = useAuth();
   const canBook = hasPermission(PERMISSIONS.BOOKING_CREATE);
+  const showBook = canBook && isAvailable("book");
+  const showBookings = canBook && isAvailable("bookings");
+  const showWallet = canBook && isAvailable("wallet");
 
   const [catalogue, setCatalogue] = useState({});
   const [wallet, setWallet] = useState(null);
@@ -71,12 +77,16 @@ export default function DashboardHome() {
   }, []);
 
   useEffect(() => {
-    if (!canBook) return;
+    if (!showWallet) return;
     fetchWallet().then(setWallet).catch(() => setWallet(null));
+  }, [showWallet]);
+
+  useEffect(() => {
+    if (!showBookings) return;
     fetchBookings({ page: 1 })
       .then((data) => setBookings(data.bookings || []))
       .catch(() => setBookings([]));
-  }, [canBook]);
+  }, [showBookings]);
 
   const upcoming = useMemo(() => {
     if (!bookings) return null;
@@ -92,8 +102,8 @@ export default function DashboardHome() {
 
   // Everything outside Travel is somebody's work tool.
   const tools = useMemo(
-    () => visibleGroups(hasPermission).filter((g) => g.key !== "travel"),
-    [hasPermission]
+    () => visibleGroups(hasPermission, isAvailable).filter((g) => g.key !== "travel"),
+    [hasPermission, isAvailable]
   );
 
   const grouped = useMemo(
@@ -120,14 +130,18 @@ export default function DashboardHome() {
               ? "Seats are sold stretch by stretch, so a train that looks full end to end often still has room on yours."
               : "Your tools are below. Everything you do here is recorded in the audit log."}
           </p>
-          {canBook && (
+          {(showBook || showBookings) && (
             <div className="home-hero__actions">
-              <Link href="/dashboard/book" className="home-btn home-btn--light">
-                <i className="pi pi-ticket" aria-hidden="true" /> Book a ticket
-              </Link>
-              <Link href="/dashboard/bookings" className="home-btn home-btn--ghost">
-                My bookings <i className="pi pi-arrow-right" aria-hidden="true" />
-              </Link>
+              {showBook && (
+                <Link href="/dashboard/book" className="home-btn home-btn--light">
+                  <i className="pi pi-ticket" aria-hidden="true" /> Book a ticket
+                </Link>
+              )}
+              {showBookings && (
+                <Link href="/dashboard/bookings" className="home-btn home-btn--ghost">
+                  My bookings <i className="pi pi-arrow-right" aria-hidden="true" />
+                </Link>
+              )}
             </div>
           )}
         </div>
@@ -142,78 +156,84 @@ export default function DashboardHome() {
 
       {/* Seats held but unpaid, with the clock running. Nothing else on this
           page is time-critical, so these go above all of it. */}
-      {canBook && <OpenCheckouts />}
-      {hasPermission(PERMISSIONS.WAITLIST_JOIN) && <MyWaitlist />}
+      {showBook && <OpenCheckouts />}
+      {hasPermission(PERMISSIONS.WAITLIST_JOIN) && (isAvailable("book") || isAvailable("bookings")) && <MyWaitlist />}
 
       {/* ---------------- Travelling ---------------- */}
-      {canBook && (
-        <section className="home-grid">
-          <Link href={next ? `/dashboard/bookings` : "/dashboard/book"} className="home-card home-next">
-            <div className="home-card__head">
-              <span className="home-card__icon home-card__icon--brand">
-                <i className="pi pi-map-marker" aria-hidden="true" />
-              </span>
-              <span className="home-card__label">Next journey</span>
-            </div>
-            {bookings === null ? (
-              <div className="home-skeleton" />
-            ) : next ? (
-              <>
-                <div className="home-next__route">
-                  <strong>{next.fromStation?.name}</strong>
-                  <i className="pi pi-arrow-right" aria-hidden="true" />
-                  <strong>{next.toStation?.name}</strong>
-                </div>
-                <div className="home-next__meta">
-                  <span>
-                    <i className="pi pi-calendar" aria-hidden="true" />
-                    {prettyDate(next.boardingDate || next.trip?.departureDate)}
-                  </span>
-                  <span>
-                    <i className="pi pi-send" aria-hidden="true" />
-                    {next.trip?.train?.name}
-                  </span>
-                  <span>
-                    <i className="pi pi-users" aria-hidden="true" />
-                    {next.ticketCount} ticket{next.ticketCount === 1 ? "" : "s"}
-                  </span>
-                </div>
-                <code className="home-next__ref">{next.reference}</code>
-              </>
-            ) : (
-              <p className="home-empty">
-                Nothing booked yet. <span>Find a train →</span>
-              </p>
-            )}
-          </Link>
+      {(showBookings || showWallet) && (
+        <section className={`home-grid${showBookings && showWallet ? "" : " home-grid--partial"}`}>
+          {showBookings && (
+            <Link href={next || !showBook ? `/dashboard/bookings` : "/dashboard/book"} className="home-card home-next">
+              <div className="home-card__head">
+                <span className="home-card__icon home-card__icon--brand">
+                  <i className="pi pi-map-marker" aria-hidden="true" />
+                </span>
+                <span className="home-card__label">Next journey</span>
+              </div>
+              {bookings === null ? (
+                <div className="home-skeleton" />
+              ) : next ? (
+                <>
+                  <div className="home-next__route">
+                    <strong>{next.fromStation?.name}</strong>
+                    <i className="pi pi-arrow-right" aria-hidden="true" />
+                    <strong>{next.toStation?.name}</strong>
+                  </div>
+                  <div className="home-next__meta">
+                    <span>
+                      <i className="pi pi-calendar" aria-hidden="true" />
+                      {prettyDate(next.boardingDate || next.trip?.departureDate)}
+                    </span>
+                    <span>
+                      <i className="pi pi-send" aria-hidden="true" />
+                      {next.trip?.train?.name}
+                    </span>
+                    <span>
+                      <i className="pi pi-users" aria-hidden="true" />
+                      {next.ticketCount} ticket{next.ticketCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <code className="home-next__ref">{next.reference}</code>
+                </>
+              ) : (
+                <p className="home-empty">
+                  Nothing booked yet. {showBook && <span>Find a train →</span>}
+                </p>
+              )}
+            </Link>
+          )}
 
-          <Link href="/dashboard/wallet" className="home-card home-stat">
-            <div className="home-card__head">
-              <span className="home-card__icon home-card__icon--green">
-                <i className="pi pi-wallet" aria-hidden="true" />
-              </span>
-              <span className="home-card__label">Wallet</span>
-            </div>
-            <div className="home-stat__value">
-              {wallet ? <>৳ {wallet.balanceFormatted}</> : <span className="home-skeleton home-skeleton--sm" />}
-            </div>
-            <span className="home-stat__hint">Pays for a ticket in one click</span>
-          </Link>
+          {showWallet && (
+            <Link href="/dashboard/wallet" className="home-card home-stat">
+              <div className="home-card__head">
+                <span className="home-card__icon home-card__icon--green">
+                  <i className="pi pi-wallet" aria-hidden="true" />
+                </span>
+                <span className="home-card__label">Wallet</span>
+              </div>
+              <div className="home-stat__value">
+                {wallet ? <>৳ {wallet.balanceFormatted}</> : <span className="home-skeleton home-skeleton--sm" />}
+              </div>
+              <span className="home-stat__hint">Pays for a ticket in one click</span>
+            </Link>
+          )}
 
-          <Link href="/dashboard/bookings" className="home-card home-stat">
-            <div className="home-card__head">
-              <span className="home-card__icon home-card__icon--violet">
-                <i className="pi pi-calendar-clock" aria-hidden="true" />
+          {showBookings && (
+            <Link href="/dashboard/bookings" className="home-card home-stat">
+              <div className="home-card__head">
+                <span className="home-card__icon home-card__icon--violet">
+                  <i className="pi pi-calendar-clock" aria-hidden="true" />
+                </span>
+                <span className="home-card__label">Upcoming</span>
+              </div>
+              <div className="home-stat__value">
+                {upcoming ? upcoming.length : <span className="home-skeleton home-skeleton--sm" />}
+              </div>
+              <span className="home-stat__hint">
+                {upcoming && upcoming.length === 1 ? "journey booked" : "journeys booked"}
               </span>
-              <span className="home-card__label">Upcoming</span>
-            </div>
-            <div className="home-stat__value">
-              {upcoming ? upcoming.length : <span className="home-skeleton home-skeleton--sm" />}
-            </div>
-            <span className="home-stat__hint">
-              {upcoming && upcoming.length === 1 ? "journey booked" : "journeys booked"}
-            </span>
-          </Link>
+            </Link>
+          )}
         </section>
       )}
 

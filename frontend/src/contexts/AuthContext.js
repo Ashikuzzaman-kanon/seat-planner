@@ -1,12 +1,13 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import api, {
   setTokens,
   clearTokens,
   getToken,
   getRefreshToken,
   setSessionExpiredHandler,
+  setFeatureUnavailableHandler,
 } from "@/lib/api";
 
 const AuthContext = createContext(null);
@@ -15,7 +16,10 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
+  // Tabs switched off for this person (Settings → Features): [{ key, message }].
+  const [unavailableFeatures, setUnavailableFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
+  const lastLoad = useRef(0);
   // Set when the session could not be checked because the server did not
   // answer — as opposed to answering "not signed in".
   const [unreachable, setUnreachable] = useState(null);
@@ -25,6 +29,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     setRoles([]);
     setPermissions([]);
+    setUnavailableFeatures([]);
   }, []);
 
   /**
@@ -38,11 +43,13 @@ export function AuthProvider({ children }) {
       setLoading(false);
       return;
     }
+    lastLoad.current = Date.now();
     try {
       const { data } = await api.get("/auth/me");
       setUser(data.user);
       setRoles(data.roles || []);
       setPermissions(data.permissions || []);
+      setUnavailableFeatures(data.unavailableFeatures || []);
       setUnreachable(null);
     } catch (err) {
       // Only the server saying "no" ends the session. A server that is asleep,
@@ -65,6 +72,7 @@ export function AuthProvider({ children }) {
       setUser(null);
       setRoles([]);
       setPermissions([]);
+      setUnavailableFeatures([]);
     });
     return () => setSessionExpiredHandler(null);
   }, []);
@@ -73,12 +81,38 @@ export function AuthProvider({ children }) {
     loadMe();
   }, [loadMe]);
 
+  /*
+   * Switches change while pages are open. The server refuses a switched-off
+   * tab at once; the menu catches up when the server says so, when the window
+   * is looked at again, and on moving between pages (at most every 20 seconds).
+   */
+  const recheck = useCallback(() => {
+    if (Date.now() - lastLoad.current < 20_000) return;
+    if (getToken() || getRefreshToken()) loadMe();
+  }, [loadMe]);
+
+  useEffect(() => {
+    setFeatureUnavailableHandler(() => {
+      if (getToken() || getRefreshToken()) loadMe();
+    });
+    const onLook = () => document.visibilityState === "visible" && recheck();
+    window.addEventListener("focus", onLook);
+    document.addEventListener("visibilitychange", onLook);
+    return () => {
+      setFeatureUnavailableHandler(null);
+      window.removeEventListener("focus", onLook);
+      document.removeEventListener("visibilitychange", onLook);
+    };
+  }, [loadMe, recheck]);
+
   /** Adopt a session response from login or email verification. */
   const adoptSession = useCallback((data) => {
     setTokens(data);
     setUser(data.user);
     setRoles(data.roles || []);
     setPermissions(data.permissions || []);
+    setUnavailableFeatures(data.unavailableFeatures || []);
+    lastLoad.current = Date.now();
     setLoading(false);
     return data.user;
   }, []);
@@ -112,6 +146,18 @@ export function AuthProvider({ children }) {
     [permissions]
   );
 
+  /** Whether a tab is on for this person. Settings has no switch and is always on. */
+  const isAvailable = useCallback(
+    (feature) => !feature || !unavailableFeatures.some((f) => f.key === feature),
+    [unavailableFeatures]
+  );
+
+  /** The message the super admin left for a tab switched off, if any. */
+  const featureMessage = useCallback(
+    (feature) => unavailableFeatures.find((f) => f.key === feature)?.message || null,
+    [unavailableFeatures]
+  );
+
   /** Roles are dynamic now, so this matches by name against everything held. */
   const hasRole = useCallback(
     (...names) => roles.some((r) => names.includes(r.name)),
@@ -128,6 +174,10 @@ export function AuthProvider({ children }) {
     logout,
     adoptSession,
     refresh: loadMe,
+    recheck,
+    unavailableFeatures,
+    isAvailable,
+    featureMessage,
     hasPermission,
     hasAnyPermission,
     hasRole,

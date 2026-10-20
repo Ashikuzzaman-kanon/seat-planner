@@ -322,6 +322,24 @@ Business rules (hold timeouts, refund slabs, waitlist windows, abuse weights,
 job retries…) live in the settings store and are edited on the *Settings*
 screen, not in environment variables.
 
+### Switching tabs off
+
+*Settings → Features* (super admin only) turns any tab of the app off — for
+everyone, or for chosen people and roles — with an optional message. The tab
+leaves their menu and every shortcut to it (the Book button, the bell, the
+Home page cards, the account menu); its address shows that it is unavailable,
+with the message; and the API refuses the calls only that tab makes, with
+`403` and `code: "FEATURE_UNAVAILABLE"`. A call another tab still needs keeps
+working: switching off Network takes its stations away, but not the train list
+Departures shows. Which tab each endpoint serves is listed in
+`backend/src/constants/features.js`, and a test fails if a signed-in route is
+left out.
+
+A switch applies to the super admin too. Settings has no switch, so it is
+always there to switch things back on. With Home off, signing in lands on the
+first tab still there. The outside APIs (the subscription check and seat
+plans) are never switched. Every change is in the audit log.
+
 ## Subscriptions and the check API
 
 Three permissions run subscriptions, and a role can hold any of them (the
