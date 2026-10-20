@@ -50,6 +50,8 @@ const SubscriptionVersionBlock = require("./SubscriptionVersionBlock");
 const SubscriptionAppNotice = require("./SubscriptionAppNotice");
 const AppToken = require("./AppToken");
 const RailwayTimetable = require("./RailwayTimetable");
+const FeatureSwitch = require("./FeatureSwitch");
+const FeatureSwitchTarget = require("./FeatureSwitchTarget");
 const demoCapture = require("../utils/demoCapture");
 
 const models = {
@@ -104,6 +106,8 @@ const models = {
   SubscriptionAppNotice,
   AppToken,
   RailwayTimetable,
+  FeatureSwitch,
+  FeatureSwitchTarget,
 };
 
 // Wire up associations for any model that declares them.

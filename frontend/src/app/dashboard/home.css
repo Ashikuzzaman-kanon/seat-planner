@@ -147,6 +147,10 @@
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 1rem;
 }
+/* Some cards gone with their tabs (Settings → Features): size to what is left. */
+.home-grid--partial {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 24rem));
+}
 
 .home-card {
   display: flex;

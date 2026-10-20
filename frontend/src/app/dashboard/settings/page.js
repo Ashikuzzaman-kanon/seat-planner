@@ -11,11 +11,13 @@ import { ProgressSpinner } from "primereact/progressspinner";
 import { fetchSettings, updateSetting } from "@/lib/settings";
 import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/constants/permissions";
+import { SUPER_ADMIN_ROLE } from "@/constants/roles";
+import FeatureSwitches from "@/components/settings/FeatureSwitches";
 
 import { TIP } from "@/components/ui/tip";
 import "./settings.css";
 export default function SettingsPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, hasRole } = useAuth();
   const toast = useRef(null);
 
   const [settings, setSettings] = useState([]);
@@ -123,6 +125,9 @@ export default function SettingsPage() {
         Runtime-configurable values. Changes take effect immediately — no restart or deploy.
         {!canManage && " You have read-only access."}
       </p>
+
+      {/* Switching tabs off is the super admin's alone: a switch applies to them too. */}
+      {hasRole(SUPER_ADMIN_ROLE) && <FeatureSwitches toast={toast} />}
 
       {Object.entries(grouped).map(([group, entries]) => (
         <div className="card" key={group} style={{ marginBottom: "1.5rem" }}>

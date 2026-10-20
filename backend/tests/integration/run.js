@@ -178,6 +178,7 @@ async function restore() {
   await conn.end();
 
   await require(path.join(BACKEND, "src/services/settingService")).loadSettings();
+  await require(path.join(BACKEND, "src/services/featureService")).loadSwitches();
   require(path.join(BACKEND, "src/services/permissionService")).invalidateAll();
   await jobService.startWorker();
 }
