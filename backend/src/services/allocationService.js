@@ -1,5 +1,6 @@
-const { sequelize, AllocationTrain, AllocationPair, AllocationClass } = require("../models");
+const { sequelize, AllocationTrain, AllocationPair, AllocationClass, AllocationUpload, User } = require("../models");
 const { ALLOCATION_STATUS, ALLOCATION_SOURCE } = require("../models/AllocationPair");
+const { UPLOAD_KINDS } = require("../models/AllocationUpload");
 const ApiError = require("../utils/ApiError");
 const { AUDIT_ACTIONS } = require("../constants/auditActions");
 const { readCensus, readStops, readCounts, CLASS_CODE, MAX_SEATS } = require("../utils/allocationFiles");
@@ -15,6 +16,10 @@ const audit = require("./auditService");
  * At most a few thousand pairs, so the whole set is kept in memory and every
  * filter, summary and page is worked out from it; any change reloads it. Like
  * the settings cache, this is per process.
+ *
+ * The railway can change its allocation at any time, so how current the data
+ * is is always shown: when each pair was checked against the railway, when
+ * each count was last set, and every file applied (allocation_uploads).
  */
 
 const NOT_CHECKED = "not_checked";
@@ -33,13 +38,22 @@ async function load() {
       attributes: ["id", "trainNumber", "fromStation", "toStation", "status", "checkedAt", "source", "updatedAt"],
       raw: true,
     }),
-    AllocationClass.findAll({ attributes: ["id", "pairId", "classCode", "seats"], raw: true }),
+    AllocationClass.findAll({
+      attributes: ["id", "pairId", "classCode", "seats", "seatsUpdatedAt", "seatsUpdatedById"],
+      raw: true,
+    }),
   ]);
 
   const byPair = new Map();
   for (const c of classes) {
     if (!byPair.has(c.pairId)) byPair.set(c.pairId, []);
-    byPair.get(c.pairId).push({ id: c.id, code: c.classCode, seats: c.seats });
+    byPair.get(c.pairId).push({
+      id: c.id,
+      code: c.classCode,
+      seats: c.seats,
+      seatsUpdatedAt: c.seatsUpdatedAt,
+      seatsUpdatedById: c.seatsUpdatedById,
+    });
   }
 
   const trainMap = new Map();
@@ -47,7 +61,7 @@ async function load() {
     const stops = Array.isArray(t.stops) ? t.stops : null;
     const pos = new Map();
     (stops || []).forEach((s, i) => !pos.has(s) && pos.set(s, i));
-    trainMap.set(t.number, { number: t.number, name: t.name, stops, pos });
+    trainMap.set(t.number, { number: t.number, name: t.name, stops, pos, stopsUpdatedAt: t.stopsUpdatedAt });
   }
 
   const list = pairs.map((p) => ({
@@ -85,7 +99,58 @@ function onRoute(train, from, to) {
  * Reading
  * ------------------------------------------------------------------ */
 
-/** What there is to filter by, and how much data there is. */
+const later = (a, b) => (!a || (b && b > a) ? b : a);
+const earlier = (a, b) => (!a || (b && b < a) ? b : a);
+
+/**
+ * When each kind of file last came in, from the upload history — or, for data
+ * applied before there was a history, from the data itself, without a name.
+ * Counts can also be typed in by hand, so theirs is the last count changed.
+ */
+async function latest(d) {
+  const newest = (kind) =>
+    AllocationUpload.findOne({
+      where: { kind },
+      include: [{ model: User, as: "uploadedBy", attributes: ["id", "fullName"] }],
+      order: [["id", "DESC"]],
+    });
+  const [stops, census] = await Promise.all([newest(UPLOAD_KINDS.STOPS), newest(UPLOAD_KINDS.CENSUS)]);
+
+  let routesAt = null;
+  for (const t of d.trains.values()) routesAt = later(routesAt, t.stopsUpdatedAt);
+
+  let censusAt = null;
+  let scannedFrom = null;
+  let scannedTo = null;
+  let count = null;
+  for (const p of d.pairs) {
+    if (p.source === ALLOCATION_SOURCE.CENSUS) {
+      censusAt = later(censusAt, p.updatedAt);
+      scannedFrom = earlier(scannedFrom, p.checkedAt);
+      scannedTo = later(scannedTo, p.checkedAt);
+    }
+    for (const c of p.classes) if (c.seatsUpdatedAt && (!count || c.seatsUpdatedAt > count.at)) count = { at: c.seatsUpdatedAt, by: c.seatsUpdatedById };
+  }
+  const countBy = count?.by ? await User.findByPk(count.by, { attributes: ["id", "fullName"] }) : null;
+
+  const fromUpload = (u) => ({
+    at: u.createdAt,
+    by: u.uploadedBy ? { id: u.uploadedBy.id, fullName: u.uploadedBy.fullName } : null,
+    fileName: u.fileName,
+    summary: u.summary,
+  });
+  return {
+    stops: stops ? fromUpload(stops) : routesAt ? { at: routesAt, by: null, fileName: null, summary: null } : null,
+    census: census
+      ? { ...fromUpload(census), scannedFrom: census.scannedFrom, scannedTo: census.scannedTo }
+      : censusAt
+      ? { at: censusAt, by: null, fileName: null, summary: null, scannedFrom, scannedTo }
+      : null,
+    counts: count ? { at: count.at, by: countBy ? { id: countBy.id, fullName: countBy.fullName } : null } : null,
+  };
+}
+
+/** What there is to filter by, how much data there is, and how current it is. */
 async function meta() {
   const d = await dataset();
   const stations = new Set();
@@ -115,7 +180,18 @@ async function meta() {
       counted: classRows.filter((c) => c.seats !== null).length,
     },
     updatedAt,
+    latest: await latest(d),
   };
+}
+
+/** The files applied, newest first. */
+async function uploads({ limit = 20 } = {}) {
+  const rows = await AllocationUpload.findAll({
+    include: [{ model: User, as: "uploadedBy", attributes: ["id", "fullName"] }],
+    order: [["id", "DESC"]],
+    limit: Math.min(Math.max(Number(limit) || 20, 1), 100),
+  });
+  return rows.map((u) => u.toPublicJSON());
 }
 
 /**
@@ -178,11 +254,15 @@ function summarise(rows) {
   const stations = new Set();
   const counts = { allocated: 0, not_allocated: 0, not_checked: 0 };
   const classes = new Map();
+  let checkedFrom = null;
+  let checkedTo = null;
   for (const p of rows) {
     trains.add(p.train);
     stations.add(p.from);
     stations.add(p.to);
     counts[p.status]++;
+    checkedFrom = earlier(checkedFrom, p.checkedAt);
+    checkedTo = later(checkedTo, p.checkedAt);
     for (const c of p.classes) {
       const s = classes.get(c.code) || { code: c.code, pairs: 0, counted: 0, seats: 0 };
       s.pairs++;
@@ -200,6 +280,9 @@ function summarise(rows) {
     allocated: counts.allocated,
     notAllocated: counts.not_allocated,
     notChecked: counts.not_checked,
+    // When the pairs shown were checked against the railway: the oldest and the newest.
+    checkedFrom,
+    checkedTo,
     classes: [...classes.values()].sort((a, b) => b.pairs - a.pairs || a.code.localeCompare(b.code)),
   };
 }
@@ -214,7 +297,7 @@ function present(d, p) {
     checkedAt: p.checkedAt,
     source: p.source,
     onRoute: onRoute(t, p.from, p.to),
-    classes: p.classes.map((c) => ({ code: c.code, seats: c.seats })),
+    classes: p.classes.map((c) => ({ code: c.code, seats: c.seats, seatsUpdatedAt: c.seatsUpdatedAt || null })),
   };
 }
 
@@ -247,8 +330,22 @@ async function chunked(rows, fn) {
   for (let i = 0; i < rows.length; i += CHUNK) await fn(rows.slice(i, i + CHUNK));
 }
 
+/** A file applied goes into the history the page shows. */
+const remember = (kind, { fileName, actor, summary, scannedFrom = null, scannedTo = null }, transaction) =>
+  AllocationUpload.create(
+    {
+      kind,
+      fileName: fileName ? String(fileName).slice(0, 200) : null,
+      summary,
+      scannedFrom,
+      scannedTo,
+      uploadedById: actor?.id ?? null,
+    },
+    { transaction }
+  );
+
 /** The route file: each train's stations in order. Trains not in the file are left alone. */
-async function importStops(text, { apply = false, actor } = {}) {
+async function importStops(text, { apply = false, actor, fileName } = {}) {
   const read = readStops(text);
   if (read.error) throw ApiError.badRequest(read.error);
   const d = await dataset();
@@ -290,6 +387,21 @@ async function importStops(text, { apply = false, actor } = {}) {
     await chunked(rows, (part) =>
       AllocationTrain.bulkCreate(part, { updateOnDuplicate: ["name", "stops", "stopsUpdatedAt", "updatedAt"], transaction })
     );
+    await remember(
+      UPLOAD_KINDS.STOPS,
+      {
+        fileName,
+        actor,
+        summary: {
+          trains: preview.trains,
+          added: preview.added,
+          changed: preview.changed,
+          unchanged: preview.unchanged,
+          skipped: preview.skipped.length,
+        },
+      },
+      transaction
+    );
   });
   invalidate();
   await audit.record({
@@ -306,7 +418,7 @@ async function importStops(text, { apply = false, actor } = {}) {
  * not in it are left as they are. A class still allocated keeps the count
  * typed in for it; one the railway no longer allocates goes, count and all.
  */
-async function importCensus(text, { apply = false, actor } = {}) {
+async function importCensus(text, { apply = false, actor, fileName } = {}) {
   const read = readCensus(text);
   if (read.error) throw ApiError.badRequest(read.error);
   const d = await dataset();
@@ -342,6 +454,12 @@ async function importCensus(text, { apply = false, actor } = {}) {
     else unchanged++;
   }
   const newTrains = [...names].filter(([n]) => !d.trains.has(n)).map(([number, name]) => ({ number, name }));
+  let scannedFrom = null;
+  let scannedTo = null;
+  for (const e of wanted.values()) {
+    scannedFrom = earlier(scannedFrom, e.checkedAt);
+    scannedTo = later(scannedTo, e.checkedAt);
+  }
 
   const preview = {
     kind: "census",
@@ -359,6 +477,8 @@ async function importCensus(text, { apply = false, actor } = {}) {
     countsLost,
     offRoute,
     duplicates,
+    scannedFrom,
+    scannedTo,
     skippedCount: read.skipped.length,
     skipped: read.skipped.slice(0, SKIPPED_SHOWN),
   };
@@ -410,6 +530,28 @@ async function importCensus(text, { apply = false, actor } = {}) {
     }
     await chunked(drop, (part) => AllocationClass.destroy({ where: { id: part }, transaction }));
     await chunked(make, (part) => AllocationClass.bulkCreate(part, { transaction }));
+    await remember(
+      UPLOAD_KINDS.CENSUS,
+      {
+        fileName,
+        actor,
+        scannedFrom,
+        scannedTo,
+        summary: {
+          rows: preview.rows,
+          pairs: preview.pairs,
+          added,
+          changed,
+          unchanged,
+          allocated,
+          notAllocated: preview.notAllocated,
+          skipped: preview.skippedCount,
+          classesRemoved,
+          countsLost,
+        },
+      },
+      transaction
+    );
   });
   invalidate();
 
@@ -433,7 +575,7 @@ async function importCensus(text, { apply = false, actor } = {}) {
 }
 
 /** The counts sheet. Only classes already allocated take a count; blank means not known. */
-async function importCounts(text, { apply = false, actor } = {}) {
+async function importCounts(text, { apply = false, actor, fileName } = {}) {
   const read = readCounts(text);
   if (read.error) throw ApiError.badRequest(read.error);
   const d = await dataset();
@@ -479,12 +621,30 @@ async function importCounts(text, { apply = false, actor } = {}) {
   if (!apply) return { applied: false, preview };
 
   const by = actor?.id ?? null;
+  const now = new Date();
   await sequelize.transaction(async (transaction) => {
     await chunked(changes, (part) =>
       AllocationClass.bulkCreate(
-        part.map((u) => ({ id: u.id, pairId: u.pairId, classCode: u.classCode, seats: u.seats, updatedById: by })),
-        { updateOnDuplicate: ["seats", "updatedById", "updatedAt"], transaction }
+        part.map((u) => ({
+          id: u.id,
+          pairId: u.pairId,
+          classCode: u.classCode,
+          seats: u.seats,
+          updatedById: by,
+          seatsUpdatedAt: now,
+          seatsUpdatedById: by,
+        })),
+        { updateOnDuplicate: ["seats", "updatedById", "seatsUpdatedAt", "seatsUpdatedById", "updatedAt"], transaction }
       )
+    );
+    await remember(
+      UPLOAD_KINDS.COUNTS,
+      {
+        fileName,
+        actor,
+        summary: { rows: preview.rows, set: preview.set, cleared: preview.cleared, unchanged: preview.unchanged, skipped: preview.skippedCount },
+      },
+      transaction
     );
   });
   invalidate();
@@ -561,10 +721,24 @@ async function savePair({ train, from, to, status, classes = [] }, actor) {
     const old = await AllocationClass.findAll({ where: { pairId: pair.id }, transaction });
     for (const row of old) {
       if (!next.has(row.classCode)) await row.destroy({ transaction });
-      else if (row.seats !== next.get(row.classCode)) await row.update({ seats: next.get(row.classCode), updatedById: by }, { transaction });
+      else if (row.seats !== next.get(row.classCode)) {
+        await row.update(
+          { seats: next.get(row.classCode), updatedById: by, seatsUpdatedAt: new Date(), seatsUpdatedById: by },
+          { transaction }
+        );
+      }
     }
     const have = new Set(old.map((r) => r.classCode));
-    const make = [...next].filter(([code]) => !have.has(code)).map(([classCode, seats]) => ({ pairId: pair.id, classCode, seats, updatedById: by }));
+    const make = [...next]
+      .filter(([code]) => !have.has(code))
+      .map(([classCode, seats]) => ({
+        pairId: pair.id,
+        classCode,
+        seats,
+        updatedById: by,
+        seatsUpdatedAt: seats === null ? null : new Date(),
+        seatsUpdatedById: seats === null ? null : by,
+      }));
     if (make.length) await AllocationClass.bulkCreate(make, { transaction });
   });
   invalidate();
@@ -598,6 +772,7 @@ async function clearPair({ train, from, to }) {
 module.exports = {
   NOT_CHECKED,
   meta,
+  uploads,
   list,
   countsSheet,
   importStops,

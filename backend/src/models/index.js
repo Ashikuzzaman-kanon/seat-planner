@@ -55,6 +55,7 @@ const FeatureSwitchTarget = require("./FeatureSwitchTarget");
 const AllocationTrain = require("./AllocationTrain");
 const AllocationPair = require("./AllocationPair");
 const AllocationClass = require("./AllocationClass");
+const AllocationUpload = require("./AllocationUpload");
 const demoCapture = require("../utils/demoCapture");
 
 const models = {
@@ -114,6 +115,7 @@ const models = {
   AllocationTrain,
   AllocationPair,
   AllocationClass,
+  AllocationUpload,
 };
 
 // Wire up associations for any model that declares them.

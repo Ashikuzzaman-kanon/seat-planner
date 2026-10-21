@@ -34,9 +34,14 @@ const countsSheet = asyncHandler(async (req, res) => {
 const upload = (importer) =>
   asyncHandler(async (req, res) => {
     const apply = req.query.apply === "1" || req.query.apply === "true";
-    const result = await importer(req.body, { apply, actor: req.user });
+    const fileName = typeof req.query.name === "string" ? req.query.name.trim() || null : null;
+    const result = await importer(req.body, { apply, actor: req.user, fileName });
     res.json({ message: apply ? "Applied" : "Read — nothing has changed yet", ...result });
   });
+
+const uploads = asyncHandler(async (req, res) => {
+  res.json({ uploads: await allocation.uploads({ limit: req.query.limit }) });
+});
 
 const savePair = asyncHandler(async (req, res) => {
   const pair = await allocation.savePair(req.body, req.user);
@@ -52,6 +57,7 @@ module.exports = {
   meta,
   list,
   countsSheet,
+  uploads,
   importStops: upload(allocation.importStops),
   importCensus: upload(allocation.importCensus),
   importCounts: upload(allocation.importCounts),

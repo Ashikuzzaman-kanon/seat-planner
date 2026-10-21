@@ -10,7 +10,7 @@ import { ProgressSpinner } from "primereact/progressspinner";
 import { Toast } from "primereact/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/constants/permissions";
-import { fetchAllocation, fetchAllocationMeta, stationLabel, STATUS_LABELS } from "@/lib/allocation";
+import { fetchAllocation, fetchAllocationMeta, stationLabel, STATUS_LABELS, span } from "@/lib/allocation";
 import DataPanel from "@/components/allocation/DataPanel";
 import PairDialog from "@/components/allocation/PairDialog";
 import { ClassChips, PairList, PairGrid } from "@/components/allocation/PairViews";
@@ -246,6 +246,12 @@ export default function AllocationPage() {
                       <span className="al-muted">
                         {" "}
                         — {n(s.allocated)} allocated, {n(s.notAllocated)} not allocated, {n(s.notChecked)} not checked
+                      </span>
+                    )}
+                    {s.checkedFrom && (
+                      <span className="al-checked">
+                        {" "}
+                        · railway checked <strong>{span(s.checkedFrom, s.checkedTo)}</strong>
                       </span>
                     )}
                   </>

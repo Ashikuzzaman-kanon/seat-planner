@@ -35,9 +35,9 @@ export async function downloadCountsSheet(params = {}) {
  * unless `apply`. Sent as plain text, since the files are larger than a JSON
  * body may be.
  */
-export async function uploadAllocation(kind, text, apply = false) {
+export async function uploadAllocation(kind, text, apply = false, fileName = null) {
   const { data } = await api.post(`/allocation/import/${kind}`, text, {
-    params: apply ? { apply: 1 } : {},
+    params: { ...(apply ? { apply: 1 } : {}), ...(fileName ? { name: fileName } : {}) },
     headers: { "Content-Type": "text/plain" },
   });
   return data;
@@ -64,3 +64,38 @@ export const STATUS_LABELS = {
   not_allocated: "Not allocated",
   not_checked: "Not checked",
 };
+
+/** The files applied, newest first: [{ kind, fileName, summary, scannedFrom, scannedTo, uploadedBy, uploadedAt }]. */
+export async function fetchAllocationUploads(limit = 20) {
+  const { data } = await api.get("/allocation/uploads", { params: { limit } });
+  return data.uploads;
+}
+
+const DHAKA = "Asia/Dhaka";
+const dayOf = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: DHAKA }).format(d);
+const clock = (d) => d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: DHAKA });
+const dayText = (d) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: DHAKA });
+
+/** "21 Oct 2026, 09:40", in Dhaka time. */
+export function when(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return `${dayText(d)}, ${clock(d)}`;
+}
+
+/** "22 Oct", or "22 Oct 2025" when not this year. */
+export function shortDay(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  const sameYear = dayOf(d).slice(0, 4) === dayOf(new Date()).slice(0, 4);
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }), timeZone: DHAKA });
+}
+
+/** A span of times: "20 Oct 2026, 17:05–17:20" on one day, else both in full. */
+export function span(fromIso, toIso) {
+  if (!fromIso && !toIso) return null;
+  if (!fromIso || !toIso || fromIso === toIso) return when(fromIso || toIso);
+  const a = new Date(fromIso);
+  const b = new Date(toIso);
+  return dayOf(a) === dayOf(b) ? `${dayText(a)}, ${clock(a)}–${clock(b)}` : `${when(fromIso)} – ${when(toIso)}`;
+}

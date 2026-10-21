@@ -2,29 +2,25 @@
 
 import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
-import { stationLabel, STATUS_LABELS } from "@/lib/allocation";
+import { stationLabel, STATUS_LABELS, when, shortDay } from "@/lib/allocation";
 
-const when = (iso) =>
-  iso
-    ? new Date(iso).toLocaleString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "Asia/Dhaka",
-      })
-    : null;
-
-/** Each class with its seats — or "count not available", never a 0 that is not one. */
+/**
+ * Each class with its seats — or "count not available", never a 0 that is not
+ * one — and when a count was last set.
+ */
 export function ClassChips({ classes }) {
   if (!classes.length) return <span className="al-muted">Classes not given</span>;
   return (
     <span className="al-classes">
       {classes.map((c) => (
-        <span key={c.code} className={`al-class${c.seats === null ? " is-unknown" : ""}`}>
+        <span
+          key={c.code}
+          className={`al-class${c.seats === null ? " is-unknown" : ""}`}
+          title={c.seats !== null && c.seatsUpdatedAt ? `Count set ${when(c.seatsUpdatedAt)}` : undefined}
+        >
           <strong>{c.code}</strong>
           {c.seats === null ? <em>count not available</em> : <span>{c.seats.toLocaleString("en-GB")} seats</span>}
+          {c.seats !== null && c.seatsUpdatedAt && <small>updated {shortDay(c.seatsUpdatedAt)}</small>}
         </span>
       ))}
     </span>
