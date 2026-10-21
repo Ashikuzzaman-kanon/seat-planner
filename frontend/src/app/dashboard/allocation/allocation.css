@@ -329,10 +329,16 @@
   font-size: 0.82rem;
 }
 .al-legend .al-cell {
-  width: 1.4rem;
-  height: 1.4rem;
+  width: auto;
+  min-width: 1.6rem;
+  height: 1.5rem;
   margin-left: 0.5rem;
+  padding: 0 0.3rem;
   cursor: default;
+}
+.al-legend__class {
+  color: var(--ink);
+  letter-spacing: 0.02em;
 }
 .al-grid-wrap {
   overflow-x: auto;
@@ -375,13 +381,16 @@
   padding-bottom: 0.25rem;
 }
 .al-grid__none {
-  width: 1.9rem;
+  width: 2.4rem;
 }
+/* Wide enough for "120", "80+" and "1.2k"; numbers are seats, nothing else. */
 .al-cell {
   display: inline-grid;
   place-items: center;
-  width: 1.9rem;
+  width: 2.4rem;
   height: 1.9rem;
+  font-size: 0.74rem;
+  letter-spacing: -0.01em;
   padding: 0;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -396,6 +405,12 @@
 }
 .al-cell.is-not_allocated {
   background: var(--border-strong);
+}
+/* The census lists the class, but no seats are set aside. */
+.al-cell.is-zero {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  color: var(--warn);
 }
 .al-cell.is-not_checked {
   background: var(--surface);

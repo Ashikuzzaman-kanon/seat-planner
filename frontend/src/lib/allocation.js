@@ -99,3 +99,47 @@ export function span(fromIso, toIso) {
   const b = new Date(toIso);
   return dayOf(a) === dayOf(b) ? `${dayText(a)}, ${clock(a)}–${clock(b)}` : `${when(fromIso)} – ${when(toIso)}`;
 }
+
+/** Seats in a grid cell: 120, 1.2k, 12k — so the cell stays square. */
+export function seatsText(n) {
+  if (n >= 10000) return `${Math.round(n / 1000)}k`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return String(n);
+}
+
+/**
+ * What one grid cell shows. A number in a cell is only ever seats.
+ *
+ * With a class chosen, that class's seats: ✓ while its count is not known, 0
+ * when the census lists it but no seats are set aside, and the pair as not
+ * allocated for that class when it is not listed. With none chosen, the seats
+ * of every class added up — ✓ while none is counted, "80+" while some are not.
+ *
+ * `tone`: allocated (green), zero (amber), not_allocated (grey), not_checked.
+ */
+export function cellOf(pair, classCode) {
+  const status = pair?.status || "not_checked";
+  if (status !== "allocated") return { tone: status, text: "", note: null };
+  if (classCode) {
+    const c = pair.classes.find((x) => x.code === classCode);
+    if (!c) return { tone: "not_allocated", text: "", note: `${classCode} not allocated` };
+    if (c.seats === null) return { tone: "allocated", text: "✓", note: `${classCode}: count not available` };
+    if (c.seats === 0) return { tone: "zero", text: "0", note: `${classCode}: no seats set aside` };
+    return { tone: "allocated", text: seatsText(c.seats), note: `${classCode}: ${c.seats} seats` };
+  }
+  const counted = pair.classes.filter((c) => c.seats !== null);
+  const total = counted.reduce((sum, c) => sum + c.seats, 0);
+  const notCounted = pair.classes.length - counted.length;
+  if (!counted.length) return { tone: "allocated", text: "✓", note: "counts not available" };
+  if (!notCounted) {
+    return total === 0
+      ? { tone: "zero", text: "0", note: "no seats set aside" }
+      : { tone: "allocated", text: seatsText(total), note: `${total} seats` };
+  }
+  if (total === 0) return { tone: "allocated", text: "✓", note: "counts not available for every class" };
+  return {
+    tone: "allocated",
+    text: `${seatsText(total)}+`,
+    note: `${total} seats counted, ${notCounted} class${notCounted === 1 ? "" : "es"} not counted`,
+  };
+}

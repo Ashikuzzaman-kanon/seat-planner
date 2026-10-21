@@ -13,7 +13,7 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { fetchAllocation, fetchAllocationMeta, stationLabel, STATUS_LABELS, span } from "@/lib/allocation";
 import DataPanel from "@/components/allocation/DataPanel";
 import PairDialog from "@/components/allocation/PairDialog";
-import { ClassChips, PairList, PairGrid } from "@/components/allocation/PairViews";
+import { ClassChips, PairList, PairGrid, GridLegend } from "@/components/allocation/PairViews";
 import "./allocation.css";
 
 const PAGE_SIZE = 50;
@@ -299,16 +299,13 @@ export default function AllocationPage() {
             ) : grid ? (
               data?.route ? (
                 <>
-                  <div className="al-legend" aria-hidden="true">
-                    <span className="al-cell is-allocated">2</span> allocated, number of classes
-                    <span className="al-cell is-not_allocated" /> not allocated
-                    <span className="al-cell is-not_checked" /> not checked
-                  </div>
+                  <GridLegend classCode={filters.cls} />
                   <PairGrid
                     route={data.route}
                     items={data.items}
                     selected={selected}
                     onSelect={(p) => setSelected(p)}
+                    classCode={filters.cls}
                   />
                   {selected && (
                     <div className="card al-picked">

@@ -184,6 +184,34 @@ const clickText = (page, selector, pattern) =>
     return /37 seats/.test(t) ? t : null;
   });
   check("and the count shows when it was updated", /updated/.test(chip || ""), chip || "");
+
+  // A number in a cell is seats, never a number of classes.
+  const counted = pairNow.classes.find((c) => c.seats === 37);
+  const others = pairNow.classes.filter((c) => c.code !== counted.code);
+  const cellText = () =>
+    admin.evaluate(
+      ([f, t]) => [...document.querySelectorAll(".al-grid .al-cell")].find((c) => c.title.startsWith(`${f} to ${t}:`))?.innerText.trim(),
+      target
+    );
+  const expected = others.some((c) => c.seats === null) ? "37+" : "37";
+  check(`the cell shows its seats: ${expected}, not how many classes`, (await cellText()) === expected, await cellText());
+  await pick(admin, "al-class", counted.code);
+  await waitFor(admin, () => Boolean(document.querySelector(".al-legend__class")));
+  check(`with ${counted.code} chosen, that class's seats`, (await cellText()) === "37", await cellText());
+  check("and the legend says which class", (await admin.evaluate(() => document.querySelector(".al-legend")?.innerText || "")).includes(counted.code));
+  if (others.length) {
+    await pick(admin, "al-class", others[0].code);
+    const other = await cellText();
+    check(`with ${others[0].code} chosen, its count — not known here, so ✓`, other === (others[0].seats === null ? "✓" : String(others[0].seats)), other);
+  }
+  await admin.evaluate(() => document.querySelector("#al-class")?.closest(".p-dropdown")?.querySelector(".p-dropdown-clear-icon")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  await waitFor(admin, () => !document.querySelector(".al-legend__class"));
+  // Pick the pair again, to take the count back out.
+  await admin.evaluate(
+    ([f, t]) => [...document.querySelectorAll(".al-grid .al-cell")].find((c) => c.title.startsWith(`${f} to ${t}:`)).click(),
+    target
+  );
+  await admin.waitForSelector(".al-picked");
   await clickText(admin, ".al-picked button", "^Edit$");
   await admin.waitForSelector(".p-dialog .al-edit");
   const again = await admin.$(".p-dialog .al-edit__row .p-inputnumber-input");
