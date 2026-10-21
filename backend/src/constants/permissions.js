@@ -94,6 +94,10 @@ const PERMISSIONS = Object.freeze({
   // Real railway data
   RAILWAY_MANAGE: "railway:manage",
 
+  // Seat allocation: the railway's own, as scanned (kept apart from booking data)
+  ALLOCATION_VIEW: "allocation:view",
+  ALLOCATION_MANAGE: "allocation:manage",
+
   // Subscriptions. Asking for one needs no permission — everyone signed in can.
   SUBSCRIPTION_MANAGE: "subscription:manage",
   SUBSCRIPTION_APPROVE: "subscription:approve",
@@ -460,6 +464,24 @@ const PERMISSION_CATALOGUE = Object.freeze([
       "Load Bangladesh Railway's published stations, trains and routes, and the seat plans transcribed " +
       "for them, and make the trains that have plans ready for departures. Adds what is missing and " +
       "leaves anything already there as it is.",
+  },
+
+  {
+    key: PERMISSIONS.ALLOCATION_VIEW,
+    group: "Seat allocation",
+    label: "See the railway's seat allocation",
+    description:
+      "See which station pairs Bangladesh Railway actually sets seats aside for, train by train and class " +
+      "by class, with the seat counts where they are known. A view of the railway's own data, kept apart " +
+      "from this site's trains and bookings.",
+  },
+  {
+    key: PERMISSIONS.ALLOCATION_MANAGE,
+    group: "Seat allocation",
+    label: "Upload and correct the seat allocation",
+    description:
+      "Upload the train routes, the census of which pairs have seats, and the sheet of seat counts — each " +
+      "shown before it is applied — and correct a pair by hand. Changes nothing the site books on.",
   },
 
   {

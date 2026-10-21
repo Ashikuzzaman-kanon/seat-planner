@@ -23,6 +23,7 @@ const railwayRoutes = require("./railwayRoutes");
 const notificationRoutes = require("./notificationRoutes");
 const subscriptionRoutes = require("./subscriptionRoutes");
 const featureRoutes = require("./featureRoutes");
+const allocationRoutes = require("./allocationRoutes");
 const { PERMISSION_CATALOGUE } = require("../constants/permissions");
 const openapi = require("../docs/openapi");
 
@@ -42,6 +43,7 @@ router.use("/users", userRoutes);
 router.use("/roles", roleRoutes);
 router.use("/settings", settingRoutes);
 router.use("/features", featureRoutes);
+router.use("/allocation", allocationRoutes);
 router.use("/audit", auditRoutes);
 router.use("/reference", referenceRoutes);
 router.use("/plans", seatPlanRoutes);

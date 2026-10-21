@@ -1,0 +1,480 @@
+/* Seat Allocation: the railway's own data on which pairs have seats. */
+
+.al {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.al-head .page-subtitle {
+  max-width: 72ch;
+}
+.al-muted {
+  color: var(--muted);
+}
+.al-warn {
+  color: var(--warn);
+}
+.al-loading {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}
+
+/* ---------------- The data, and the files that fill it ---------------- */
+
+.al-data {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+}
+.al-data__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.1rem;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.al-data__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.al-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+}
+.al-empty > .pi {
+  font-size: 2rem;
+  color: var(--brand-600);
+}
+.al-empty h2 {
+  margin: 0.25rem 0 0;
+  font-size: 1.2rem;
+}
+.al-empty p {
+  max-width: 56ch;
+  margin: 0;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+
+/* ---------------- Filters ---------------- */
+
+.al-filters {
+  display: grid;
+  gap: 0.75rem;
+}
+.al-filters__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.al-filters__grid label {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.al-filters__grid label > span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.al-filters__grid .p-dropdown {
+  width: 100%;
+  min-width: 0;
+}
+.al-filters__more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.al-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* ---------------- Summary ---------------- */
+
+.al-results {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.al-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+.al-summary__line {
+  flex: 1 1 24rem;
+  margin: 0;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.al-summary__classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex-basis: 100%;
+  order: 3;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.al-summary__classes li {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+.al-view .p-button {
+  padding: 0.4rem 0.8rem;
+}
+.al-view__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.al-none {
+  margin: 0;
+  padding: 1.5rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ---------------- The list ---------------- */
+
+.al-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.al-pair {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-width: 0;
+}
+.al-pair.is-not_allocated,
+.al-pair.is-not_checked {
+  background: var(--surface-2);
+}
+.al-pair.is-not_checked {
+  border-style: dashed;
+}
+.al-pair__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  min-width: 0;
+}
+.al-train {
+  color: var(--ink-2);
+  font-size: 0.88rem;
+}
+.al-train strong {
+  margin-right: 0.15rem;
+  color: var(--brand-700);
+  font-variant-numeric: tabular-nums;
+}
+.al-journey {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 650;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.al-journey .pi {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.al-pair__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+}
+
+.al-classes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.al-class {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-sm);
+  background: var(--ok-soft);
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-variant-numeric: tabular-nums;
+}
+.al-class strong {
+  color: var(--ok);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.al-class.is-unknown {
+  background: var(--surface-2);
+  border: 1px dashed var(--border-strong);
+}
+.al-class em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 0.8rem;
+}
+
+/* ---------------- The grid ---------------- */
+
+.al-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.al-legend .al-cell {
+  width: 1.4rem;
+  height: 1.4rem;
+  margin-left: 0.5rem;
+  cursor: default;
+}
+.al-grid-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.al-grid {
+  border-collapse: separate;
+  border-spacing: 3px;
+  font-size: 0.78rem;
+}
+.al-grid th {
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.al-grid__corner,
+.al-grid__from {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  padding: 0 0.5rem 0 0.4rem;
+  background: var(--surface);
+  text-align: right;
+}
+.al-grid__corner {
+  vertical-align: bottom;
+  color: var(--muted) !important;
+  font-weight: 500 !important;
+}
+.al-grid__to {
+  height: 9rem;
+  vertical-align: bottom;
+}
+.al-grid__to span {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  padding-bottom: 0.25rem;
+}
+.al-grid__none {
+  width: 1.9rem;
+}
+.al-cell {
+  display: inline-grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.al-cell.is-allocated {
+  background: var(--ok);
+  color: #fff;
+}
+.al-cell.is-not_allocated {
+  background: var(--border-strong);
+}
+.al-cell.is-not_checked {
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+}
+.al-cell.is-selected {
+  outline: 3px solid var(--brand-500);
+  outline-offset: 1px;
+}
+.al-cell:focus-visible {
+  outline: 3px solid var(--brand-500);
+}
+.al-picked {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+
+/* ---------------- Dialogs ---------------- */
+
+.al-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.al-dialog__forget {
+  margin-right: auto;
+}
+.al-preview {
+  display: grid;
+  gap: 0.75rem;
+}
+.al-preview__lead {
+  margin: 0;
+  color: var(--muted);
+}
+.al-preview__facts {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.1rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.al-skipped h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+}
+.al-skipped__list {
+  max-height: 16rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.al-skipped__list table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.al-skipped__list td {
+  padding: 0.35rem 0.55rem;
+  border-top: 1px solid var(--border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.al-skipped__list tr:first-child td {
+  border-top: 0;
+}
+.al-skipped__list td:first-child {
+  white-space: nowrap;
+}
+
+.al-edit {
+  display: grid;
+  gap: 1rem;
+}
+.al-edit__pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-weight: 650;
+}
+.al-edit__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.al-edit__status label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.al-edit__status label.is-on {
+  border-color: var(--brand-500);
+  background: var(--brand-50);
+}
+.al-edit__classes {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: start;
+}
+.al-edit__head,
+.al-edit__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 9rem) auto;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+.al-edit__head {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.al-edit__row .p-dropdown,
+.al-edit__row .p-inputnumber {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---------------- A phone ---------------- */
+
+@media (max-width: 900px) {
+  .al-filters__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 520px) {
+  .al-filters__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .al-edit__head,
+  .al-edit__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 6.5rem) auto;
+  }
+}

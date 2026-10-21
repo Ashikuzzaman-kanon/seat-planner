@@ -107,6 +107,12 @@ module.exports = {
     { name: "Users", description: "User directory and role assignment" },
     { name: "Settings", description: "Runtime-configurable values" },
     { name: "Features", description: "Switching tabs of the app off, for everyone or for chosen users and roles" },
+    {
+      name: "Seat allocation",
+      description:
+        "Which station pairs the railway actually sets seats aside for, per train and class — the railway's own " +
+        "data, uploaded from a census of its booking site and kept apart from the site's trains and bookings",
+    },
     { name: "Audit", description: "Record of privileged actions" },
     { name: "Network", description: "Stations, trains, routes, fares and seat attributes" },
     { name: "Departures", description: "Composition, schedules, and the trips generated from them" },
@@ -150,6 +156,32 @@ module.exports = {
             "serves, and the message the super admin left",
         },
         errors: arr(obj({ field: str(), message: str() })),
+      }),
+
+      AllocationClass: obj({
+        code: str("The railway's class code, such as S_CHAIR"),
+        seats: { ...int("Seats set aside. null while the count is not known — not the same as 0"), nullable: true },
+      }),
+
+      AllocationPair: obj({
+        train: obj({ number: int(), name: str() }),
+        from: str("Station, named as the railway names it"),
+        to: str(),
+        status: { type: "string", enum: ["allocated", "not_allocated", "not_checked"] },
+        checkedAt: { type: "string", format: "date-time", nullable: true },
+        source: { type: "string", enum: ["census", "manual"], nullable: true },
+        onRoute: { ...bool("Both stations on the train's uploaded route, in that order; null with no route"), nullable: true },
+        classes: arr(ref("AllocationClass")),
+      }),
+
+      AllocationSummary: obj({
+        trains: int(),
+        pairs: int(),
+        stations: int(),
+        allocated: int(),
+        notAllocated: int(),
+        notChecked: int(),
+        classes: arr(obj({ code: str(), pairs: int(), counted: int("Pairs with a count known"), seats: int("Their total") })),
       }),
 
       UnavailableFeature: obj({
@@ -1707,6 +1739,153 @@ module.exports = {
           403: errors[403],
           404: response("No feature by that name (Settings has none)", ref("Error")),
         },
+      },
+    },
+
+    "/allocation/meta": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "What there is to filter by, and how much data there is",
+        ...secured("allocation:view"),
+        responses: {
+          200: response(
+            "Trains, stations and classes, with totals",
+            obj({
+              trains: arr(obj({ number: int(), name: str(), hasStops: bool() })),
+              stations: arr(str()),
+              classes: arr(str()),
+              totals: obj({
+                trains: int(),
+                trainsWithStops: int(),
+                pairs: int(),
+                allocated: int(),
+                notAllocated: int(),
+                classes: int(),
+                counted: int(),
+              }),
+              updatedAt: { type: "string", format: "date-time", nullable: true },
+            })
+          ),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "The pairs that match: any of from, to, train and class",
+        description: [
+          "Each filter left out means all. From and to together: the trains with seats on that journey; from",
+          "alone: everywhere a train with seats goes from there; a train alone: its pairs in route order, with",
+          "its route. Only allocated pairs unless show=all, which adds pairs found not allocated and — from the",
+          "uploaded routes — the pairs nobody has checked. The summary covers every match, not just the page.",
+        ].join("\n"),
+        ...secured("allocation:view"),
+        parameters: [
+          queryParam("from", "Boarding station"),
+          queryParam("to", "Destination"),
+          queryParam("train", "Train number", "integer"),
+          queryParam("class", "Class code"),
+          queryParam("show", "allocated (default) or all"),
+          queryParam("page", "From 1", "integer"),
+          queryParam("pageSize", "1 to 1000; 50 by default", "integer"),
+        ],
+        responses: {
+          200: response(
+            "Pairs",
+            obj({
+              items: arr(ref("AllocationPair")),
+              total: int(),
+              page: int(),
+              pageSize: int(),
+              summary: ref("AllocationSummary"),
+              route: { ...arr(str()), nullable: true, description: "With train: its stations in order, if uploaded" },
+            })
+          ),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation/counts.csv": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "The counts sheet: one line per allocated class, for the same filters",
+        description: "Columns train, train_name, from, to, class, seats — seats blank where the count is not known. Fill it in and upload it back.",
+        ...secured("allocation:view"),
+        parameters: [queryParam("from", "Boarding station"), queryParam("to", "Destination"), queryParam("train", "Train number", "integer"), queryParam("class", "Class code")],
+        responses: {
+          200: { description: "CSV", content: { "text/csv": { schema: { type: "string" } } } },
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation/import/{kind}": {
+      post: {
+        tags: ["Seat allocation"],
+        summary: "Upload a file: read it, and with ?apply=1 apply it",
+        description: [
+          "The file is the request body, sent as text/plain (it may be several megabytes). kind:",
+          "- stops: train-stoppages.json, each train's stations in order. Trains not in the file are left alone.",
+          "- census: the census CSV (From, To, Result, Trains with seats (classes), Trains on the route, Scanned at).",
+          "  Pairs in the file replace what is stored for them; the rest are left alone. A class still allocated keeps",
+          "  its count; one no longer allocated goes. Failed scans, and Allocated without the trains named, are left out.",
+          "- counts: the counts sheet. Only classes already allocated take a count; blank means not known.",
+          "Without apply nothing changes: the preview says what applying would do, and what is left out and why.",
+        ].join("\n"),
+        ...secured("allocation:manage"),
+        parameters: [
+          pathParam("kind", "stops, census or counts", "string"),
+          queryParam("apply", "1 to apply; otherwise only read"),
+        ],
+        requestBody: { required: true, content: { "text/plain": { schema: { type: "string" } } } },
+        responses: {
+          200: response(
+            "Read, or applied",
+            obj({ message: str(), applied: bool(), preview: { type: "object", description: "What the file holds and does" } })
+          ),
+          400: errors[400],
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation/pairs": {
+      put: {
+        tags: ["Seat allocation"],
+        summary: "Set one train's pair by hand: allocated with its classes and counts, or not allocated",
+        ...secured("allocation:manage"),
+        requestBody: body(
+          obj(
+            {
+              train: int(),
+              from: str(),
+              to: str(),
+              status: { type: "string", enum: ["allocated", "not_allocated"] },
+              classes: arr(ref("AllocationClass")),
+            },
+            ["train", "from", "to", "status"]
+          )
+        ),
+        responses: {
+          200: response("Saved", obj({ message: str(), pair: ref("AllocationPair") })),
+          400: response("Not on the train's route in that order, or a class or count that is not one", ref("Error")),
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+      delete: {
+        tags: ["Seat allocation"],
+        summary: "Forget a pair: back to not checked",
+        ...secured("allocation:manage"),
+        parameters: [
+          { name: "train", in: "query", required: true, schema: { type: "integer" } },
+          { name: "from", in: "query", required: true, schema: { type: "string" } },
+          { name: "to", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: { 200: response("Forgotten", obj({ message: str() })), 403: errors[403], 404: errors[404] },
       },
     },
 

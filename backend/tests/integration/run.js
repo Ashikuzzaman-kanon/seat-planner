@@ -179,6 +179,7 @@ async function restore() {
 
   await require(path.join(BACKEND, "src/services/settingService")).loadSettings();
   await require(path.join(BACKEND, "src/services/featureService")).loadSwitches();
+  require(path.join(BACKEND, "src/services/allocationService")).invalidate();
   require(path.join(BACKEND, "src/services/permissionService")).invalidateAll();
   await jobService.startWorker();
 }
@@ -280,7 +281,11 @@ const signal = (out) =>
       const failures = lines.filter((l) => /\bFAIL\b|Error|crashed/.test(l));
       // Long details (a whole JSON response) are cut: the line says what failed.
       const cut = (l) => (l.length > 240 ? `${l.slice(0, 240)}…` : l);
-      console.log((failures.length ? failures : lines).slice(-15).map((l) => `        ${cut(l)}`).join("\n"));
+      // A suite that crashed never printed its count: show how it ended, not
+      // only the lines that happen to say "Error".
+      const crashed = !/passed, \d+ failed/.test(tail);
+      const shown = crashed ? lines.slice(-25) : (failures.length ? failures : lines).slice(-15);
+      console.log(shown.map((l) => `        ${cut(l)}`).join("\n"));
     }
   }
 

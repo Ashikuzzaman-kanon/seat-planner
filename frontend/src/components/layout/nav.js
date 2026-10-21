@@ -148,6 +148,14 @@ export const NAV_GROUPS = [
         permission: PERMISSIONS.PLAN_APPROVE,
         blurb: "Plans waiting for sign-off",
       },
+      {
+        href: "/dashboard/allocation",
+        feature: "seat-allocation",
+        label: "Seat Allocation",
+        icon: "pi pi-chart-bar",
+        permission: PERMISSIONS.ALLOCATION_VIEW,
+        blurb: "Which pairs the railway gives seats to",
+      },
     ],
   },
   {

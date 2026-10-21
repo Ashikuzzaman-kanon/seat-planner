@@ -52,6 +52,9 @@ const AppToken = require("./AppToken");
 const RailwayTimetable = require("./RailwayTimetable");
 const FeatureSwitch = require("./FeatureSwitch");
 const FeatureSwitchTarget = require("./FeatureSwitchTarget");
+const AllocationTrain = require("./AllocationTrain");
+const AllocationPair = require("./AllocationPair");
+const AllocationClass = require("./AllocationClass");
 const demoCapture = require("../utils/demoCapture");
 
 const models = {
@@ -108,6 +111,9 @@ const models = {
   RailwayTimetable,
   FeatureSwitch,
   FeatureSwitchTarget,
+  AllocationTrain,
+  AllocationPair,
+  AllocationClass,
 };
 
 // Wire up associations for any model that declares them.

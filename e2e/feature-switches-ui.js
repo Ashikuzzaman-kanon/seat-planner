@@ -86,7 +86,7 @@ const rowText = (page, label) =>
     await admin.goto(`${BASE}/dashboard/settings`, { waitUntil: "networkidle0" });
     await admin.waitForSelector(".fs__row");
     const rows = await admin.evaluate(() => document.querySelectorAll(".fs__row").length);
-    check("every tab but Settings is listed, all on", rows === 23 && /Everything on/.test(await admin.evaluate(() => document.querySelector(".fs")?.innerText)), `${rows}`);
+    check("every tab but Settings is listed, all on", rows === 24 && /Everything on/.test(await admin.evaluate(() => document.querySelector(".fs")?.innerText)), `${rows}`);
 
     console.log("\n== Wallet off for everyone ==");
     await openSwitch(admin, "Wallet");
