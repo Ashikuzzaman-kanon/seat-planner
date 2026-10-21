@@ -329,10 +329,16 @@
   font-size: 0.82rem;
 }
 .al-legend .al-cell {
-  width: 1.4rem;
-  height: 1.4rem;
+  width: auto;
+  min-width: 1.6rem;
+  height: 1.5rem;
   margin-left: 0.5rem;
+  padding: 0 0.3rem;
   cursor: default;
+}
+.al-legend__class {
+  color: var(--ink);
+  letter-spacing: 0.02em;
 }
 .al-grid-wrap {
   overflow-x: auto;
@@ -375,13 +381,16 @@
   padding-bottom: 0.25rem;
 }
 .al-grid__none {
-  width: 1.9rem;
+  width: 2.4rem;
 }
+/* Wide enough for "120", "80+" and "1.2k"; numbers are seats, nothing else. */
 .al-cell {
   display: inline-grid;
   place-items: center;
-  width: 1.9rem;
+  width: 2.4rem;
   height: 1.9rem;
+  font-size: 0.74rem;
+  letter-spacing: -0.01em;
   padding: 0;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -397,6 +406,12 @@
 .al-cell.is-not_allocated {
   background: var(--border-strong);
 }
+/* The census lists the class, but no seats are set aside. */
+.al-cell.is-zero {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  color: var(--warn);
+}
 .al-cell.is-not_checked {
   background: var(--surface);
   border: 1px dashed var(--border-strong);
@@ -408,10 +423,118 @@
 .al-cell:focus-visible {
   outline: 3px solid var(--brand-500);
 }
-.al-picked {
+/* A cell's card: at once on hover, kept open by a click or a tap. */
+.al-card {
+  position: fixed;
+  z-index: 1100;
   display: grid;
+  gap: 0.45rem;
+  width: min(18rem, calc(100vw - 16px));
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  color: var(--ink);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+/* Hovering never catches the pointer: moving off the cell always closes it. */
+.al-card.is-hover {
+  pointer-events: none;
+}
+.al-card.is-pinned {
+  border-color: var(--brand-500);
+  box-shadow: var(--shadow-lg);
+}
+.al-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 0.5rem;
-  justify-items: start;
+}
+.al-card__pair {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.al-card__pair .pi {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.al-card__close {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin: -0.25rem -0.35rem 0 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.al-card__close:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.al-card__status {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.al-card__status.tone-allocated {
+  color: var(--ok);
+}
+.al-card__status.tone-zero {
+  color: var(--warn);
+}
+.al-card__status.tone-not_allocated,
+.al-card__status.tone-not_checked {
+  color: var(--muted);
+}
+.al-card__classes {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.al-card__classes li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.25rem 0.45rem;
+  border-radius: 6px;
+  background: var(--surface-2);
+  font-variant-numeric: tabular-nums;
+}
+.al-card__classes li.is-chosen {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+}
+.al-card__classes em {
+  color: var(--muted);
+  font-style: normal;
+}
+.al-card__classes .is-zero {
+  color: var(--warn);
+  font-weight: 600;
+}
+.al-card__classes small {
+  color: var(--muted);
+}
+.al-card__note,
+.al-card__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.al-card__edit {
+  justify-self: start;
 }
 
 /* ---------------- Dialogs ---------------- */

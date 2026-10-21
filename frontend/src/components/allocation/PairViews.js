@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
-import { stationLabel, STATUS_LABELS, when, shortDay } from "@/lib/allocation";
+import { stationLabel, STATUS_LABELS, when, shortDay, cellOf } from "@/lib/allocation";
+import CellCard from "./CellCard";
 
 /**
  * Each class with its seats — or "count not available", never a 0 that is not
@@ -28,6 +30,25 @@ export function ClassChips({ classes }) {
 }
 
 const SEVERITY = { not_allocated: "secondary", not_checked: "warning" };
+
+/** What the grid's cells mean — for the class chosen, if one is. */
+export function GridLegend({ classCode }) {
+  return (
+    <div className="al-legend" aria-hidden="true">
+      {classCode && <strong className="al-legend__class">{classCode}</strong>}
+      <span className="al-cell is-allocated">✓</span> allocated, count not known
+      <span className="al-cell is-allocated">120</span> seats set aside
+      {!classCode && (
+        <>
+          <span className="al-cell is-allocated">80+</span> more in classes not counted
+        </>
+      )}
+      <span className="al-cell is-zero">0</span> none set aside
+      <span className="al-cell is-not_allocated" /> {classCode ? `${classCode} not allocated` : "not allocated"}
+      <span className="al-cell is-not_checked" /> not checked
+    </div>
+  );
+}
 
 /** The pairs as a list, one card each. */
 export function PairList({ items, oneTrain, canManage, onEdit }) {
@@ -76,11 +97,63 @@ export function PairList({ items, oneTrain, canManage, onEdit }) {
 
 /**
  * One train's pairs as a grid: boarding stations down the side, destinations
- * across the top, in route order. A cell shows how many classes have seats.
+ * across the top, in route order. A number in a cell is only ever seats: of
+ * the class chosen, or of every class added up (see cellOf).
+ *
+ * Every class and count of a cell is in a card beside it: shown at once on
+ * hover (or focus) and gone when the pointer leaves; kept open by a click or
+ * a tap until it is closed, Escape is pressed, or something else is clicked.
  */
-export function PairGrid({ route, items, selected, onSelect }) {
+export function PairGrid({ route, items, classCode = null, canManage = false, onEdit }) {
   const cells = new Map(items.map((p) => [`${p.from}|${p.to}`, p]));
   const pos = new Map(route.map((s, i) => [s, i]));
+  // { key: "from|to", from, to, el } — the pair is looked up fresh, so an edit shows at once.
+  const [hover, setHover] = useState(null);
+  const [pinned, setPinned] = useState(null);
+  // Hover cards only where there is a pointer that hovers: on a touch screen a
+  // tap opens the card that stays, and nothing is left hanging after it.
+  const [canHover, setCanHover] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(hover: hover) and (pointer: fine)");
+    setCanHover(media.matches);
+    const change = (e) => setCanHover(e.matches);
+    media.addEventListener?.("change", change);
+    return () => media.removeEventListener?.("change", change);
+  }, []);
+
+  useEffect(() => {
+    if (!pinned) return undefined;
+    const onKey = (e) => e.key === "Escape" && setPinned(null);
+    const onDown = (e) => {
+      if (e.target.closest?.(".al-card.is-pinned") || e.target.closest?.(".al-grid .al-cell")) return;
+      if (e.target.closest?.(".p-dialog, .p-dialog-mask")) return;
+      setPinned(null);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("touchstart", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("touchstart", onDown);
+    };
+  }, [pinned]);
+
+  const card = (spot, isPinned) =>
+    spot && (
+      <CellCard
+        anchor={spot.el}
+        pair={cells.get(spot.key)}
+        from={spot.from}
+        to={spot.to}
+        classCode={classCode}
+        pinned={isPinned}
+        canManage={canManage}
+        onEdit={() => onEdit?.(cells.get(spot.key))}
+        onClose={() => setPinned(null)}
+      />
+    );
+
   return (
     <div className="al-grid-wrap">
       <table className="al-grid">
@@ -107,20 +180,29 @@ export function PairGrid({ route, items, selected, onSelect }) {
                 if (j <= i) return <td key={to} className="al-grid__none" />;
                 const p = cells.get(`${from}|${to}`);
                 const status = p?.status || "not_checked";
-                const on = selected && selected.from === from && selected.to === to;
+                const cell = cellOf(p, classCode);
+                const key = `${from}|${to}`;
+                const spot = (el) => ({ key, from, to, el });
+                const on = pinned?.key === key;
                 const label = `${stationLabel(from)} to ${stationLabel(to)}: ${STATUS_LABELS[status]}${
-                  p?.classes?.length ? ` — ${p.classes.map((c) => `${c.code} ${c.seats ?? "count not available"}`).join(", ")}` : ""
-                }`;
+                  cell.note ? ` (${cell.note})` : ""
+                }${p?.classes?.length ? ` — ${p.classes.map((c) => `${c.code} ${c.seats ?? "count not available"}`).join(", ")}` : ""}`;
                 return (
                   <td key={to}>
                     <button
                       type="button"
-                      className={`al-cell is-${status}${on ? " is-selected" : ""}`}
-                      title={label}
+                      className={`al-cell is-${cell.tone}${on ? " is-selected" : ""}`}
                       aria-label={label}
-                      onClick={() => onSelect(p || null, from, to)}
+                      aria-expanded={on}
+                      data-from={from}
+                      data-to={to}
+                      onMouseEnter={(e) => canHover && setHover(spot(e.currentTarget))}
+                      onMouseLeave={() => setHover(null)}
+                      onFocus={(e) => setHover(spot(e.currentTarget))}
+                      onBlur={() => setHover(null)}
+                      onClick={(e) => setPinned(on ? null : spot(e.currentTarget))}
                     >
-                      {status === "allocated" ? p.classes.length || "✓" : ""}
+                      {cell.text}
                     </button>
                   </td>
                 );
@@ -129,6 +211,8 @@ export function PairGrid({ route, items, selected, onSelect }) {
           ))}
         </tbody>
       </table>
+      {card(pinned, true)}
+      {hover?.key !== pinned?.key && card(hover, false)}
     </div>
   );
 }

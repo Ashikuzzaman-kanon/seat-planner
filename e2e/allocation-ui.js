@@ -143,49 +143,93 @@ const clickText = (page, selector, pattern) =>
     allocated: document.querySelectorAll(".al-grid .al-cell.is-allocated").length,
   }));
   check("as a grid, every pair of its route, the allocated ones marked", cells.all > 0 && cells.allocated > 0, JSON.stringify(cells));
-  await admin.evaluate(() => document.querySelector(".al-grid .al-cell.is-allocated").click());
-  await admin.waitForSelector(".al-picked");
-  const picked = await admin.evaluate(() => document.querySelector(".al-picked").innerText);
-  check("a cell shows its pair and classes", /→|\n/.test(picked) && /seats|count not available/.test(picked), picked);
+  // The pair worked with from here on: the first allocated cell, by its stations.
+  const target = await admin.evaluate(() => {
+    const c = document.querySelector(".al-grid .al-cell.is-allocated");
+    return [c.dataset.from, c.dataset.to];
+  });
+  const cellEl = async () =>
+    (
+      await admin.evaluateHandle(
+        ([f, t]) => [...document.querySelectorAll(".al-grid .al-cell")].find((c) => c.dataset.from === f && c.dataset.to === t),
+        target
+      )
+    ).asElement();
+  const cellText = async () => (await (await cellEl()).evaluate((c) => c.innerText.trim()));
+  const pinnedText = () => admin.evaluate(() => document.querySelector(".al-card.is-pinned")?.innerText || "");
+
+  console.log("\n== a cell's card ==");
+  await (await cellEl()).hover();
+  const hoverCard = await waitFor(admin, () => document.querySelector(".al-card.is-hover")?.innerText, null, 1500);
+  check("hovering shows its card at once: the pair, each class and its count",
+    Boolean(hoverCard) && /seats|count not available/.test(hoverCard) && /Click to keep it open/.test(hoverCard), hoverCard || "");
+  await admin.mouse.move(2, 2);
+  check("moving away takes it away", Boolean(await waitFor(admin, () => !document.querySelector(".al-card"), null, 1500)));
+  await (await cellEl()).click();
+  await admin.waitForSelector(".al-card.is-pinned");
+  await admin.mouse.move(2, 2);
+  await sleep(300);
+  check("clicking keeps it open, wherever the pointer goes", Boolean(await admin.$(".al-card.is-pinned")));
+  check("beside the cell, on the screen", await admin.evaluate(() => {
+    const r = document.querySelector(".al-card.is-pinned").getBoundingClientRect();
+    return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
+  }));
+  check("with Edit, for whoever manages the data", /\bEdit\b/.test(await pinnedText()));
   await admin.screenshot({ path: path.join(OUT, "allocation-1-grid.png"), fullPage: true });
+  await admin.keyboard.press("Escape");
+  check("Escape closes it", Boolean(await waitFor(admin, () => !document.querySelector(".al-card.is-pinned"), null, 1500)));
+  await (await cellEl()).click();
+  await admin.waitForSelector(".al-card.is-pinned");
+  await admin.click(".al-card__close");
+  check("so does its ×", Boolean(await waitFor(admin, () => !document.querySelector(".al-card.is-pinned"), null, 1500)));
+  await (await cellEl()).click();
+  await admin.waitForSelector(".al-card.is-pinned");
+  await admin.click(".page-title");
+  check("and a click anywhere else", Boolean(await waitFor(admin, () => !document.querySelector(".al-card.is-pinned"), null, 1500)));
 
   console.log("\n== a count typed in, and taken out ==");
   const before = (await api(token, `/allocation?train=${train.number}&pageSize=1000`)).items;
-  // "Biman Bandar to Dhaka: Allocated — …": the pair, from the cell picked.
-  const target = await admin.evaluate(() => {
-    const m = /^(.*) to (.*?): /.exec(document.querySelector(".al-grid .al-cell.is-selected").title);
-    return [m[1], m[2]];
-  });
-  await clickText(admin, ".al-picked button", "^Edit$");
-  await admin.waitForSelector(".p-dialog .al-edit");
+  const openEdit = async () => {
+    if (!(await admin.$(".al-card.is-pinned"))) {
+      await (await cellEl()).click();
+      await admin.waitForSelector(".al-card.is-pinned");
+    }
+    await clickText(admin, ".al-card.is-pinned button", "^(Edit|Set)$");
+    await admin.waitForSelector(".p-dialog .al-edit");
+  };
+  await openEdit();
   const input = await admin.$(".p-dialog .al-edit__row .p-inputnumber-input");
   await input.click({ clickCount: 3 });
   await input.type("37");
   await saveButton(admin);
   await waitFor(admin, () => !document.querySelector(".p-dialog .al-edit"));
   const pairNow = (await api(token, `/allocation?train=${train.number}&pageSize=1000`)).items.find(
-    (i) => label(i.from) === target[0] && label(i.to) === target[1]
+    (i) => i.from === target[0] && i.to === target[1]
   );
   check("saved: 37 seats, saying when", pairNow?.classes.some((c) => c.seats === 37 && c.seatsUpdatedAt), JSON.stringify(pairNow?.classes));
-  // The grid reloads after saving: wait for the cell to show the new count before picking it.
-  await waitFor(
-    admin,
-    ([f, t]) =>
-      [...document.querySelectorAll(".al-grid .al-cell")].some((c) => c.title.startsWith(`${f} to ${t}:`) && /\b37\b/.test(c.title)),
-    target
-  );
-  await admin.evaluate(
-    (f, t) => [...document.querySelectorAll(".al-grid .al-cell")].find((c) => c.title.startsWith(`${f} to ${t}:`)).click(),
-    target[0],
-    target[1]
-  );
-  const chip = await waitFor(admin, () => {
-    const t = document.querySelector(".al-picked .al-classes")?.innerText || "";
+  const fresh = await waitFor(admin, () => {
+    const t = document.querySelector(".al-card.is-pinned")?.innerText || "";
     return /37 seats/.test(t) ? t : null;
   });
-  check("and the count shows when it was updated", /updated/.test(chip || ""), chip || "");
-  await clickText(admin, ".al-picked button", "^Edit$");
-  await admin.waitForSelector(".p-dialog .al-edit");
+  check("the card stays open and shows the new count, with the day it was set", /37 seats · \d{1,2} [A-Z][a-z]{2}/.test(fresh || ""), fresh || "");
+
+  // A number in a cell is seats, never a number of classes.
+  const counted = pairNow.classes.find((c) => c.seats === 37);
+  const others = pairNow.classes.filter((c) => c.code !== counted.code);
+  const expected = others.some((c) => c.seats === null) ? "37+" : "37";
+  check(`the cell shows its seats: ${expected}, not how many classes`, (await cellText()) === expected, await cellText());
+  await pick(admin, "al-class", counted.code);
+  await waitFor(admin, () => Boolean(document.querySelector(".al-legend__class")));
+  check(`with ${counted.code} chosen, that class's seats`, (await cellText()) === "37", await cellText());
+  check("and the legend says which class", (await admin.evaluate(() => document.querySelector(".al-legend")?.innerText || "")).includes(counted.code));
+  if (others.length) {
+    await pick(admin, "al-class", others[0].code);
+    const other = await cellText();
+    check(`with ${others[0].code} chosen, its count — not known here, so ✓`, other === (others[0].seats === null ? "✓" : String(others[0].seats)), other);
+  }
+  await admin.evaluate(() => document.querySelector("#al-class")?.closest(".p-dropdown")?.querySelector(".p-dropdown-clear-icon")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+  await waitFor(admin, () => !document.querySelector(".al-legend__class"));
+  await openEdit();
   const again = await admin.$(".p-dialog .al-edit__row .p-inputnumber-input");
   await again.click({ clickCount: 3 });
   await admin.keyboard.press("Backspace");
@@ -196,7 +240,8 @@ const clickText = (page, selector, pattern) =>
   const strip = (list) =>
     JSON.stringify(list.map((i) => [i.from, i.to, i.status, i.source, i.checkedAt, i.classes.map((c) => [c.code, c.seats])]));
   check("emptied: back to not known — the pair as it was, still the census's", strip(after) === strip(before),
-    JSON.stringify(after.find((i) => label(i.from) === target[0] && label(i.to) === target[1])));
+    JSON.stringify(after.find((i) => i.from === target[0] && i.to === target[1])));
+  await admin.keyboard.press("Escape");
 
   console.log("\n== files ==");
   const sheet = await api(token, `/allocation/counts.csv?train=${train.number}`);
@@ -233,6 +278,15 @@ const clickText = (page, selector, pattern) =>
   await admin.waitForSelector(".al-grid");
   check("and the grid scrolls inside itself, not the page",
     (await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0);
+  await admin.mouse.move(1, 1);
+  await admin.evaluate(() => document.querySelector(".al-grid .al-cell.is-allocated").scrollIntoView({ block: "center", inline: "center" }));
+  await admin.evaluate(() => document.querySelector(".al-grid .al-cell.is-allocated").click());
+  await admin.waitForSelector(".al-card.is-pinned");
+  check("a tap keeps a cell's card open, on the screen", await admin.evaluate(() => {
+    const r = document.querySelector(".al-card.is-pinned").getBoundingClientRect();
+    return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight;
+  }));
+  await admin.screenshot({ path: path.join(OUT, "allocation-3-phone-card.png") });
 
   console.log("\n== a passenger ==");
   const passenger = await signIn(browser, "unittest-user@example.com");

@@ -10,10 +10,10 @@ import { ProgressSpinner } from "primereact/progressspinner";
 import { Toast } from "primereact/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/constants/permissions";
-import { fetchAllocation, fetchAllocationMeta, stationLabel, STATUS_LABELS, span } from "@/lib/allocation";
+import { fetchAllocation, fetchAllocationMeta, stationLabel, span } from "@/lib/allocation";
 import DataPanel from "@/components/allocation/DataPanel";
 import PairDialog from "@/components/allocation/PairDialog";
-import { ClassChips, PairList, PairGrid } from "@/components/allocation/PairViews";
+import { PairList, PairGrid, GridLegend } from "@/components/allocation/PairViews";
 import "./allocation.css";
 
 const PAGE_SIZE = 50;
@@ -46,7 +46,6 @@ export default function AllocationPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [selected, setSelected] = useState(null);
 
   const oneTrain = Boolean(filters.train);
   const grid = oneTrain && view === "grid";
@@ -91,7 +90,6 @@ export default function AllocationPage() {
   const choose = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value ?? null }));
     setPage(1);
-    setSelected(null);
   };
 
   const refresh = async () => {
@@ -101,7 +99,6 @@ export default function AllocationPage() {
   const saved = async (message) => {
     toast.current?.show({ severity: "success", summary: message });
     setEditing(null);
-    setSelected(null);
     await loadMeta();
   };
 
@@ -227,7 +224,6 @@ export default function AllocationPage() {
                 <Button label="Clear filters" icon="pi pi-filter-slash" text size="small" onClick={() => {
                   setFilters(NO_FILTERS);
                   setPage(1);
-                  setSelected(null);
                 }} />
               )}
             </div>
@@ -280,7 +276,6 @@ export default function AllocationPage() {
                   ]}
                   onChange={(e) => {
                     if (e.value) setView(e.value);
-                    setSelected(null);
                   }}
                   className="al-view"
                   itemTemplate={(o) => (
@@ -299,37 +294,14 @@ export default function AllocationPage() {
             ) : grid ? (
               data?.route ? (
                 <>
-                  <div className="al-legend" aria-hidden="true">
-                    <span className="al-cell is-allocated">2</span> allocated, number of classes
-                    <span className="al-cell is-not_allocated" /> not allocated
-                    <span className="al-cell is-not_checked" /> not checked
-                  </div>
+                  <GridLegend classCode={filters.cls} />
                   <PairGrid
                     route={data.route}
                     items={data.items}
-                    selected={selected}
-                    onSelect={(p) => setSelected(p)}
+                    classCode={filters.cls}
+                    canManage={canManage}
+                    onEdit={setEditing}
                   />
-                  {selected && (
-                    <div className="card al-picked">
-                      <div className="al-pair__head">
-                        <span className="al-journey">
-                          {stationLabel(selected.from)} <i className="pi pi-arrow-right" aria-hidden="true" />{" "}
-                          {stationLabel(selected.to)}
-                        </span>
-                        <span className="al-muted">{STATUS_LABELS[selected.status]}</span>
-                      </div>
-                      {selected.status === "allocated" && <ClassChips classes={selected.classes} />}
-                      {canManage && (
-                        <Button
-                          label={selected.status === "not_checked" ? "Set" : "Edit"}
-                          size="small"
-                          outlined
-                          onClick={() => setEditing(selected)}
-                        />
-                      )}
-                    </div>
-                  )}
                 </>
               ) : (
                 <p className="al-muted">
