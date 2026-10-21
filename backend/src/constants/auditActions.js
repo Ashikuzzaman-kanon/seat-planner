@@ -119,6 +119,11 @@ const AUDIT_ACTIONS = Object.freeze({
   // Feature switches (Settings → Features)
   FEATURE_SWITCH: "feature.switch",
 
+  // Seat allocation: the railway's own, uploaded and edited (kept apart from booking data)
+  ALLOCATION_IMPORT: "allocation.import",
+  ALLOCATION_EDIT: "allocation.edit",
+  ALLOCATION_CLEAR: "allocation.clear",
+
   // The daily sweep deleting long-departed trains' unsold seats.
   SEATS_CLEARED: "trip.seats_cleared",
 

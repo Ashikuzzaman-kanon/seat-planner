@@ -322,6 +322,26 @@ Business rules (hold timeouts, refund slabs, waitlist windows, abuse weights,
 job retries…) live in the settings store and are edited on the *Settings*
 screen, not in environment variables.
 
+### Seat allocation
+
+*Operations → Seat Allocation* shows which station pairs Bangladesh Railway
+actually sets seats aside for, train by train and class by class. Four
+filters — from, to, train, class — each left empty to mean all: from and to
+together give the trains with seats on that journey, a train alone gives its
+pairs in route order (and a grid). Only allocated pairs show unless asked.
+
+It is the railway's own data, kept apart from the site's: its tables
+(`allocation_*`) name trains, stations and classes as the railway does, as
+text, and point at nothing the site books on; loading or syncing railway data,
+demo data and the clean-ups never touch them. Whoever holds
+`allocation:manage` fills it from three files, each shown before it is
+applied: the train routes (`train-stoppages.json`, for travel order), the
+census CSV from BR Ticket Helper (pairs in the file replace what is stored for
+them; failed scans, and "Allocated" without the trains named, are left out
+with the reason), and the counts sheet (download it, fill in seats, upload
+it). A count not known is stored as empty and shown as "count not available",
+never as 0. A pair can also be set by hand.
+
 ### Switching tabs off
 
 *Settings → Features* (super admin only) turns any tab of the app off — for

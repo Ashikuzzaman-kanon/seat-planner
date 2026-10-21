@@ -72,6 +72,9 @@ export const PERMISSIONS = {
 
   RAILWAY_MANAGE: "railway:manage",
 
+  ALLOCATION_VIEW: "allocation:view",
+  ALLOCATION_MANAGE: "allocation:manage",
+
   SUBSCRIPTION_MANAGE: "subscription:manage",
   SUBSCRIPTION_APPROVE: "subscription:approve",
   SUBSCRIPTION_VERSIONS: "subscription:versions",

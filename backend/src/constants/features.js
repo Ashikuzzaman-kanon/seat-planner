@@ -25,6 +25,7 @@ const FEATURES = Object.freeze([
   { key: "network", label: "Network", group: "Operations", path: "/dashboard/network" },
   { key: "plans", label: "Seat Plans", group: "Operations", path: "/dashboard/plans" },
   { key: "approvals", label: "Approvals", group: "Operations", path: "/dashboard/approvals" },
+  { key: "seat-allocation", label: "Seat Allocation", group: "Operations", path: "/dashboard/allocation" },
   { key: "users", label: "Users", group: "Administration", path: "/dashboard/users" },
   { key: "roles", label: "Roles", group: "Administration", path: "/dashboard/roles" },
   { key: "reference", label: "Reference Data", group: "Administration", path: "/dashboard/reference" },
@@ -142,6 +143,8 @@ const FEATURE_ROUTES = Object.freeze([
   ["POST", "/plans/:x/approve", ["approvals"]],
   ["POST", "/plans/:x/reject", ["approvals"]],
   ["*", "/plans/**", ["plans"]],
+
+  ["*", "/allocation/**", ["seat-allocation"]],
 
   ["*", "/subscriptions/**", ["subscriptions"]],
 
