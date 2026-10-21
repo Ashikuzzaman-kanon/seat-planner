@@ -342,6 +342,11 @@ with the reason), and the counts sheet (download it, fill in seats, upload
 it). A count not known is stored as empty and shown as "count not available",
 never as 0. A pair can also be set by hand.
 
+The railway can change its allocation at any time, so the page says how
+current the data is: when the routes, the census and the counts last came in
+and from whom, the span of times the railway was checked for the pairs shown,
+when each count was last set, and every file applied (the upload history).
+
 ### Switching tabs off
 
 *Settings → Features* (super admin only) turns any tab of the app off — for

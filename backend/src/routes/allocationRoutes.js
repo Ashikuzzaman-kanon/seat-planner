@@ -38,6 +38,7 @@ router.get(
   c.list
 );
 router.get("/counts.csv", canView, filterRules, validate, c.countsSheet);
+router.get("/uploads", canView, [query("limit").optional().isInt({ min: 1, max: 100 })], validate, c.uploads);
 
 // Files come as plain text, up to a few megabytes: the census of every pair
 // is far beyond the 100 kB a JSON body may be.
@@ -46,6 +47,7 @@ const file = [
   body()
     .custom((value) => typeof value === "string" && value.trim().length > 0)
     .withMessage("Send the file's contents as the request body, as text/plain"),
+  query("name").optional().isString().isLength({ max: 200 }).withMessage("name is the file's name"),
 ];
 router.post("/import/stops", canManage, file, validate, c.importStops);
 router.post("/import/census", canManage, file, validate, c.importCensus);

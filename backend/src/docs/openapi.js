@@ -161,6 +161,23 @@ module.exports = {
       AllocationClass: obj({
         code: str("The railway's class code, such as S_CHAIR"),
         seats: { ...int("Seats set aside. null while the count is not known — not the same as 0"), nullable: true },
+        seatsUpdatedAt: {
+          type: "string",
+          format: "date-time",
+          nullable: true,
+          description: "When the count was last set or cleared (by the counts sheet or by hand) — not when a census kept the class",
+        },
+      }),
+
+      AllocationUpload: obj({
+        id: int(),
+        kind: { type: "string", enum: ["stops", "census", "counts"] },
+        fileName: { ...str(), nullable: true },
+        summary: { type: "object", description: "What it did: added, changed, set, cleared, left out…" },
+        scannedFrom: { type: "string", format: "date-time", nullable: true, description: "A census: the earliest scan in it" },
+        scannedTo: { type: "string", format: "date-time", nullable: true, description: "A census: the latest scan in it" },
+        uploadedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        uploadedAt: { type: "string", format: "date-time" },
       }),
 
       AllocationPair: obj({
@@ -181,6 +198,8 @@ module.exports = {
         allocated: int(),
         notAllocated: int(),
         notChecked: int(),
+        checkedFrom: { type: "string", format: "date-time", nullable: true, description: "The oldest railway check among the pairs matched" },
+        checkedTo: { type: "string", format: "date-time", nullable: true, description: "The newest" },
         classes: arr(obj({ code: str(), pairs: int(), counted: int("Pairs with a count known"), seats: int("Their total") })),
       }),
 
@@ -1764,8 +1783,34 @@ module.exports = {
                 counted: int(),
               }),
               updatedAt: { type: "string", format: "date-time", nullable: true },
+              latest: obj({
+                stops: {
+                  type: "object",
+                  nullable: true,
+                  description: "The routes: { at, by, fileName, summary } — by and fileName null for data applied before uploads were recorded",
+                },
+                census: {
+                  type: "object",
+                  nullable: true,
+                  description: "The census: as stops, plus scannedFrom and scannedTo, when the railway was checked",
+                },
+                counts: { type: "object", nullable: true, description: "The last count set: { at, by }, by the counts sheet or by hand" },
+              }),
             })
           ),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation/uploads": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "Every file applied, newest first",
+        ...secured("allocation:view"),
+        parameters: [queryParam("limit", "1 to 100; 20 by default", "integer")],
+        responses: {
+          200: response("Uploads", obj({ uploads: arr(ref("AllocationUpload")) })),
           403: errors[403],
         },
       },
@@ -1839,6 +1884,7 @@ module.exports = {
         parameters: [
           pathParam("kind", "stops, census or counts", "string"),
           queryParam("apply", "1 to apply; otherwise only read"),
+          queryParam("name", "The file's name, kept in the upload history"),
         ],
         requestBody: { required: true, content: { "text/plain": { schema: { type: "string" } } } },
         responses: {

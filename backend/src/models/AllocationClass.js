@@ -15,6 +15,9 @@ AllocationClass.init(
     classCode: { type: DataTypes.STRING(20), allowNull: false },
     seats: { type: DataTypes.INTEGER, allowNull: true },
     updatedById: { type: DataTypes.INTEGER, allowNull: true },
+    /** When the count was last set or cleared — not when a census merely kept the class. */
+    seatsUpdatedAt: { type: DataTypes.DATE, allowNull: true },
+    seatsUpdatedById: { type: DataTypes.INTEGER, allowNull: true },
   },
   {
     sequelize,

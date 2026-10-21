@@ -1,25 +1,22 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { Message } from "primereact/message";
-import { uploadAllocation, downloadCountsSheet, stationLabel } from "@/lib/allocation";
+import {
+  uploadAllocation,
+  downloadCountsSheet,
+  fetchAllocationUploads,
+  stationLabel,
+  when,
+  span,
+} from "@/lib/allocation";
 
 const n = (x) => Number(x || 0).toLocaleString("en-GB");
 /** "1 line", "2 lines". */
 const count = (x, one, many = `${one}s`) => `${n(x)} ${Number(x) === 1 ? one : many}`;
-const when = (iso) =>
-  iso
-    ? new Date(iso).toLocaleString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "Asia/Dhaka",
-      })
-    : null;
+const byWhom = (x) => (x?.by?.fullName ? ` by ${x.by.fullName}` : "");
 
 const UPLOADS = {
   stops: { label: "Upload routes", icon: "pi pi-directions", accept: ".json,application/json", title: "Train routes" },
@@ -28,9 +25,11 @@ const UPLOADS = {
 };
 
 /**
- * How much allocation data there is, and — for whoever manages it — the files
+ * How much allocation data there is and how current it is — the railway can
+ * change its allocation at any time — and, for whoever manages it, the files
  * that fill it: the train routes, the census, and the seat counts. Each file
- * is read and shown first; nothing changes until Apply.
+ * is read and shown first; nothing changes until Apply. Every file applied is
+ * in the upload history.
  */
 export default function DataPanel({ meta, canManage, filters, onChanged, toast }) {
   const inputs = { stops: useRef(null), census: useRef(null), counts: useRef(null) };
@@ -38,7 +37,18 @@ export default function DataPanel({ meta, canManage, filters, onChanged, toast }
   const [pending, setPending] = useState(null);
   const [applying, setApplying] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [history, setHistory] = useState(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const t = meta?.totals;
+  const latest = meta?.latest || {};
+
+  const loadHistory = useCallback(async () => {
+    try {
+      setHistory(await fetchAllocationUploads(20));
+    } catch (err) {
+      toast.current?.show({ severity: "error", summary: "Upload history", detail: err.message });
+    }
+  }, [toast]);
 
   const pick = async (kind, e) => {
     const file = e.target.files?.[0];
@@ -47,7 +57,7 @@ export default function DataPanel({ meta, canManage, filters, onChanged, toast }
     setReading(kind);
     try {
       const text = await file.text();
-      const { preview } = await uploadAllocation(kind, text, false);
+      const { preview } = await uploadAllocation(kind, text, false, file.name);
       setPending({ kind, text, preview, fileName: file.name });
     } catch (err) {
       toast.current?.show({ severity: "error", summary: UPLOADS[kind].title, detail: err.message, life: 8000 });
@@ -59,10 +69,11 @@ export default function DataPanel({ meta, canManage, filters, onChanged, toast }
   const apply = async () => {
     setApplying(true);
     try {
-      await uploadAllocation(pending.kind, pending.text, true);
+      await uploadAllocation(pending.kind, pending.text, true, pending.fileName);
       toast.current?.show({ severity: "success", summary: UPLOADS[pending.kind].title, detail: "Applied" });
       setPending(null);
       await onChanged();
+      if (historyOpen) await loadHistory();
     } catch (err) {
       toast.current?.show({ severity: "error", summary: "Not applied", detail: err.message, life: 8000 });
     } finally {
@@ -83,24 +94,65 @@ export default function DataPanel({ meta, canManage, filters, onChanged, toast }
 
   return (
     <section className="card al-data">
-      <div className="al-data__facts">
-        {t && t.pairs + t.trains > 0 ? (
-          <>
-            <span>
-              <strong>{n(t.trainsWithStops)}</strong> train routes
-            </span>
-            <span>
-              <strong>{n(t.pairs)}</strong> pairs checked ({n(t.allocated)} allocated)
-            </span>
-            <span>
-              Counts known for <strong>{n(t.counted)}</strong> of {n(t.classes)} classes
-            </span>
-            {meta.updatedAt && <span className="al-muted">Last change {when(meta.updatedAt)}</span>}
-          </>
-        ) : (
-          <span className="al-muted">Nothing uploaded yet.</span>
-        )}
-      </div>
+      <dl className="al-latest">
+        <div>
+          <dt>Routes</dt>
+          <dd>
+            {latest.stops ? (
+              <>
+                <strong>{count(t.trainsWithStops, "train")}</strong>
+                <span className="al-muted">
+                  {" "}
+                  · uploaded {when(latest.stops.at)}
+                  {byWhom(latest.stops)}
+                </span>
+              </>
+            ) : (
+              <span className="al-muted">Not uploaded yet</span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Census</dt>
+          <dd>
+            {latest.census ? (
+              <>
+                <strong>{count(t.pairs, "pair")}</strong> checked, {n(t.allocated)} allocated
+                {latest.census.scannedFrom && (
+                  <>
+                    {" "}
+                    · railway checked <strong>{span(latest.census.scannedFrom, latest.census.scannedTo)}</strong>
+                  </>
+                )}
+                <span className="al-muted">
+                  {" "}
+                  · uploaded {when(latest.census.at)}
+                  {byWhom(latest.census)}
+                </span>
+              </>
+            ) : (
+              <span className="al-muted">Not uploaded yet</span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Counts</dt>
+          <dd>
+            {latest.counts ? (
+              <>
+                Known for <strong>{n(t.counted)}</strong> of {count(t.classes, "class", "classes")}
+                <span className="al-muted">
+                  {" "}
+                  · last changed {when(latest.counts.at)}
+                  {byWhom(latest.counts)}
+                </span>
+              </>
+            ) : (
+              <span className="al-muted">None yet</span>
+            )}
+          </dd>
+        </div>
+      </dl>
 
       {canManage && (
         <div className="al-data__actions">
@@ -137,9 +189,52 @@ export default function DataPanel({ meta, canManage, filters, onChanged, toast }
         </div>
       )}
 
+      <details
+        className="al-history"
+        onToggle={(e) => {
+          setHistoryOpen(e.currentTarget.open);
+          if (e.currentTarget.open && !history) loadHistory();
+        }}
+      >
+        <summary>Upload history</summary>
+        {!history ? (
+          <p className="al-muted">Loading…</p>
+        ) : history.length === 0 ? (
+          <p className="al-muted">No file has been applied since the history began.</p>
+        ) : (
+          <ol className="al-history__list">
+            {history.map((u) => (
+              <li key={u.id}>
+                <span className="al-history__when">{when(u.uploadedAt)}</span>
+                <span>
+                  <strong>{UPLOADS[u.kind]?.title || u.kind}</strong>
+                  {u.fileName && <span className="al-muted"> · {u.fileName}</span>}
+                  {u.uploadedBy && <span className="al-muted"> · {u.uploadedBy.fullName}</span>}
+                </span>
+                <span className="al-history__what">{describe(u)}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </details>
+
       <PreviewDialog pending={pending} applying={applying} onApply={apply} onHide={() => !applying && setPending(null)} />
     </section>
   );
+}
+
+/** What an upload did, in a line. */
+function describe(u) {
+  const s = u.summary || {};
+  if (u.kind === "stops") return `${count(s.trains, "train")}: ${n(s.added)} new, ${n(s.changed)} changed`;
+  if (u.kind === "census") {
+    const scanned = span(u.scannedFrom, u.scannedTo);
+    return `${count(s.pairs, "train pair")}: ${n(s.added)} new, ${n(s.changed)} changed${
+      s.skipped ? `, ${count(s.skipped, "line")} left out` : ""
+    }${scanned ? ` · railway checked ${scanned}` : ""}`;
+  }
+  if (u.kind === "counts") return `${count(s.set, "count")} set, ${n(s.cleared)} cleared`;
+  return "";
 }
 
 function PreviewDialog({ pending, applying, onApply, onHide }) {
@@ -209,6 +304,7 @@ function PreviewDialog({ pending, applying, onApply, onHide }) {
                   {n(p.offRoute)} pairs are not on their train&apos;s route in that order. They are kept as given.
                 </li>
               )}
+              {p.scannedFrom && <li>The railway was checked {span(p.scannedFrom, p.scannedTo)}.</li>}
               {p.duplicates > 0 && <li>{n(p.duplicates)} train pairs appear twice; the later line is used.</li>}
             </ul>
           )}

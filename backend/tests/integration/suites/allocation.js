@@ -4,7 +4,7 @@
 // and class; corrected by hand. Kept apart from everything the site books on.
 const path = require("path");
 const BACKEND = path.resolve(__dirname, "../../..");
-const { TrainName, Station, CoachClass, TrainQuotaRule, SeatPlan, sequelize } = require(`${BACKEND}/src/models`);
+const { TrainName, Station, CoachClass, TrainQuotaRule, SeatPlan, AllocationUpload, sequelize } = require(`${BACKEND}/src/models`);
 
 const BASE = process.env.API_BASE;
 const PASSWORD = "UnitTest123!";
@@ -31,6 +31,8 @@ async function call(method, url, { token, body, text } = {}) {
 }
 const login = async (email) => (await call("POST", "/auth/login", { body: { email, password: PASSWORD } })).body;
 const say = (r) => `${r.status} ${(r.text || "").slice(0, 240)}`;
+/** Classes as code and seats, leaving out when each count was set. */
+const cs = (classes) => JSON.stringify((classes || []).map(({ code, seats }) => ({ code, seats })));
 
 const STOPS = {
   trains: [
@@ -73,7 +75,7 @@ const CENSUS = [
   const sp = await call("POST", "/allocation/import/stops", { token: S, text: stopsText });
   check("read first: three new trains", sp.status === 200 && sp.body.applied === false && sp.body.preview.added === 3, say(sp));
   check("and nothing changed yet", (await call("GET", "/allocation/meta", { token: S })).body.totals.trains === 0);
-  const sa = await call("POST", "/allocation/import/stops?apply=1", { token: S, text: stopsText });
+  const sa = await call("POST", "/allocation/import/stops?apply=1&name=routes.json", { token: S, text: stopsText });
   check("applied", sa.status === 200 && sa.body.applied === true);
   const m1 = (await call("GET", "/allocation/meta", { token: S })).body;
   check("three trains with routes, names without their number", m1.totals.trainsWithStops === 3 &&
@@ -90,7 +92,7 @@ const CENSUS = [
     p.skippedCount === 2 && p.skipped[0].reason === "The scan failed for this pair" &&
     p.skipped[1].reason === "Allocated, but which trains have seats is not given" && p.skipped[1].line === 7, JSON.stringify(p.skipped));
   check("and nothing changed yet", (await call("GET", "/allocation/meta", { token: S })).body.totals.pairs === 0);
-  check("applied", (await call("POST", "/allocation/import/census?apply=1", { token: S, text: CENSUS })).body.applied === true);
+  check("applied", (await call("POST", "/allocation/import/census?apply=1&name=census-1.csv", { token: S, text: CENSUS })).body.applied === true);
   const m2 = (await call("GET", "/allocation/meta", { token: S })).body;
   check("6 pairs stored, 4 allocated, 5 classes, no counts known", m2.totals.pairs === 6 && m2.totals.allocated === 4 &&
     m2.totals.classes === 5 && m2.totals.counted === 0, JSON.stringify(m2.totals));
@@ -103,7 +105,7 @@ const CENSUS = [
   check("no filter: every allocated pair", all.total === 4 && all.summary.trains === 3, brief(all));
   const pair = await get("from=Aport&to=Ccross");
   check("from and to: the trains with seats on that journey", brief(pair) === "9101:Aport>Ccross 9102:Aport>Ccross", brief(pair));
-  check("each with its classes, the count not known", JSON.stringify(pair.items[0].classes) ===
+  check("each with its classes, the count not known", cs(pair.items[0].classes) ===
     JSON.stringify([{ code: "S_CHAIR", seats: null }, { code: "SNIGDHA", seats: null }]), JSON.stringify(pair.items[0].classes));
   check("from alone: every train with seats from there", (await get("from=Aport")).total === 2);
   const to = await get("to=Aport");
@@ -147,10 +149,14 @@ const CENSUS = [
     /whole number/.test(kp.skipped[0].reason) && /no seats allocated/.test(kp.skipped[1].reason) && /no SNIGDHA seats/.test(kp.skipped[2].reason),
     JSON.stringify(kp.skipped));
   check("nothing changed yet", (await get("from=Aport&to=Ccross&train=9101")).items[0].classes.every((c) => c.seats === null));
-  await call("POST", "/allocation/import/counts?apply=1", { token: S, text: filled });
+  await call("POST", "/allocation/import/counts?apply=1&name=counts.csv", { token: S, text: filled });
   const counted = (await get("from=Aport&to=Ccross&train=9101")).items[0].classes;
   check("applied: 40, and 0 — a real zero, not 'not known'",
-    JSON.stringify(counted) === JSON.stringify([{ code: "S_CHAIR", seats: 40 }, { code: "SNIGDHA", seats: 0 }]), JSON.stringify(counted));
+    cs(counted) === JSON.stringify([{ code: "S_CHAIR", seats: 40 }, { code: "SNIGDHA", seats: 0 }]), JSON.stringify(counted));
+  const snigdhaAt = counted.find((c) => c.code === "SNIGDHA")?.seatsUpdatedAt;
+  check("each count says when it was set", Boolean(snigdhaAt) && counted.every((c) => c.seatsUpdatedAt), JSON.stringify(counted));
+  check("a class never counted says nothing of the kind",
+    (await get("from=Aport&to=Ccross&train=9102")).items[0].classes[0].seatsUpdatedAt === null);
   const sum = (await get("")).summary.classes.find((c) => c.code === "S_CHAIR");
   check("the summary adds up only the counts known", sum.pairs === 2 && sum.counted === 1 && sum.seats === 40, JSON.stringify(sum));
   const blank = "train,from,to,class,seats\n9101,Aport,Ccross,S_CHAIR,\n";
@@ -166,10 +172,12 @@ const CENSUS = [
   const np = (await call("POST", "/allocation/import/census", { token: S, text: NEXT })).body.preview;
   check("read: one pair changed, a class gone with its count, two as they were",
     np.changed === 1 && np.unchanged === 2 && np.classesRemoved === 1 && np.countsLost === 1, JSON.stringify(np));
-  await call("POST", "/allocation/import/census?apply=1", { token: S, text: NEXT });
+  await call("POST", "/allocation/import/census?apply=1&name=census-2.csv", { token: S, text: NEXT });
   const after = (await get("from=Aport&to=Ccross&train=9101")).items[0].classes;
   check("applied: S_CHAIR goes, SNIGDHA keeps the 0 typed in for it",
-    JSON.stringify(after) === JSON.stringify([{ code: "SNIGDHA", seats: 0 }]), JSON.stringify(after));
+    cs(after) === JSON.stringify([{ code: "SNIGDHA", seats: 0 }]), JSON.stringify(after));
+  check("and the time it was typed in: keeping a class is not counting it again", after[0]?.seatsUpdatedAt === snigdhaAt,
+    `${after[0]?.seatsUpdatedAt} vs ${snigdhaAt}`);
   check("pairs not in the file are left as they were", brief(await get("to=Aport")) === "9103:Ccross>Aport");
 
   console.log("\n== by hand ==");
@@ -187,7 +195,7 @@ const CENSUS = [
     train: 9103, from: "Bvale", to: "Aport", status: "allocated", classes: [{ code: "f_seat", seats: 12 }, { code: "AC_S", seats: null }],
   } });
   check("a pair set by hand, with a count and one not known", set.status === 200 && set.body.pair.source === "manual" &&
-    JSON.stringify(set.body.pair.classes) === JSON.stringify([{ code: "AC_S", seats: null }, { code: "F_SEAT", seats: 12 }]), say(set));
+    cs(set.body.pair.classes) === JSON.stringify([{ code: "AC_S", seats: null }, { code: "F_SEAT", seats: 12 }]), say(set));
   check("backwards on its route is refused", (await call("PUT", "/allocation/pairs", { token: S,
     body: { train: 9103, from: "Aport", to: "Dtown", status: "allocated", classes: [] } })).status === 400);
   check("a class twice is refused", (await call("PUT", "/allocation/pairs", { token: S,
@@ -200,6 +208,33 @@ const CENSUS = [
   const back = (await get("train=9103&show=all")).items.find((i) => i.from === "Bvale" && i.to === "Aport");
   check("forgotten, it is back to not checked", cleared.status === 200 && back?.status === "not_checked", say(cleared));
   check("forgetting it again finds nothing", (await call("DELETE", "/allocation/pairs?train=9103&from=Bvale&to=Aport", { token: S })).status === 404);
+
+  console.log("\n== how current it is ==");
+  const history = (await call("GET", "/allocation/uploads", { token: S })).body?.uploads || [];
+  check("every file applied is in the history, newest first — not the ones only read",
+    history.map((u) => `${u.kind}:${u.fileName}`).join() === "census:census-2.csv,counts:counts.csv,census:census-1.csv,stops:routes.json",
+    history.map((u) => `${u.kind}:${u.fileName}`).join());
+  check("each saying who uploaded it and when", history.every((u) => u.uploadedBy?.fullName === su.user.fullName && u.uploadedAt),
+    JSON.stringify(history[0]));
+  check("and what it did", history[3].summary.added === 3 && history[2].summary.pairs === 6 && history[1].summary.set === 2 &&
+    history[0].summary.changed === 1, JSON.stringify(history.map((u) => u.summary)));
+  check("a census, when the railway was scanned", history[0].scannedFrom === "2026-10-20T17:20:39.000Z" &&
+    history[0].scannedTo === "2026-10-20T17:20:39.000Z", JSON.stringify(history[0]));
+  check("a passenger may not read it", (await call("GET", "/allocation/uploads", { token: user.accessToken })).status === 403);
+  const latest = (await call("GET", "/allocation/meta", { token: S })).body.latest;
+  check("the page's top line: routes, census and counts, each when and by whom",
+    latest.stops?.by?.fullName === su.user.fullName && latest.stops.fileName === "routes.json" &&
+      latest.census?.fileName === "census-2.csv" && latest.census.scannedFrom === "2026-10-20T17:20:39.000Z" &&
+      latest.counts?.at && latest.counts.by?.fullName === su.user.fullName, JSON.stringify(latest));
+  const ranged = (await get("train=9101")).summary;
+  check("the results say when the pairs shown were checked", ranged.checkedFrom === "2026-10-20T17:20:39.000Z" &&
+    ranged.checkedTo === "2026-10-20T17:20:39.000Z", JSON.stringify(ranged));
+  check("a count typed in by hand says when", (await get("from=Bvale&to=Dtown&train=9101")).items[0].classes[0].seatsUpdatedAt !== null);
+  await AllocationUpload.destroy({ where: {} });
+  const older = (await call("GET", "/allocation/meta", { token: S })).body.latest;
+  check("data applied before there was a history still says when, from the data itself",
+    older.stops?.at && older.stops.by === null && older.census?.at && older.census.by === null &&
+      older.census.scannedFrom === "2026-10-20T17:20:39.000Z", JSON.stringify(older));
 
   console.log("\n== files sent wrong ==");
   const asJson = await call("POST", "/allocation/import/census", { token: S, body: { csv: CENSUS } });

@@ -6,7 +6,8 @@
 //
 // Needs the API and the web app running with allocation data uploaded (the
 // train routes and a census — Operations → Seat Allocation), and the unit-test
-// accounts. Leaves the data as it found it.
+// accounts. Leaves the allocation and its counts as it found them; only the
+// time a count last changed moves.
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -97,9 +98,22 @@ const clickText = (page, selector, pattern) =>
   console.log("== the page ==");
   await admin.goto(`${BASE}/dashboard/allocation`, { waitUntil: "networkidle0" });
   await admin.waitForSelector(".al-pair");
-  check("it says how much data there is", /train routes/.test(await admin.evaluate(() => document.querySelector(".al-data")?.innerText)));
+  check("it says how much data there is", /\d+ trains?/.test(await admin.evaluate(() => document.querySelector(".al-data")?.innerText)));
   check("and lists every allocated pair to begin with", /^Everything:/.test(await summary(admin)));
   check("with the upload buttons for whoever manages it", await admin.evaluate(() => document.querySelectorAll("input[data-upload]").length === 3));
+  const top = await admin.evaluate(() => document.querySelector(".al-latest")?.innerText || "");
+  check("and how current it is: routes and census, each with when they came in, and when the railway was checked",
+    /Routes[\s\S]*uploaded/i.test(top) && /Census[\s\S]*railway checked[\s\S]*uploaded/i.test(top) && /Counts/i.test(top), top);
+  check("the results say when the railway was checked for them", /railway checked/.test(await summary(admin)));
+  await admin.evaluate(() => {
+    document.querySelector(".al-history").open = true;
+  });
+  const history = await waitFor(admin, () => {
+    const t = document.querySelector(".al-history")?.innerText || "";
+    return /Loading/.test(t) ? null : t;
+  });
+  check("the upload history opens, listing what was applied — or saying nothing yet",
+    /No file has been applied|uploaded|Census|Train routes|Seat counts/.test(history || ""), history || "");
 
   console.log("\n== from and to ==");
   await pick(admin, "al-from", label(first.from));
@@ -152,12 +166,24 @@ const clickText = (page, selector, pattern) =>
   const pairNow = (await api(token, `/allocation?train=${train.number}&pageSize=1000`)).items.find(
     (i) => label(i.from) === target[0] && label(i.to) === target[1]
   );
-  check("saved: 37 seats", pairNow?.classes.some((c) => c.seats === 37), JSON.stringify(pairNow?.classes));
+  check("saved: 37 seats, saying when", pairNow?.classes.some((c) => c.seats === 37 && c.seatsUpdatedAt), JSON.stringify(pairNow?.classes));
+  // The grid reloads after saving: wait for the cell to show the new count before picking it.
+  await waitFor(
+    admin,
+    ([f, t]) =>
+      [...document.querySelectorAll(".al-grid .al-cell")].some((c) => c.title.startsWith(`${f} to ${t}:`) && /\b37\b/.test(c.title)),
+    target
+  );
   await admin.evaluate(
     (f, t) => [...document.querySelectorAll(".al-grid .al-cell")].find((c) => c.title.startsWith(`${f} to ${t}:`)).click(),
     target[0],
     target[1]
   );
+  const chip = await waitFor(admin, () => {
+    const t = document.querySelector(".al-picked .al-classes")?.innerText || "";
+    return /37 seats/.test(t) ? t : null;
+  });
+  check("and the count shows when it was updated", /updated/.test(chip || ""), chip || "");
   await clickText(admin, ".al-picked button", "^Edit$");
   await admin.waitForSelector(".p-dialog .al-edit");
   const again = await admin.$(".p-dialog .al-edit__row .p-inputnumber-input");
@@ -167,7 +193,8 @@ const clickText = (page, selector, pattern) =>
   await saveButton(admin);
   await waitFor(admin, () => !document.querySelector(".p-dialog .al-edit"));
   const after = (await api(token, `/allocation?train=${train.number}&pageSize=1000`)).items;
-  const strip = (list) => JSON.stringify(list.map((i) => [i.from, i.to, i.status, i.source, i.checkedAt, i.classes]));
+  const strip = (list) =>
+    JSON.stringify(list.map((i) => [i.from, i.to, i.status, i.source, i.checkedAt, i.classes.map((c) => [c.code, c.seats])]));
   check("emptied: back to not known — the pair as it was, still the census's", strip(after) === strip(before),
     JSON.stringify(after.find((i) => label(i.from) === target[0] && label(i.to) === target[1])));
 
