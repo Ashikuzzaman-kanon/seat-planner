@@ -1,6 +1,6 @@
 const { Op, QueryTypes } = require("sequelize");
 const { sequelize, PublicVisit, PublicVisitDay, User } = require("../models");
-const { VISIT_OUTCOMES } = require("../models/PublicVisit");
+const { VISIT_OUTCOMES, VISIT_CHANNELS } = require("../models/PublicVisit");
 const ApiError = require("../utils/ApiError");
 const env = require("../config/env");
 const settings = require("./settingService");
@@ -11,6 +11,7 @@ const { AUDIT_ACTIONS } = require("../constants/auditActions");
 const { createLimiter } = require("../utils/rateLimiter");
 const { issuePass, checkPass } = require("../utils/publicPass");
 const { todayInDhaka, addDays } = require("../utils/dhakaTime");
+const { searchOf, queryKeyOf } = require("./allocationRequestService");
 
 /**
  * Seat Allocation for everyone, at /seat-allocation, without signing in —
@@ -30,6 +31,10 @@ const { todayInDhaka, addDays } = require("../utils/dhakaTime");
  * Every request is recorded (public_visits, and the audit log): when, from
  * where, which browser, what was searched and what happened. Records older
  * than the days set in Settings are folded into each day's totals.
+ *
+ * The same table holds the searches made inside the app (channel "app",
+ * services/allocationRequestService); everything here — the free searches,
+ * the managers' view of the page — counts the public page's rows only.
  */
 
 const FEATURE = "seat-allocation";
@@ -100,6 +105,7 @@ function record(visitor, { kind, outcome, query = null, queryKey = null, results
   const saved = PublicVisit.create({
     kind,
     outcome,
+    channel: VISIT_CHANNELS.PUBLIC,
     ip: visitor.ip,
     country: visitor.country,
     city: visitor.city,
@@ -234,11 +240,6 @@ async function meta() {
   };
 }
 
-/** A search, in a fixed form, so the free searches of a day can be counted. Paging is the same search. */
-function queryKeyOf({ from, to, train, classCode, show }) {
-  return [from || "", to || "", train || "", classCode || "", show === "all" ? "all" : ""].join("|");
-}
-
 /** What everyone sees on arriving — every allocated pair, no filter chosen. Not counted as a search. */
 const ARRIVAL = queryKeyOf({});
 
@@ -247,7 +248,13 @@ async function overFreeSearches(visitor, key) {
   const perIp = settings.get("allocation.public_searches_per_ip_day");
   const since = dayStart();
   if (key === ARRIVAL) return false;
-  const shown = { kind: "list", outcome: VISIT_OUTCOMES.SHOWN, createdAt: { [Op.gte]: since }, queryKey: { [Op.notIn]: [ARRIVAL] } };
+  const shown = {
+    channel: VISIT_CHANNELS.PUBLIC,
+    kind: "list",
+    outcome: VISIT_OUTCOMES.SHOWN,
+    createdAt: { [Op.gte]: since },
+    queryKey: { [Op.notIn]: [ARRIVAL] },
+  };
   // The same search again — the next page, coming back to it — is free.
   if (await PublicVisit.count({ where: { ...shown, visitorId: visitor.visitorId, queryKey: key } })) return false;
   const mine = await PublicVisit.count({ where: { ...shown, visitorId: visitor.visitorId }, distinct: true, col: "query_key" });
@@ -255,8 +262,8 @@ async function overFreeSearches(visitor, key) {
   if (!visitor.ip) return false;
   const [{ n }] = await sequelize.query(
     `SELECT COUNT(DISTINCT visitor_id, query_key) AS n FROM public_visits
-      WHERE ip = :ip AND kind = 'list' AND outcome = 'shown' AND query_key IS NOT NULL AND query_key <> :arrival
-        AND created_at >= :since`,
+      WHERE channel = 'public' AND ip = :ip AND kind = 'list' AND outcome = 'shown' AND query_key IS NOT NULL
+        AND query_key <> :arrival AND created_at >= :since`,
     { replacements: { ip: visitor.ip, since: utc(since), arrival: ARRIVAL }, type: QueryTypes.SELECT }
   );
   return Number(n) >= perIp;
@@ -268,14 +275,7 @@ async function overFreeSearches(visitor, key) {
  */
 async function list(visitor, filters, user = null) {
   if (!visitor.visitorId) throw ApiError.badRequest("Reload the page and try again");
-  const query = {
-    from: filters.from || null,
-    to: filters.to || null,
-    train: filters.train ? Number(filters.train) : null,
-    class: filters.classCode || null,
-    show: filters.show === "all" ? "all" : "allocated",
-    page: Number(filters.page) || 1,
-  };
+  const query = searchOf(filters);
   const queryKey = queryKeyOf(filters);
   if (!user && (await overFreeSearches(visitor, queryKey))) {
     await record(visitor, { kind: "list", outcome: VISIT_OUTCOMES.SIGN_IN, query, queryKey });
@@ -292,7 +292,7 @@ async function list(visitor, filters, user = null) {
 }
 
 /* ------------------------------------------------------------------ *
- * For managers: how the public page is used
+ * For the Requests tab: how the public page is used
  * ------------------------------------------------------------------ */
 
 const blockedSql = `outcome IN (${BLOCKED.map((o) => `'${o}'`).join(",")})`;
@@ -304,7 +304,7 @@ async function totalsSince(since) {
             COUNT(DISTINCT visitor_id) AS visitors,
             COALESCE(SUM(outcome = 'sign_in'), 0) AS prompted,
             COALESCE(SUM(${blockedSql}), 0) AS blocked
-       FROM public_visits WHERE created_at >= :since`,
+       FROM public_visits WHERE channel = 'public' AND created_at >= :since`,
     { replacements: { since: utc(since) }, type: QueryTypes.SELECT }
   );
   return Object.fromEntries(Object.entries(row).map(([k, v]) => [k, Number(v)]));
@@ -314,7 +314,7 @@ async function journeysSince(since, limit = 10) {
   const rows = await sequelize.query(
     `SELECT query_key AS queryKey, ANY_VALUE(query) AS query, COUNT(*) AS searches, COUNT(DISTINCT visitor_id) AS visitors
        FROM public_visits
-      WHERE kind = 'list' AND outcome = 'shown' AND query_key IS NOT NULL AND created_at >= :since
+      WHERE channel = 'public' AND kind = 'list' AND outcome = 'shown' AND query_key IS NOT NULL AND created_at >= :since
       GROUP BY query_key ORDER BY searches DESC LIMIT ${Number(limit)}`,
     { replacements: { since: utc(since) }, type: QueryTypes.SELECT }
   );
@@ -328,7 +328,7 @@ async function journeysSince(since, limit = 10) {
 async function spreadSince(since, column) {
   const rows = await sequelize.query(
     `SELECT ${column} AS value, COUNT(DISTINCT visitor_id) AS visitors FROM public_visits
-      WHERE created_at >= :since GROUP BY ${column} ORDER BY visitors DESC LIMIT 6`,
+      WHERE channel = 'public' AND created_at >= :since GROUP BY ${column} ORDER BY visitors DESC LIMIT 6`,
     { replacements: { since: utc(since) }, type: QueryTypes.SELECT }
   );
   return rows.map((r) => ({ value: r.value, visitors: Number(r.visitors) }));
@@ -346,11 +346,12 @@ async function visits() {
     spreadSince(month, "country"),
     spreadSince(month, "device"),
     PublicVisit.findAll({
+      where: { channel: VISIT_CHANNELS.PUBLIC },
       include: [{ model: User, as: "user", attributes: ["id", "fullName"] }],
       order: [["id", "DESC"]],
       limit: 50,
     }),
-    PublicVisitDay.findAll({ order: [["day", "ASC"]] }),
+    PublicVisitDay.findAll({ where: { channel: VISIT_CHANNELS.PUBLIC }, order: [["day", "ASC"]] }),
   ]);
   return {
     enabled: enabled(),
@@ -393,20 +394,21 @@ async function visits() {
 }
 
 /**
- * The daily sweep: fold the visits older than the days kept into each day's
- * totals, then delete them. Whole Dhaka days only.
+ * The daily sweep: fold the requests older than the days kept into each
+ * day's totals — the public page's and the app's apart — then delete them.
+ * Whole Dhaka days only.
  */
 async function prune() {
   const keep = settings.get("allocation.public_visit_days");
   const cutoff = dayStart(addDays(todayInDhaka(), -keep + 1));
   const days = await sequelize.query(
-    `SELECT DATE(DATE_ADD(created_at, INTERVAL 6 HOUR)) AS day,
+    `SELECT DATE(DATE_ADD(created_at, INTERVAL 6 HOUR)) AS day, channel,
             COUNT(*) AS requests,
             COALESCE(SUM(kind = 'list' AND outcome = 'shown'), 0) AS searches,
             COUNT(DISTINCT visitor_id) AS visitors,
             COALESCE(SUM(outcome = 'sign_in'), 0) AS prompted,
             COALESCE(SUM(${blockedSql}), 0) AS blocked
-       FROM public_visits WHERE created_at < :cutoff GROUP BY day`,
+       FROM public_visits WHERE created_at < :cutoff GROUP BY day, channel`,
     { replacements: { cutoff: utc(cutoff) }, type: QueryTypes.SELECT }
   );
   for (const d of days) {
@@ -414,9 +416,13 @@ async function prune() {
     const start = dayStart(day);
     const top = await sequelize.query(
       `SELECT ANY_VALUE(query) AS query, COUNT(*) AS searches FROM public_visits
-        WHERE kind = 'list' AND outcome = 'shown' AND query_key IS NOT NULL AND created_at >= :start AND created_at < :end
+        WHERE channel = :channel AND kind = 'list' AND outcome = 'shown' AND query_key IS NOT NULL
+          AND created_at >= :start AND created_at < :end
         GROUP BY query_key ORDER BY searches DESC LIMIT 10`,
-      { replacements: { start: utc(start), end: utc(new Date(start.getTime() + DAY_MS)) }, type: QueryTypes.SELECT }
+      {
+        replacements: { channel: d.channel, start: utc(start), end: utc(new Date(start.getTime() + DAY_MS)) },
+        type: QueryTypes.SELECT,
+      }
     );
     const add = {
       requests: Number(d.requests),
@@ -425,7 +431,10 @@ async function prune() {
       prompted: Number(d.prompted),
       blocked: Number(d.blocked),
     };
-    const [row, made] = await PublicVisitDay.findOrCreate({ where: { day }, defaults: { day, ...add, journeys: [] } });
+    const [row, made] = await PublicVisitDay.findOrCreate({
+      where: { day, channel: d.channel },
+      defaults: { day, channel: d.channel, ...add, journeys: [] },
+    });
     const journeys = top.map((r) => ({ query: typeof r.query === "string" ? JSON.parse(r.query) : r.query, searches: Number(r.searches) }));
     if (made) await row.update({ journeys });
     else {

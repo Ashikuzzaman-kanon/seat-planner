@@ -1907,8 +1907,86 @@ module.exports = {
       get: {
         tags: ["Seat allocation"],
         summary: "How the public page is used: totals, most searched journeys, where from, the latest visits",
-        ...secured("allocation:manage"),
+        ...secured("allocation:requests"),
         responses: { 200: response("Visits", { type: "object" }), 403: errors[403] },
+      },
+    },
+
+    "/allocation/requests": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "Who looks at the seat allocation, and for what: requests grouped and counted",
+        description: [
+          "The requests from the public page (channel public) and the searches made in the app (channel app),",
+          "within a span of Dhaka days, grouped by one or two fields and counted: requests, people (signed in),",
+          "visitors (browsers), and the searches that found nothing. Searches only, unless all=1. With the",
+          "totals, the counts over time (by hour over a day or two, by day up to three months, by week beyond),",
+          "the latest 50 requests that match, and — for days whose requests are gone — the daily totals kept.",
+          "",
+          "Fields: channel, signedIn, person, role, visitor, ip, journey, station, from, to, train, class, show, search, outcome, found, kind, country, city, device, browser, os, language, site, hour, weekday, day, week, month.",
+        ].join("\n"),
+        ...secured("allocation:requests"),
+        parameters: [
+          queryParam("by", "One or two fields, comma-separated (channel by default), such as train,outcome"),
+          queryParam("w", "A filter, field:value — repeat it for more; field: alone means none (not signed in…)"),
+          queryParam("since", "First day, YYYY-MM-DD (30 days back by default)"),
+          queryParam("until", "Last day, YYYY-MM-DD (today by default)"),
+          queryParam("all", "1 to count every request — page opens and bot checks too — not only searches"),
+        ],
+        responses: {
+          200: response(
+            "The analysis",
+            obj({
+              totals: obj({ requests: int(), people: int(), visitors: int(), nothing: int(), public: int(), app: int() }),
+              groups: arr(
+                obj({
+                  values: arr(str("A field's value, as a filter takes it; null for none")),
+                  labels: arr(str("The same, for people to read")),
+                  requests: int(),
+                  people: int(),
+                  visitors: int(),
+                  nothing: int("Searches shown that found nothing"),
+                  lastAt: { type: "string", format: "date-time" },
+                })
+              ),
+              truncated: bool("More than 500 groups: the rest left out"),
+              series: obj({ size: str("hour, day or week"), points: arr({ type: "object" }) }),
+              latest: arr({ type: "object" }),
+              dimensions: arr(obj({ key: str(), group: str(), label: str() })),
+            })
+          ),
+          400: errors[400],
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation/requests.csv": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "The same groups as a spreadsheet",
+        ...secured("allocation:requests"),
+        parameters: [
+          queryParam("by", "As for /allocation/requests"),
+          queryParam("w", "As for /allocation/requests"),
+          queryParam("since", "As for /allocation/requests"),
+          queryParam("until", "As for /allocation/requests"),
+          queryParam("all", "As for /allocation/requests"),
+        ],
+        responses: {
+          200: { description: "CSV", content: { "text/csv": { schema: { type: "string" } } } },
+          400: errors[400],
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation/requests/today": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "Today's searches, on the public page and in the app",
+        ...secured("allocation:requests"),
+        responses: { 200: response("Today", obj({ searches: int(), people: int(), visitors: int() })), 403: errors[403] },
       },
     },
 
@@ -1934,6 +2012,7 @@ module.exports = {
           "alone: everywhere a train with seats goes from there; a train alone: its pairs in route order, with",
           "its route. Only allocated pairs unless show=all, which adds pairs found not allocated and — from the",
           "uploaded routes — the pairs nobody has checked. The summary covers every match, not just the page.",
+          "Each search is recorded as a request (channel app; see /allocation/requests).",
         ].join("\n"),
         ...secured("allocation:view"),
         parameters: [

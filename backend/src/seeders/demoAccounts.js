@@ -82,6 +82,8 @@ const DEMO_ROLES = [
       P.SETTING_VIEW,
       P.AUDIT_VIEW,
       P.JOB_VIEW,
+      // Who looks at the seat allocation, and for what.
+      P.ALLOCATION_REQUESTS,
     ],
   },
   {

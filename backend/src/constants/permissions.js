@@ -97,6 +97,7 @@ const PERMISSIONS = Object.freeze({
   // Seat allocation: the railway's own, as scanned (kept apart from booking data)
   ALLOCATION_VIEW: "allocation:view",
   ALLOCATION_MANAGE: "allocation:manage",
+  ALLOCATION_REQUESTS: "allocation:requests",
 
   // Subscriptions. Asking for one needs no permission — everyone signed in can.
   SUBSCRIPTION_MANAGE: "subscription:manage",
@@ -482,6 +483,14 @@ const PERMISSION_CATALOGUE = Object.freeze([
     description:
       "Upload the train routes, the census of which pairs have seats, and the sheet of seat counts — each " +
       "shown before it is applied — and correct a pair by hand. Changes nothing the site books on.",
+  },
+  {
+    key: PERMISSIONS.ALLOCATION_REQUESTS,
+    group: "Seat allocation",
+    label: "See allocation requests",
+    description:
+      "Analyse who looks at the seat allocation — on the public page and in the app — and what they look for: " +
+      "grouped by person, train, station, place, device or time, with names and internet addresses.",
   },
 
   {

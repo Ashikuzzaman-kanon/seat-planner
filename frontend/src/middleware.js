@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
 /**
- * The public Seat Allocation API, passed on to the backend by this server
- * rather than by the plain /api rewrite — so it can say who is really asking.
+ * The public Seat Allocation API, and the app's own seat allocation search,
+ * passed on to the backend by this server rather than by the plain /api
+ * rewrite — so it can say who is really asking. Both are recorded as
+ * requests for the seat allocation, with where they came from.
  *
  * The backend sees this server's address, not the visitor's. Here, the
  * visitor's address and rough location (which Vercel adds to every request)
@@ -30,5 +32,5 @@ export function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/api/v1/public/:path*", "/api/public/:path*"],
+  matcher: ["/api/v1/public/:path*", "/api/public/:path*", "/api/v1/allocation", "/api/allocation"],
 };

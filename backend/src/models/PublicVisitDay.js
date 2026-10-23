@@ -1,12 +1,13 @@
 const { DataTypes, Model } = require("sequelize");
 const sequelize = require("../config/database");
 
-/** A day's totals for the public Seat Allocation page, kept after its visits are deleted. */
+/** A day's totals for the seat allocation requests of one channel (public, app), kept after the requests are deleted. */
 class PublicVisitDay extends Model {}
 
 PublicVisitDay.init(
   {
     day: { type: DataTypes.DATEONLY, primaryKey: true },
+    channel: { type: DataTypes.STRING(10), primaryKey: true, defaultValue: "public" },
     requests: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     searches: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     visitors: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },

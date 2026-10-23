@@ -72,6 +72,11 @@ export default function PrivacyPage() {
           kept for 90 days at most, unless the site&apos;s settings say otherwise, and after that only each
           day&apos;s totals remain.
         </p>
+        <p>
+          Searches for the seat allocation made inside the app, signed in, are recorded the same way — with your
+          account, and the same random number if your browser has one — so the site&apos;s staff can see which
+          trains, stations and journeys people look for. They are kept for the same time.
+        </p>
 
         <h2>What it is used for</h2>
         <p>
@@ -102,7 +107,7 @@ export default function PrivacyPage() {
         <h2>In your browser</h2>
         <p>
           Your browser keeps the tokens that keep you signed in, one display setting — which way seat maps are
-          turned — and, if you open the public Seat Allocation page, a random number to count its free searches.
+          turned — and, if you open Seat Allocation, a random number to count the public page&apos;s free searches.
           There are no advertising or analytics cookies. Signing out removes the sign-in tokens.
         </p>
 

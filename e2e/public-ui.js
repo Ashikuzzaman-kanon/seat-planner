@@ -144,15 +144,16 @@ async function pickFrom(page, index) {
     console.log("\n== a manager ==");
     const manager = await newPage(browser);
     await signIn(manager, "unittest-super1@example.com");
-    await manager.goto(`${BASE}/dashboard/allocation`, { waitUntil: "networkidle0" });
-    await manager.waitForSelector(".al-visits");
-    await manager.evaluate(() => (document.querySelector(".al-visits").open = true));
+    // On the Requests tab, under the analysis.
+    await manager.goto(`${BASE}/dashboard/allocation#requests`, { waitUntil: "networkidle0" });
+    await manager.waitForSelector(".al-public");
+    await manager.evaluate(() => (document.querySelector(".al-public").open = true));
     const panel = await waitFor(manager, () => {
-      const t = document.querySelector(".al-visits")?.innerText || "";
+      const t = document.querySelector(".al-public")?.innerText || "";
       return /Latest visits/i.test(t) ? t : null;
     });
     check("sees how the public page is used", /Open to the public/i.test(panel || "") && /Today/i.test(panel || "") && /Searched most/i.test(panel || ""), (panel || "").slice(0, 300));
-    check("visit by visit", (await manager.evaluate(() => document.querySelectorAll(".al-visits__latest tbody tr").length)) > 3);
+    check("visit by visit", (await manager.evaluate(() => document.querySelectorAll(".al-public .al-visits__latest tbody tr").length)) > 3);
     await manager.screenshot({ path: path.join(OUT, "public-4-visits.png"), fullPage: true });
 
     console.log("\n== the phone ==");

@@ -10,6 +10,8 @@ const filters = (q) => ({
 
 const { PERMISSIONS } = require("../constants/permissions");
 const publicAllocation = require("../services/publicAllocationService");
+const requests = require("../services/allocationRequestService");
+const { readVisitor } = require("../utils/publicRequest");
 
 /**
  * Without allocation:view (seeing it because it is public), only when the
@@ -26,13 +28,11 @@ const publicVisits = asyncHandler(async (_req, res) => {
   res.json(await publicAllocation.visits());
 });
 
+/** A search in the app: answered, and recorded as one of the requests (channel "app"). */
 const list = asyncHandler(async (req, res) => {
-  const result = await allocation.list({
-    ...filters(req.query),
-    show: req.query.show,
-    page: req.query.page,
-    pageSize: req.query.pageSize,
-  });
+  const asked = { ...filters(req.query), show: req.query.show, page: req.query.page, pageSize: req.query.pageSize };
+  const result = await allocation.list(asked);
+  await requests.recordAppSearch(readVisitor(req), req.user, asked, result.total);
   if (req.permissions?.has(PERMISSIONS.ALLOCATION_VIEW)) return res.json(result);
   // Where a pair came from (census or by hand) is for staff.
   res.json({ ...result, items: result.items.map(({ source, ...rest }) => rest) });
@@ -68,12 +68,31 @@ const clearPair = asyncHandler(async (req, res) => {
   res.json({ message: "Back to not checked" });
 });
 
+/** Who looks at the seat allocation, and for what: grouped and counted. */
+const requestAnalysis = asyncHandler(async (req, res) => {
+  res.json(await requests.analyse(req.query));
+});
+
+const requestSheet = asyncHandler(async (req, res) => {
+  const text = await requests.csv(req.query);
+  res.set("Content-Type", "text/csv; charset=utf-8");
+  res.set("Content-Disposition", 'attachment; filename="allocation-requests.csv"');
+  res.send(text);
+});
+
+const requestsToday = asyncHandler(async (_req, res) => {
+  res.json(await requests.today());
+});
+
 module.exports = {
   meta,
   list,
   countsSheet,
   uploads,
   publicVisits,
+  requestAnalysis,
+  requestSheet,
+  requestsToday,
   importStops: upload(allocation.importStops),
   importCensus: upload(allocation.importCensus),
   importCounts: upload(allocation.importCounts),

@@ -74,6 +74,7 @@ export const PERMISSIONS = {
 
   ALLOCATION_VIEW: "allocation:view",
   ALLOCATION_MANAGE: "allocation:manage",
+  ALLOCATION_REQUESTS: "allocation:requests",
 
   SUBSCRIPTION_MANAGE: "subscription:manage",
   SUBSCRIPTION_APPROVE: "subscription:approve",

@@ -1,4 +1,5 @@
 import api from "@/lib/api";
+import { visitorId } from "@/lib/publicAllocation";
 
 /**
  * Seat allocation: which station pairs the railway actually gives seats to,
@@ -13,7 +14,9 @@ export async function fetchAllocationMeta() {
 
 /** Pairs matching { from, to, train, class, show: "allocated" | "all", page, pageSize }. */
 export async function fetchAllocation(params = {}) {
-  const { data } = await api.get("/allocation", { params: clean(params) });
+  // The browser's random id, as on the public page: a search here and one
+  // there, from the same browser, count as the same visitor.
+  const { data } = await api.get("/allocation", { params: clean(params), headers: { "x-sp-visitor": visitorId() } });
   return data;
 }
 
@@ -69,6 +72,40 @@ export const STATUS_LABELS = {
 export async function fetchAllocationUploads(limit = 20) {
   const { data } = await api.get("/allocation/uploads", { params: { limit } });
   return data.uploads;
+}
+
+/*
+ * Who looks at the seat allocation, and for what (allocation:requests).
+ * { by: "train,outcome", where: [{ key, value }], since, until, all } — each
+ * filter goes as w=field:value, repeated; a value of null as w=field: alone.
+ */
+const requestParams = ({ by, where = [], since, until, all }) => ({
+  params: clean({ by, since, until, all: all ? "1" : null, w: where.map((w) => `${w.key}:${w.value ?? ""}`) }),
+  paramsSerializer: { indexes: null },
+});
+
+export async function fetchAllocationRequests(ask) {
+  const { data } = await api.get("/allocation/requests", requestParams(ask));
+  return data;
+}
+
+/** The groups as a spreadsheet, saved as a file. */
+export async function downloadAllocationRequests(ask) {
+  const { data } = await api.get("/allocation/requests.csv", { ...requestParams(ask), responseType: "blob" });
+  const url = URL.createObjectURL(data);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "allocation-requests.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Today's searches, on the public page and in the app: { searches, people, visitors }. */
+export async function fetchAllocationRequestsToday() {
+  const { data } = await api.get("/allocation/requests/today");
+  return data;
 }
 
 const DHAKA = "Asia/Dhaka";
