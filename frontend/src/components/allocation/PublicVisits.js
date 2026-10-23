@@ -8,7 +8,7 @@ import { stationLabel, when } from "@/lib/allocation";
 
 const n = (x) => Number(x || 0).toLocaleString("en-GB");
 
-const OUTCOMES = {
+export const OUTCOMES = {
   shown: ["Shown", "success"],
   sign_in: ["Asked to sign in", "info"],
   rate_limited: ["Too many requests", "warning"],
@@ -28,10 +28,10 @@ export function journeyText(q) {
 }
 
 /**
- * How the public page is used, for whoever manages the data: visits and
- * searches today, this week and this month, how many were asked to sign in or
- * turned away, the journeys searched most, where visitors are and what they
- * use, and the latest visits one by one.
+ * How the public page is used, on the Requests tab (allocation:requests):
+ * visits and searches today, this week and this month, how many were asked to
+ * sign in or turned away, the journeys searched most, where visitors are and
+ * what they use, and the latest visits one by one.
  */
 export default function PublicVisits() {
   const [data, setData] = useState(null);
@@ -47,7 +47,7 @@ export default function PublicVisits() {
   };
 
   return (
-    <details className="card al-visits" onToggle={(e) => e.currentTarget.open && !data && load()}>
+    <details className="card al-visits al-public" onToggle={(e) => e.currentTarget.open && !data && load()}>
       <summary>
         <span>Public page</span>
         <small className="al-muted">

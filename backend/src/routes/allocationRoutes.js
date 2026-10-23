@@ -27,6 +27,7 @@ function canSee(req, res, next) {
   return canView(req, res, next);
 }
 const canManage = requirePermission(PERMISSIONS.ALLOCATION_MANAGE);
+const canSeeRequests = requirePermission(PERMISSIONS.ALLOCATION_REQUESTS);
 
 const station = (where, field) => where(field).optional({ values: "falsy" }).isString().isLength({ max: 100 });
 const filterRules = [
@@ -51,8 +52,23 @@ router.get(
 );
 router.get("/counts.csv", canView, filterRules, validate, c.countsSheet);
 router.get("/uploads", canView, [query("limit").optional().isInt({ min: 1, max: 100 })], validate, c.uploads);
-// How the public page is used: for whoever manages the data.
-router.get("/public-visits", canManage, c.publicVisits);
+// Who looks at it, and for what — on the public page and in the app
+// (services/allocationRequestService checks each field and filter itself).
+const requestRules = [
+  query("by").optional().matches(/^[A-Za-z]+(,[A-Za-z]+)?$/).withMessage("by is one or two fields, such as train,outcome"),
+  query("w")
+    .optional()
+    .custom((w) => (Array.isArray(w) ? w : [w]).every((x) => typeof x === "string" && x.length <= 320))
+    .withMessage("w is field:value, such as train:705"),
+  query("since").optional().isDate({ format: "YYYY-MM-DD", strictMode: true }).withMessage("since is a day, YYYY-MM-DD"),
+  query("until").optional().isDate({ format: "YYYY-MM-DD", strictMode: true }).withMessage("until is a day, YYYY-MM-DD"),
+  query("all").optional().isIn(["0", "1", "true", "false"]),
+];
+router.get("/requests", canSeeRequests, requestRules, validate, c.requestAnalysis);
+router.get("/requests.csv", canSeeRequests, requestRules, validate, c.requestSheet);
+router.get("/requests/today", canSeeRequests, c.requestsToday);
+// How the public page is used, at a glance.
+router.get("/public-visits", canSeeRequests, c.publicVisits);
 
 // Files come as plain text, up to a few megabytes: the census of every pair
 // is far beyond the 100 kB a JSON body may be.

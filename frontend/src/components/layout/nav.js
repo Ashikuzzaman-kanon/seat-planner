@@ -154,7 +154,9 @@ export const NAV_GROUPS = [
         label: "Seat Allocation",
         icon: "pi pi-chart-bar",
         permission: PERMISSIONS.ALLOCATION_VIEW,
-        // While Seat Allocation is open to the public, everyone signed in sees it.
+        // Whoever analyses its requests sees it too…
+        orPermission: PERMISSIONS.ALLOCATION_REQUESTS,
+        // …and while Seat Allocation is open to the public, everyone signed in.
         orPublic: "seat-allocation",
         blurb: "Which pairs the railway gives seats to",
       },
@@ -237,7 +239,10 @@ export function visibleGroups(hasPermission, isAvailable = () => true, isPublic 
     ...group,
     items: group.items.filter(
       (item) =>
-        (!item.permission || hasPermission(item.permission) || (item.orPublic && isPublic(item.orPublic))) &&
+        (!item.permission ||
+          hasPermission(item.permission) ||
+          (item.orPermission && hasPermission(item.orPermission)) ||
+          (item.orPublic && isPublic(item.orPublic))) &&
         (!item.feature || isAvailable(item.feature))
     ),
   })).filter((group) => group.items.length);

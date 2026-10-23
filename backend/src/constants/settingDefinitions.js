@@ -578,10 +578,11 @@ const SETTING_DEFINITIONS = Object.freeze([
   {
     key: "allocation.public_visit_days",
     group: "Public seat allocation",
-    label: "Keep each public visit for (days)",
+    label: "Keep each seat allocation request for (days)",
     description:
-      "Each visit to the public page is recorded — time, internet address, rough location, browser, what was " +
-      "searched. After this many days the records are deleted and only each day's totals are kept.",
+      "Each request for the seat allocation is recorded — on the public page and the searches made in the app: " +
+      "time, internet address, rough location, browser, who if signed in, what was searched. After this many " +
+      "days the records are deleted and only each day's totals are kept.",
     type: SETTING_TYPES.INTEGER,
     default: 90,
     min: 7,

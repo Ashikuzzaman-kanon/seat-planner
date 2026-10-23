@@ -13,6 +13,7 @@
     "features": "node feature-switches-ui.js",
     "allocation": "node allocation-ui.js",
     "public": "node public-ui.js",
+    "requests": "node requests-ui.js",
     "wake": "node test-wake.js",
     "booking": "node flow.js && node flow2.js",
     "all": "node audit-ui.js && node dialogs.js && node demo-ui.js && node test-wake.js"

@@ -376,8 +376,31 @@ app too.
   country and city, browser, OS, device, language, referring page, a random
   browser id, what was searched, how many results, what happened) and into the
   audit log. Kept for the days set in Settings (default 90), then folded into
-  daily totals. *Seat Allocation → Public page* shows them to whoever holds
-  `allocation:manage`.
+  daily totals. *Seat Allocation → Requests → Public page* shows them at a
+  glance.
+
+### Seat allocation requests
+
+Every search for the seat allocation is recorded: on the public page (above),
+and inside the app — the same table, `public_visits`, its `channel` saying
+which (`public` or `app`). The app's searches carry who made them, and the
+browser's address and rough location the same way the public page's do
+(`frontend/src/middleware.js` covers the app's search too). They never count
+against the public page's free searches, and are not in the audit log.
+
+*Seat Allocation → Requests*, for whoever holds `allocation:requests` (the
+super admin, and the admin role), analyses them: pick the days, group by one
+field and then another — who (person, role, browser, address, signed in or
+not), where (public page or app), the journey (from, to, from → to, a station
+either way, train, class, the whole search), the outcome (shown, asked to sign
+in, turned away; found something or nothing), place and device (country, city,
+device, browser, OS, language, the site they came from) or time (hour,
+weekday, day, week, month) — and each group is counted: requests, people,
+visitors, searches that found nothing, when last. A row breaks down further or
+lists its requests one by one; a bar of the chart narrows to its hour, day or
+week; the groups download as CSV. The tab carries today's count. Days whose
+requests have been folded into daily totals show as those totals only, the
+public page's and the app's apart.
 
 ### Switching tabs off
 
