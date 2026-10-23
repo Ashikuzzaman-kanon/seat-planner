@@ -256,6 +256,8 @@ function summarise(rows) {
   const classes = new Map();
   let checkedFrom = null;
   let checkedTo = null;
+  let countsFrom = null;
+  let countsTo = null;
   for (const p of rows) {
     trains.add(p.train);
     stations.add(p.from);
@@ -269,6 +271,8 @@ function summarise(rows) {
       if (c.seats !== null) {
         s.counted++;
         s.seats += c.seats;
+        countsFrom = earlier(countsFrom, c.seatsUpdatedAt);
+        countsTo = later(countsTo, c.seatsUpdatedAt);
       }
       classes.set(c.code, s);
     }
@@ -283,6 +287,9 @@ function summarise(rows) {
     // When the pairs shown were checked against the railway: the oldest and the newest.
     checkedFrom,
     checkedTo,
+    // When the seat counts shown were set: the oldest and the newest.
+    countsFrom,
+    countsTo,
     classes: [...classes.values()].sort((a, b) => b.pairs - a.pairs || a.code.localeCompare(b.code)),
   };
 }

@@ -7,7 +7,7 @@ import { Button } from "primereact/button";
 import { SelectButton } from "primereact/selectbutton";
 import { Paginator } from "primereact/paginator";
 import { ProgressSpinner } from "primereact/progressspinner";
-import { stationLabel, span } from "@/lib/allocation";
+import { stationLabel, span, daySpan } from "@/lib/allocation";
 import { PairList, PairGrid, GridLegend } from "./PairViews";
 import "./allocation.css";
 
@@ -198,6 +198,12 @@ export default function Explorer({ meta, fetchList, canManage = false, onEdit, o
                         · railway checked <strong>{span(s.checkedFrom, s.checkedTo)}</strong>
                       </span>
                     )}
+                    {s.countsFrom && (
+                      <span className="al-checked">
+                        {" "}
+                        · counts updated <strong>{daySpan(s.countsFrom, s.countsTo)}</strong>
+                      </span>
+                    )}
                   </>
                 ) : (
                   " "
@@ -263,7 +269,13 @@ export default function Explorer({ meta, fetchList, canManage = false, onEdit, o
               )
             ) : data?.items.length ? (
               <>
-                <PairList items={data.items} oneTrain={oneTrain} canManage={canManage} onEdit={onEdit} />
+                <PairList
+                  items={data.items}
+                  oneTrain={oneTrain}
+                  canManage={canManage}
+                  onEdit={onEdit}
+                  newestChecked={s?.checkedTo}
+                />
                 {data.total > PAGE_SIZE && (
                   <Paginator
                     first={(page - 1) * PAGE_SIZE}
