@@ -203,17 +203,24 @@ export default function Explorer({ meta, fetchList, canManage = false, onEdit, o
                   " "
                 )}
               </p>
+              {/* Seats class by class: there when wanted, folded away by default. */}
               {s?.classes.length > 0 && (
-                <ul className="al-summary__classes">
-                  {s.classes.map((c) => (
-                    <li key={c.code}>
-                      <strong>{c.code}</strong> on {n(c.pairs)} pair{c.pairs === 1 ? "" : "s"}
-                      <span className="al-muted">
-                        {c.counted ? ` · ${n(c.seats)} seats on the ${n(c.counted)} counted` : " · counts not available"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <details className="al-summary__more">
+                  <summary>
+                    <i className="pi pi-chevron-right" aria-hidden="true" />
+                    Seats by class <span className="al-muted">({s.classes.length})</span>
+                  </summary>
+                  <ul className="al-summary__classes">
+                    {s.classes.map((c) => (
+                      <li key={c.code}>
+                        <strong>{c.code}</strong> on {n(c.pairs)} pair{c.pairs === 1 ? "" : "s"}
+                        <span className="al-muted">
+                          {c.counted ? ` · ${n(c.seats)} seats on the ${n(c.counted)} counted` : " · counts not available"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               )}
               {oneTrain && (
                 <SelectButton

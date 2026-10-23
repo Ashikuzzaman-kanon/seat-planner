@@ -183,13 +183,35 @@
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
+.al-summary__more {
+  flex-basis: 100%;
+  order: 3;
+}
+.al-summary__more summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  color: var(--brand-700);
+  font-size: 0.86rem;
+  font-weight: 600;
+  list-style: none;
+}
+.al-summary__more summary::-webkit-details-marker {
+  display: none;
+}
+.al-summary__more summary .pi {
+  font-size: 0.7rem;
+  transition: transform 0.15s ease;
+}
+.al-summary__more[open] summary .pi {
+  transform: rotate(90deg);
+}
 .al-summary__classes {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  flex-basis: 100%;
-  order: 3;
-  margin: 0;
+  margin: 0.5rem 0 0;
   padding: 0;
   list-style: none;
 }
