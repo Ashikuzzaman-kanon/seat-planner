@@ -17,7 +17,7 @@ export const metadata = {
   description: "What Seat Planner keeps about you, why, and how to have it removed.",
 };
 
-const UPDATED = "27 September 2026";
+const UPDATED = "23 October 2026";
 
 export default function PrivacyPage() {
   return (
@@ -57,6 +57,22 @@ export default function PrivacyPage() {
           </li>
         </ul>
 
+        <h2>The public Seat Allocation page</h2>
+        <p>
+          Seat Allocation can be opened at <Link href="/seat-allocation">/seat-allocation</Link> without an account.
+          Each visit to it is recorded: the time, your internet (IP) address and the rough location it points to
+          (country and city), your browser, operating system and kind of device, your language, the page you came
+          from, what you searched for, and a random number your browser keeps for this page. No name, email or
+          phone number is asked for or known. If you are signed in, the visit is linked to your account.
+        </p>
+        <p>
+          It is used to stop abuse (too many requests, robots), to count the free searches a day before you are
+          asked to sign in, and to see how the page is used. A check that you are not a robot may be run by
+          Cloudflare Turnstile, which receives your IP address and browser details for that purpose. Each visit is
+          kept for 90 days at most, unless the site&apos;s settings say otherwise, and after that only each
+          day&apos;s totals remain.
+        </p>
+
         <h2>What it is used for</h2>
         <p>
           Only to run the service: to sign you in, sell and check tickets, return money you are owed, and keep
@@ -80,12 +96,14 @@ export default function PrivacyPage() {
           <li>Aiven — hosts the main database</li>
           <li>MongoDB Atlas — hosts the security log</li>
           <li>Google — delivers email</li>
+          <li>Cloudflare — the check that a visitor to the public Seat Allocation page is not a robot</li>
         </ul>
 
         <h2>In your browser</h2>
         <p>
-          Your browser keeps the tokens that keep you signed in, and one display setting — which way seat maps
-          are turned. There are no advertising or analytics cookies. Signing out removes the sign-in tokens.
+          Your browser keeps the tokens that keep you signed in, one display setting — which way seat maps are
+          turned — and, if you open the public Seat Allocation page, a random number to count its free searches.
+          There are no advertising or analytics cookies. Signing out removes the sign-in tokens.
         </p>
 
         <h2>How long it is kept, and removing it</h2>

@@ -47,8 +47,19 @@ function initials(name = "") {
  * first tab still there stands in for it.
  */
 export default function DashboardShell({ children }) {
-  const { user, roles, loading, unreachable, refresh, recheck, logout, hasPermission, isAvailable, featureMessage } =
-    useAuth();
+  const {
+    user,
+    roles,
+    loading,
+    unreachable,
+    refresh,
+    recheck,
+    logout,
+    hasPermission,
+    isAvailable,
+    isPublic,
+    featureMessage,
+  } = useAuth();
   const [retrying, setRetrying] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -60,10 +71,10 @@ export default function DashboardShell({ children }) {
     if (!loading && !user && !unreachable) router.replace("/login");
   }, [loading, user, unreachable, router]);
 
-  const groups = useMemo(() => visibleGroups(hasPermission, isAvailable), [hasPermission, isAvailable]);
+  const groups = useMemo(() => visibleGroups(hasPermission, isAvailable, isPublic), [hasPermission, isAvailable, isPublic]);
   const here = locate(pathname);
   const offHere = Boolean(here.item?.feature) && !isAvailable(here.item.feature);
-  const homeHref = isAvailable("home") ? "/dashboard" : firstVisibleHref(hasPermission, isAvailable) || "/dashboard";
+  const homeHref = isAvailable("home") ? "/dashboard" : firstVisibleHref(hasPermission, isAvailable, isPublic) || "/dashboard";
 
   // Switches can change while the app is open: look again on moving between pages.
   useEffect(() => {

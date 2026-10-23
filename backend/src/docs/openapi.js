@@ -108,6 +108,12 @@ module.exports = {
     { name: "Settings", description: "Runtime-configurable values" },
     { name: "Features", description: "Switching tabs of the app off, for everyone or for chosen users and roles" },
     {
+      name: "Public seat allocation",
+      description:
+        "Seat Allocation for everyone, without signing in (/seat-allocation): read-only, rate-limited, with a bot " +
+        "check and a number of free searches a day. Switched on in Settings.",
+    },
+    {
       name: "Seat allocation",
       description:
         "Which station pairs the railway actually sets seats aside for, per train and class — the railway's own " +
@@ -301,6 +307,7 @@ module.exports = {
         roles: arr(obj({ id: int(), name: str() })),
         permissions: arr(str("Effective permission keys")),
         unavailableFeatures: arr(ref("UnavailableFeature")),
+        publicFeatures: arr(str("Features open to the public, and so to everyone signed in: seat-allocation")),
       }),
 
       Setting: obj({
@@ -1455,6 +1462,7 @@ module.exports = {
               roles: arr(obj({ id: int(), name: str() })),
               permissions: arr(str()),
               unavailableFeatures: arr(ref("UnavailableFeature")),
+              publicFeatures: arr(str()),
             })
           ),
           401: errors[401],
@@ -1800,6 +1808,105 @@ module.exports = {
           ),
           403: errors[403],
         },
+      },
+    },
+
+    "/public/allocation/status": {
+      get: {
+        tags: ["Public seat allocation"],
+        summary: "Whether the public page is open, and the bot check's site key",
+        security: [],
+        responses: { 200: response("Status", obj({ enabled: bool(), botCheck: { ...obj({ siteKey: str() }), nullable: true } })) },
+      },
+    },
+
+    "/public/allocation/meta": {
+      get: {
+        tags: ["Public seat allocation"],
+        summary: "The filters, and how current the data is — no sign-in",
+        description: [
+          "Headers: x-sp-visitor (a random id the browser keeps), x-sp-referrer (the page the visitor came from).",
+          "Reached through the web app's server, which adds the visitor's address and, with PUBLIC_EDGE_SECRET set,",
+          "a secret; without the secret such requests are refused (REFUSED). Recorded in public_visits and the audit log.",
+        ].join("\n"),
+        security: [],
+        responses: {
+          200: response(
+            "Filters and freshness",
+            obj({
+              trains: arr(obj({ number: int(), name: str() })),
+              stations: arr(str()),
+              classes: arr(str()),
+              totals: obj({ trains: int(), pairs: int(), allocated: int() }),
+              lastUpdated: { type: "string", format: "date-time", nullable: true },
+              railwayChecked: { ...obj({ from: str(), to: str() }), nullable: true },
+              enabled: bool(),
+              botCheck: { ...obj({ siteKey: str() }), nullable: true },
+              signedIn: bool(),
+            })
+          ),
+          403: response("REFUSED: not through the web app", ref("Error")),
+          404: response("PUBLIC_OFF: not open to the public", ref("Error")),
+          429: response("RATE_LIMITED, with Retry-After", ref("Error")),
+        },
+      },
+    },
+
+    "/public/allocation": {
+      get: {
+        tags: ["Public seat allocation"],
+        summary: "A search — the same answer as GET /allocation, without where pairs came from",
+        description: [
+          "Needs x-sp-visitor, and x-sp-pass (from POST /public/allocation/pass) when the bot check is on.",
+          "Without a sign-in, a visitor has the free searches of the day set in Settings (different from, to, train,",
+          "class; paging and the opening view do not count), per browser and per address; then SIGN_IN_REQUIRED.",
+          "Signed in (Authorization: Bearer), searches are unlimited.",
+        ].join("\n"),
+        security: [],
+        parameters: [
+          queryParam("from", "Boarding station"),
+          queryParam("to", "Destination"),
+          queryParam("train", "Train number", "integer"),
+          queryParam("class", "Class code"),
+          queryParam("show", "allocated (default) or all"),
+          queryParam("page", "From 1", "integer"),
+          queryParam("pageSize", "1 to 1000", "integer"),
+        ],
+        responses: {
+          200: response(
+            "Pairs",
+            obj({ items: arr(ref("AllocationPair")), total: int(), page: int(), pageSize: int(), summary: ref("AllocationSummary") })
+          ),
+          400: response("No visitor id, or a bad filter", ref("Error")),
+          403: response("SIGN_IN_REQUIRED (details.freeSearches), BOT_CHECK (details.siteKey) or REFUSED", ref("Error")),
+          404: response("PUBLIC_OFF", ref("Error")),
+          429: response("RATE_LIMITED, with Retry-After", ref("Error")),
+        },
+      },
+    },
+
+    "/public/allocation/pass": {
+      post: {
+        tags: ["Public seat allocation"],
+        summary: "Trade a Cloudflare Turnstile token for a pass lasting an hour",
+        security: [],
+        requestBody: body(obj({ token: str("Turnstile's answer") }, ["token"])),
+        responses: {
+          200: response(
+            "The pass (null when no bot check is set up)",
+            obj({ required: bool(), pass: { ...str(), nullable: true }, expiresAt: { type: "string", format: "date-time", nullable: true } })
+          ),
+          403: response("BOT_CHECK: the token did not pass", ref("Error")),
+        },
+      },
+    },
+
+    "/allocation/public-visits": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "How the public page is used: totals, most searched journeys, where from, the latest visits",
+        ...secured("allocation:manage"),
+        responses: { 200: response("Visits", { type: "object" }), 403: errors[403] },
       },
     },
 

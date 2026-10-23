@@ -69,6 +69,13 @@ const testEnv = {
   RAILWAY_SOURCE_URL: "http://127.0.0.1:47329/train-routes",
   RAILWAY_RETRY_MS: "20",
   RAILWAY_PAUSE_MS: "0",
+  // The public Seat Allocation page: only through the web app (which the
+  // suite plays, with this secret), and a bot check whose answers a stand-in
+  // gives (allocation-public suite).
+  PUBLIC_EDGE_SECRET: "test-edge-secret",
+  TURNSTILE_SITE_KEY: "test-site-key",
+  TURNSTILE_SECRET_KEY: "test-secret-key",
+  TURNSTILE_VERIFY_URL: "http://127.0.0.1:47331/siteverify",
 };
 
 if (!/_test$/.test(testEnv.DB_NAME)) {

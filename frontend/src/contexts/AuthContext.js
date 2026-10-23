@@ -18,6 +18,8 @@ export function AuthProvider({ children }) {
   const [permissions, setPermissions] = useState([]);
   // Tabs switched off for this person (Settings → Features): [{ key, message }].
   const [unavailableFeatures, setUnavailableFeatures] = useState([]);
+  // What every signed-in person may see because it is open to the public.
+  const [publicFeatures, setPublicFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
   const lastLoad = useRef(0);
   // Set when the session could not be checked because the server did not
@@ -50,6 +52,7 @@ export function AuthProvider({ children }) {
       setRoles(data.roles || []);
       setPermissions(data.permissions || []);
       setUnavailableFeatures(data.unavailableFeatures || []);
+      setPublicFeatures(data.publicFeatures || []);
       setUnreachable(null);
     } catch (err) {
       // Only the server saying "no" ends the session. A server that is asleep,
@@ -112,6 +115,7 @@ export function AuthProvider({ children }) {
     setRoles(data.roles || []);
     setPermissions(data.permissions || []);
     setUnavailableFeatures(data.unavailableFeatures || []);
+    setPublicFeatures(data.publicFeatures || []);
     lastLoad.current = Date.now();
     setLoading(false);
     return data.user;
@@ -152,6 +156,9 @@ export function AuthProvider({ children }) {
     [unavailableFeatures]
   );
 
+  /** Whether a feature is open to the public, and so to everyone signed in. */
+  const isPublic = useCallback((feature) => publicFeatures.includes(feature), [publicFeatures]);
+
   /** The message the super admin left for a tab switched off, if any. */
   const featureMessage = useCallback(
     (feature) => unavailableFeatures.find((f) => f.key === feature)?.message || null,
@@ -177,6 +184,7 @@ export function AuthProvider({ children }) {
     recheck,
     unavailableFeatures,
     isAvailable,
+    isPublic,
     featureMessage,
     hasPermission,
     hasAnyPermission,
