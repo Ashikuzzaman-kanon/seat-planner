@@ -257,7 +257,7 @@ const CENSUS = [
     check("managers see the totals kept", earlier?.days === 1 && earlier.searches === 3, JSON.stringify(earlier));
 
     console.log("\n== the audit log, when there is one ==");
-    const logged = (await call("GET", "/audit?action=allocation.public_view&limit=5", { token: S })).body;
+    const logged = (await call("GET", "/audit?action=allocation.public_view&limit=50", { token: S })).body;
     if (logged?.available === false) {
       console.log("  (no document store here — skipped)");
     } else {
