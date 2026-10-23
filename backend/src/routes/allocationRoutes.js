@@ -14,6 +14,18 @@ const { PERMISSIONS } = require("../constants/permissions");
 router.use(authenticate);
 
 const canView = requirePermission(PERMISSIONS.ALLOCATION_VIEW);
+
+/*
+ * While Seat Allocation is open to the public, everyone signed in may see it
+ * in the app too — the filters, the list and the grid. Who uploaded what, the
+ * upload history and the counts sheet stay with those who hold
+ * allocation:view.
+ */
+const publicAllocation = require("../services/publicAllocationService");
+function canSee(req, res, next) {
+  if (req.permissions?.has(PERMISSIONS.ALLOCATION_VIEW) || publicAllocation.enabled()) return next();
+  return canView(req, res, next);
+}
 const canManage = requirePermission(PERMISSIONS.ALLOCATION_MANAGE);
 
 const station = (where, field) => where(field).optional({ values: "falsy" }).isString().isLength({ max: 100 });
@@ -24,10 +36,10 @@ const filterRules = [
   query("class").optional({ values: "falsy" }).matches(/^[A-Za-z][A-Za-z0-9_]{0,19}$/).withMessage("class is a class code, such as S_CHAIR"),
 ];
 
-router.get("/meta", canView, c.meta);
+router.get("/meta", canSee, c.meta);
 router.get(
   "/",
-  canView,
+  canSee,
   [
     ...filterRules,
     query("show").optional().isIn(["allocated", "all"]).withMessage("show is allocated or all"),
@@ -39,6 +51,8 @@ router.get(
 );
 router.get("/counts.csv", canView, filterRules, validate, c.countsSheet);
 router.get("/uploads", canView, [query("limit").optional().isInt({ min: 1, max: 100 })], validate, c.uploads);
+// How the public page is used: for whoever manages the data.
+router.get("/public-visits", canManage, c.publicVisits);
 
 // Files come as plain text, up to a few megabytes: the census of every pair
 // is far beyond the 100 kB a JSON body may be.

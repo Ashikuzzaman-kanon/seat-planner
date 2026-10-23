@@ -24,6 +24,7 @@ const notificationRoutes = require("./notificationRoutes");
 const subscriptionRoutes = require("./subscriptionRoutes");
 const featureRoutes = require("./featureRoutes");
 const allocationRoutes = require("./allocationRoutes");
+const publicRoutes = require("./publicRoutes");
 const { PERMISSION_CATALOGUE } = require("../constants/permissions");
 const openapi = require("../docs/openapi");
 
@@ -44,6 +45,8 @@ router.use("/roles", roleRoutes);
 router.use("/settings", settingRoutes);
 router.use("/features", featureRoutes);
 router.use("/allocation", allocationRoutes);
+// Seat Allocation for everyone, without signing in.
+router.use("/public/allocation", publicRoutes);
 router.use("/audit", auditRoutes);
 router.use("/reference", referenceRoutes);
 router.use("/plans", seatPlanRoutes);

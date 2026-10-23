@@ -50,6 +50,11 @@ function isOffFor(key, who) {
   return s.userIds.has(who.userId) || who.roleIds.some((id) => s.roleIds.has(id));
 }
 
+/** Whether a feature is switched off for everyone (and so for the public too). */
+function offForEveryone(key) {
+  return cache.get(key)?.state === SWITCH_STATES.OFF_ALL;
+}
+
 /** The features off for a person, each with the message left for them. */
 function unavailableFor(user, access) {
   const who = whoOf(user, access);
@@ -215,4 +220,4 @@ async function set(key, { state, message, userIds, roleIds } = {}, actingUser) {
   return after;
 }
 
-module.exports = { loadSwitches, unavailableFor, guard, list, people, set, apiPath };
+module.exports = { loadSwitches, unavailableFor, offForEveryone, guard, list, people, set, apiPath };

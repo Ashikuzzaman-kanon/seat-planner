@@ -123,6 +123,8 @@ const AUDIT_ACTIONS = Object.freeze({
   ALLOCATION_IMPORT: "allocation.import",
   ALLOCATION_EDIT: "allocation.edit",
   ALLOCATION_CLEAR: "allocation.clear",
+  // Each request to the public page, signed in or not
+  ALLOCATION_PUBLIC_VIEW: "allocation.public_view",
 
   // The daily sweep deleting long-departed trains' unsold seats.
   SEATS_CLEARED: "trip.seats_cleared",

@@ -8,19 +8,34 @@ const filters = (q) => ({
   classCode: q.class || undefined,
 });
 
-const meta = asyncHandler(async (_req, res) => {
-  res.json(await allocation.meta());
+const { PERMISSIONS } = require("../constants/permissions");
+const publicAllocation = require("../services/publicAllocationService");
+
+/**
+ * Without allocation:view (seeing it because it is public), only when the
+ * data was brought up to date — not who uploaded which file.
+ */
+const meta = asyncHandler(async (req, res) => {
+  const m = await allocation.meta();
+  if (req.permissions?.has(PERMISSIONS.ALLOCATION_VIEW)) return res.json({ ...m, staff: true });
+  const at = (x) => (x ? { at: x.at, scannedFrom: x.scannedFrom ?? null, scannedTo: x.scannedTo ?? null } : null);
+  res.json({ ...m, latest: { stops: at(m.latest?.stops), census: at(m.latest?.census), counts: at(m.latest?.counts) }, staff: false });
+});
+
+const publicVisits = asyncHandler(async (_req, res) => {
+  res.json(await publicAllocation.visits());
 });
 
 const list = asyncHandler(async (req, res) => {
-  res.json(
-    await allocation.list({
-      ...filters(req.query),
-      show: req.query.show,
-      page: req.query.page,
-      pageSize: req.query.pageSize,
-    })
-  );
+  const result = await allocation.list({
+    ...filters(req.query),
+    show: req.query.show,
+    page: req.query.page,
+    pageSize: req.query.pageSize,
+  });
+  if (req.permissions?.has(PERMISSIONS.ALLOCATION_VIEW)) return res.json(result);
+  // Where a pair came from (census or by hand) is for staff.
+  res.json({ ...result, items: result.items.map(({ source, ...rest }) => rest) });
 });
 
 const countsSheet = asyncHandler(async (req, res) => {
@@ -58,6 +73,7 @@ module.exports = {
   list,
   countsSheet,
   uploads,
+  publicVisits,
   importStops: upload(allocation.importStops),
   importCensus: upload(allocation.importCensus),
   importCounts: upload(allocation.importCounts),

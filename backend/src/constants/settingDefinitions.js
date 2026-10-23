@@ -504,6 +504,89 @@ const SETTING_DEFINITIONS = Object.freeze([
     min: 1,
     max: 8760,
   },
+
+  // Seat Allocation for everyone, without signing in (/seat-allocation).
+  {
+    key: "allocation.public_enabled",
+    group: "Public seat allocation",
+    label: "Show Seat Allocation to everyone",
+    description:
+      "Lets anyone see Seat Allocation at /seat-allocation without signing in, and adds a button for it to the " +
+      "sign-in page. While on, every signed-in user can see it in the app too. Switching the Seat Allocation " +
+      "tab off for everyone (Settings → Features) turns this off as well.",
+    type: SETTING_TYPES.BOOLEAN,
+    default: false,
+  },
+  {
+    key: "allocation.public_free_searches",
+    group: "Public seat allocation",
+    label: "Free searches a day before asking to sign in",
+    description:
+      "How many different searches (from, to, train, class) a visitor who has not signed in may make in a day, " +
+      "counted per browser. Then the results give way to an invitation to sign in or create a free account. " +
+      "0 asks at once.",
+    type: SETTING_TYPES.INTEGER,
+    default: 5,
+    min: 0,
+    max: 1000,
+  },
+  {
+    key: "allocation.public_searches_per_ip_day",
+    group: "Public seat allocation",
+    label: "Free searches a day from one internet address",
+    description:
+      "The same, counted per internet address across every browser behind it — so clearing a browser does not " +
+      "start the count again. Mobile networks put many people behind one address, so keep this well above the " +
+      "per-browser number.",
+    type: SETTING_TYPES.INTEGER,
+    default: 200,
+    min: 0,
+    max: 100000,
+  },
+  {
+    key: "allocation.public_requests_per_minute",
+    group: "Public seat allocation",
+    label: "Requests a minute from one internet address",
+    description: "More than this in a minute, and the address is asked to wait. Signed-in visitors are limited the same way.",
+    type: SETTING_TYPES.INTEGER,
+    default: 60,
+    min: 1,
+    max: 10000,
+  },
+  {
+    key: "allocation.public_requests_per_day",
+    group: "Public seat allocation",
+    label: "Requests a day from one internet address",
+    description: "More than this in a day, and the address is turned away until the next day (Dhaka time).",
+    type: SETTING_TYPES.INTEGER,
+    default: 3000,
+    min: 1,
+    max: 1000000,
+  },
+  {
+    key: "allocation.public_requests_per_second",
+    group: "Public seat allocation",
+    label: "Requests a second for the whole public page",
+    description:
+      "A ceiling for every visitor together, so a flood from many addresses cannot take the server down. Past " +
+      "it, visitors are asked to wait a moment.",
+    type: SETTING_TYPES.INTEGER,
+    default: 30,
+    min: 1,
+    max: 10000,
+  },
+  {
+    key: "allocation.public_visit_days",
+    group: "Public seat allocation",
+    label: "Keep each public visit for (days)",
+    description:
+      "Each visit to the public page is recorded — time, internet address, rough location, browser, what was " +
+      "searched. After this many days the records are deleted and only each day's totals are kept.",
+    type: SETTING_TYPES.INTEGER,
+    default: 90,
+    min: 7,
+    max: 730,
+  },
 ]);
 
 const DEFINITIONS_BY_KEY = Object.freeze(

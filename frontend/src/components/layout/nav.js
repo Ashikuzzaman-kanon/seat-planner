@@ -154,6 +154,8 @@ export const NAV_GROUPS = [
         label: "Seat Allocation",
         icon: "pi pi-chart-bar",
         permission: PERMISSIONS.ALLOCATION_VIEW,
+        // While Seat Allocation is open to the public, everyone signed in sees it.
+        orPublic: "seat-allocation",
         blurb: "Which pairs the railway gives seats to",
       },
     ],
@@ -230,18 +232,20 @@ export const NAV_GROUPS = [
 ];
 
 /** The groups a person can see, with empty groups dropped. */
-export function visibleGroups(hasPermission, isAvailable = () => true) {
+export function visibleGroups(hasPermission, isAvailable = () => true, isPublic = () => false) {
   return NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter(
-      (item) => (!item.permission || hasPermission(item.permission)) && (!item.feature || isAvailable(item.feature))
+      (item) =>
+        (!item.permission || hasPermission(item.permission) || (item.orPublic && isPublic(item.orPublic))) &&
+        (!item.feature || isAvailable(item.feature))
     ),
   })).filter((group) => group.items.length);
 }
 
 /** Where to land when Home is switched off: the first tab still there. */
-export function firstVisibleHref(hasPermission, isAvailable) {
-  return visibleGroups(hasPermission, isAvailable)[0]?.items[0]?.href || null;
+export function firstVisibleHref(hasPermission, isAvailable, isPublic) {
+  return visibleGroups(hasPermission, isAvailable, isPublic)[0]?.items[0]?.href || null;
 }
 
 /**

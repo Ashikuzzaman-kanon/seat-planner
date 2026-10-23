@@ -154,6 +154,13 @@ register("jobs.prune", {
   handler: async () => durable.prune(),
 });
 
+register("allocation.public_prune", {
+  describe: "Folds visits to the public Seat Allocation page older than the days kept into each day's totals, and deletes them",
+  everyMinutes: 24 * 60,
+  runOnBoot: true,
+  handler: async () => require("../services/publicAllocationService").prune(),
+});
+
 register("waitlist.close", {
   describe: "Closes queue places for departures that have gone or been cancelled",
   everyMinutes: 60,

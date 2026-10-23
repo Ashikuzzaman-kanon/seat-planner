@@ -56,6 +56,8 @@ const AllocationTrain = require("./AllocationTrain");
 const AllocationPair = require("./AllocationPair");
 const AllocationClass = require("./AllocationClass");
 const AllocationUpload = require("./AllocationUpload");
+const PublicVisit = require("./PublicVisit");
+const PublicVisitDay = require("./PublicVisitDay");
 const demoCapture = require("../utils/demoCapture");
 
 const models = {
@@ -116,6 +118,8 @@ const models = {
   AllocationPair,
   AllocationClass,
   AllocationUpload,
+  PublicVisit,
+  PublicVisitDay,
 };
 
 // Wire up associations for any model that declares them.

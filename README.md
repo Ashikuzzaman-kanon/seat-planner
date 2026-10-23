@@ -314,9 +314,12 @@ Backend environment (`backend/.env`):
 | `CORS_ORIGINS` | production | Comma-separated allowed origins |
 | `APP_URL` | no | The web app's address, for buttons and the logo in emails. Defaults to the first `CORS_ORIGINS` entry |
 | `SUPER_ADMIN_NAME` `SUPER_ADMIN_EMAIL` `SUPER_ADMIN_PASSWORD` | for seeding | Used by `npm run seed:superadmin` |
+| `PUBLIC_EDGE_SECRET` | for the public page | Shared with the web app (same value on Vercel): the public Seat Allocation API then only answers through it, with the visitor's real address |
+| `TURNSTILE_SITE_KEY` `TURNSTILE_SECRET_KEY` | no | Cloudflare Turnstile, the public page's bot check. Without them, rate limits only |
 
 Frontend: `NEXT_PUBLIC_API_BASE_URL` (use `/api`) and, in production,
-`BACKEND_ORIGIN` — where the `/api` rewrite points.
+`BACKEND_ORIGIN` — where the `/api` rewrite points — and `PUBLIC_EDGE_SECRET`,
+the same value as the API's.
 
 Business rules (hold timeouts, refund slabs, waitlist windows, abuse weights,
 job retries…) live in the settings store and are edited on the *Settings*
@@ -346,6 +349,35 @@ The railway can change its allocation at any time, so the page says how
 current the data is: when the routes, the census and the counts last came in
 and from whom, the span of times the railway was checked for the pairs shown,
 when each count was last set, and every file applied (the upload history).
+
+### Seat allocation for everyone
+
+With **Settings → Public seat allocation → Show Seat Allocation to everyone**
+on, anyone can open `/seat-allocation` without signing in — the same filters,
+list and grid, read-only — and the sign-in page gets a *Check seat allocation
+· Free · no account needed* button. Every signed-in user can then see it in the
+app too.
+
+- **Free searches:** a number a day (default 5) per browser, and a higher one
+  per internet address, then *"Sign in or create a free account to keep
+  searching"*. The opening view and paging don't count; signed in, there is
+  no limit. Counted from the visit records, so a restart doesn't reset them.
+- **Rate limits:** per address a minute and a day, and a ceiling for the
+  whole page a second — all in Settings. Over them: `429` with Retry-After.
+- **Bot check:** Cloudflare Turnstile, once `TURNSTILE_SITE_KEY` and
+  `TURNSTILE_SECRET_KEY` are set on the API. It runs once a visit, out of
+  sight unless unsure, and its pass lasts an hour.
+- **Real addresses:** the web app's server (`frontend/src/middleware.js`)
+  passes each visitor's address and Vercel's rough location to the API, with
+  `PUBLIC_EDGE_SECRET` — set the **same value on Vercel and on Render**. With
+  it set, the public API refuses anything that didn't come through the web
+  app; without it, an address could be faked.
+- **Records:** every request goes into `public_visits` (time, address,
+  country and city, browser, OS, device, language, referring page, a random
+  browser id, what was searched, how many results, what happened) and into the
+  audit log. Kept for the days set in Settings (default 90), then folded into
+  daily totals. *Seat Allocation → Public page* shows them to whoever holds
+  `allocation:manage`.
 
 ### Switching tabs off
 

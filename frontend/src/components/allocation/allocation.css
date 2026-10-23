@@ -672,3 +672,139 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 6.5rem) auto;
   }
 }
+
+/* ---------------- Where the data comes from (public, and signed-in non-staff) ---------------- */
+
+.al-notice {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--info);
+  border-radius: var(--radius);
+  background: var(--info-soft);
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.al-notice p {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0;
+}
+.al-notice .pi {
+  margin-top: 0.2rem;
+  color: var(--info);
+}
+.al-notice__fine {
+  padding-left: 1.5rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+/* ---------------- The public page's visits, for managers ---------------- */
+
+.al-visits {
+  display: grid;
+  gap: 0.75rem;
+}
+.al-visits summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  cursor: pointer;
+  font-weight: 650;
+}
+.al-visits summary small {
+  font-weight: 400;
+}
+.al-visits__body {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.75rem;
+  min-width: 0;
+}
+.al-visits__state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+.al-visits h4 {
+  margin: 0 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.al-visits__totals {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.al-visits__totals th,
+.al-visits__totals td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+.al-visits__totals th:first-child {
+  text-align: left;
+}
+.al-visits__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 1rem 1.5rem;
+}
+.al-visits__rank {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
+  font-size: 0.86rem;
+}
+.al-visits__rank li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.al-visits__latest {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.al-visits__latest table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.al-visits__latest th,
+.al-visits__latest td {
+  padding: 0.4rem 0.55rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.al-visits__latest th {
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.al-nowrap {
+  white-space: nowrap;
+}
+.al-break {
+  max-width: 16rem;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .al-visits__cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

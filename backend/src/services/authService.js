@@ -73,6 +73,7 @@ async function buildSession(user, context = {}) {
     roles: access.roles,
     permissions: access.permissions,
     unavailableFeatures: features.unavailableFor(user, access),
+    publicFeatures: require("./publicAllocationService").publicFeatures(),
   };
 }
 
@@ -377,6 +378,7 @@ async function refresh({ refreshToken }, context) {
     roles: access.roles,
     permissions: access.permissions,
     unavailableFeatures: features.unavailableFor(user, access),
+    publicFeatures: require("./publicAllocationService").publicFeatures(),
   };
 }
 

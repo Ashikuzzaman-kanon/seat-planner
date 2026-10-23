@@ -57,7 +57,7 @@ const prettyDate = (iso) =>
  * its card with it — the wallet with Wallet, the next journey with My Bookings.
  */
 export default function DashboardHome() {
-  const { user, roles, permissions, hasPermission, isAvailable } = useAuth();
+  const { user, roles, permissions, hasPermission, isAvailable, isPublic } = useAuth();
   const canBook = hasPermission(PERMISSIONS.BOOKING_CREATE);
   const showBook = canBook && isAvailable("book");
   const showBookings = canBook && isAvailable("bookings");
@@ -102,8 +102,8 @@ export default function DashboardHome() {
 
   // Everything outside Travel is somebody's work tool.
   const tools = useMemo(
-    () => visibleGroups(hasPermission, isAvailable).filter((g) => g.key !== "travel"),
-    [hasPermission, isAvailable]
+    () => visibleGroups(hasPermission, isAvailable, isPublic).filter((g) => g.key !== "travel"),
+    [hasPermission, isAvailable, isPublic]
   );
 
   const grouped = useMemo(
