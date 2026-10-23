@@ -91,6 +91,25 @@ export function shortDay(iso) {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(sameYear ? {} : { year: "numeric" }), timeZone: DHAKA });
 }
 
+/** A span of days, briefly: "22 Oct", "22–23 Oct", "30 Oct – 2 Nov" (with the year when not this one). */
+export function daySpan(fromIso, toIso) {
+  if (!fromIso && !toIso) return null;
+  const a = new Date(fromIso || toIso);
+  const b = new Date(toIso || fromIso);
+  const parts = (d) => ({
+    day: d.toLocaleDateString("en-GB", { day: "numeric", timeZone: DHAKA }),
+    month: d.toLocaleDateString("en-GB", { month: "short", timeZone: DHAKA }),
+    year: dayOf(d).slice(0, 4),
+  });
+  const x = parts(a);
+  const y = parts(b);
+  const thisYear = dayOf(new Date()).slice(0, 4);
+  const yearOf = (p) => (p.year === thisYear ? "" : ` ${p.year}`);
+  if (dayOf(a) === dayOf(b)) return `${x.day} ${x.month}${yearOf(x)}`;
+  if (x.month === y.month && x.year === y.year) return `${x.day}–${y.day} ${y.month}${yearOf(y)}`;
+  return `${x.day} ${x.month}${x.year === y.year ? "" : yearOf(x)} – ${y.day} ${y.month}${yearOf(y)}`;
+}
+
 /** A span of times: "20 Oct 2026, 17:05–17:20" on one day, else both in full. */
 export function span(fromIso, toIso) {
   if (!fromIso && !toIso) return null;

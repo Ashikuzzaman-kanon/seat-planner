@@ -159,6 +159,11 @@ const CENSUS = [
     (await get("from=Aport&to=Ccross&train=9102")).items[0].classes[0].seatsUpdatedAt === null);
   const sum = (await get("")).summary.classes.find((c) => c.code === "S_CHAIR");
   check("the summary adds up only the counts known", sum.pairs === 2 && sum.counted === 1 && sum.seats === 40, JSON.stringify(sum));
+  const countsSpan = (await get("")).summary;
+  check("and says once when the counts shown were set", countsSpan.countsFrom === snigdhaAt && countsSpan.countsTo === snigdhaAt,
+    `${countsSpan.countsFrom} – ${countsSpan.countsTo} vs ${snigdhaAt}`);
+  check("nothing of the kind where no count is known",
+    (await get("from=Aport&to=Ccross&train=9102")).summary.countsFrom === null);
   const blank = "train,from,to,class,seats\n9101,Aport,Ccross,S_CHAIR,\n";
   check("a blank count clears it back to not known",
     (await call("POST", "/allocation/import/counts", { token: S, text: blank })).body.preview.cleared === 1);

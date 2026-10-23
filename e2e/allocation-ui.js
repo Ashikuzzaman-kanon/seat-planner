@@ -105,6 +105,17 @@ const clickText = (page, selector, pattern) =>
   check("and how current it is: routes and census, each with when they came in, and when the railway was checked",
     /Routes[\s\S]*uploaded/i.test(top) && /Census[\s\S]*railway checked[\s\S]*uploaded/i.test(top) && /Counts/i.test(top), top);
   check("the results say when the railway was checked for them", /railway checked/.test(await summary(admin)));
+  const quiet = await admin.evaluate(() => {
+    const cards = [...document.querySelectorAll(".al-pair")];
+    const zeros = [...document.querySelectorAll(".al-pair .al-class")].filter((c) => /^\S+\s+0 seats$/.test(c.innerText.trim()));
+    return {
+      repeated: cards.filter((el) => /Checked \d|updated \d/.test(el.innerText)).length,
+      zeros: zeros.length,
+      amber: zeros.filter((c) => c.classList.contains("is-zero")).length,
+    };
+  });
+  check("and the cards do not each say it again: no 'Checked …' or 'updated …' on every one", quiet.repeated === 0, JSON.stringify(quiet));
+  check("a class with 0 seats is amber, as in the grid", quiet.amber === quiet.zeros, JSON.stringify(quiet));
   await admin.evaluate(() => {
     document.querySelector(".al-history").open = true;
   });
@@ -212,6 +223,11 @@ const clickText = (page, selector, pattern) =>
     return /37 seats/.test(t) ? t : null;
   });
   check("the card stays open and shows the new count, with the day it was set", /37 seats · \d{1,2} [A-Z][a-z]{2}/.test(fresh || ""), fresh || "");
+  const countsLine = await waitFor(admin, () => {
+    const t = document.querySelector(".al-summary__line")?.innerText || "";
+    return /counts updated/.test(t) ? t : null;
+  });
+  check("and the summary says, once, when the counts shown were set", /counts updated \d{1,2}(–\d{1,2})? [A-Z][a-z]{2}/.test(countsLine || ""), countsLine || "");
 
   // A number in a cell is seats, never a number of classes.
   const counted = pairNow.classes.find((c) => c.seats === 37);

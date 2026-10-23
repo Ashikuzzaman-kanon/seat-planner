@@ -206,6 +206,8 @@ module.exports = {
         notChecked: int(),
         checkedFrom: { type: "string", format: "date-time", nullable: true, description: "The oldest railway check among the pairs matched" },
         checkedTo: { type: "string", format: "date-time", nullable: true, description: "The newest" },
+        countsFrom: { type: "string", format: "date-time", nullable: true, description: "When the oldest seat count shown was set" },
+        countsTo: { type: "string", format: "date-time", nullable: true, description: "When the newest was set" },
         classes: arr(obj({ code: str(), pairs: int(), counted: int("Pairs with a count known"), seats: int("Their total") })),
       }),
 

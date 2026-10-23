@@ -183,13 +183,35 @@
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
+.al-summary__more {
+  flex-basis: 100%;
+  order: 3;
+}
+.al-summary__more summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  color: var(--brand-700);
+  font-size: 0.86rem;
+  font-weight: 600;
+  list-style: none;
+}
+.al-summary__more summary::-webkit-details-marker {
+  display: none;
+}
+.al-summary__more summary .pi {
+  font-size: 0.7rem;
+  transition: transform 0.15s ease;
+}
+.al-summary__more[open] summary .pi {
+  transform: rotate(90deg);
+}
 .al-summary__classes {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  flex-basis: 100%;
-  order: 3;
-  margin: 0;
+  margin: 0.5rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -272,12 +294,23 @@
   color: var(--muted);
   font-size: 0.8rem;
 }
-.al-pair__foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.25rem 1rem;
+/* Edit has its own corner beside the title, at every width, so a card with nothing more to say is two lines. */
+.al-pair.has-edit {
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 0.75rem;
+}
+.al-pair.has-edit > * {
+  grid-column: 1 / -1;
+}
+.al-pair.has-edit > .al-pair__head {
+  grid-column: 1;
+  grid-row: 1;
+}
+.al-pair.has-edit > .al-pair__edit {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  padding-block: 0.2rem;
 }
 
 .al-classes {
@@ -310,9 +343,32 @@
   font-style: normal;
   font-size: 0.8rem;
 }
-.al-class small {
+/* Listed by the census, but no seats set aside: amber, as in the grid. */
+.al-class.is-zero {
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+}
+.al-class.is-zero strong,
+.al-class.is-zero span {
+  color: var(--warn);
+}
+.al-pair__notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+.al-pair__older {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--warn);
+}
+.al-pair__hand {
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-2);
   color: var(--muted);
-  font-size: 0.75rem;
 }
 .al-checked {
   color: var(--ink-2);

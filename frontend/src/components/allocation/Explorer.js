@@ -7,7 +7,7 @@ import { Button } from "primereact/button";
 import { SelectButton } from "primereact/selectbutton";
 import { Paginator } from "primereact/paginator";
 import { ProgressSpinner } from "primereact/progressspinner";
-import { stationLabel, span } from "@/lib/allocation";
+import { stationLabel, span, daySpan } from "@/lib/allocation";
 import { PairList, PairGrid, GridLegend } from "./PairViews";
 import "./allocation.css";
 
@@ -198,22 +198,35 @@ export default function Explorer({ meta, fetchList, canManage = false, onEdit, o
                         · railway checked <strong>{span(s.checkedFrom, s.checkedTo)}</strong>
                       </span>
                     )}
+                    {s.countsFrom && (
+                      <span className="al-checked">
+                        {" "}
+                        · counts updated <strong>{daySpan(s.countsFrom, s.countsTo)}</strong>
+                      </span>
+                    )}
                   </>
                 ) : (
                   " "
                 )}
               </p>
+              {/* Seats class by class: there when wanted, folded away by default. */}
               {s?.classes.length > 0 && (
-                <ul className="al-summary__classes">
-                  {s.classes.map((c) => (
-                    <li key={c.code}>
-                      <strong>{c.code}</strong> on {n(c.pairs)} pair{c.pairs === 1 ? "" : "s"}
-                      <span className="al-muted">
-                        {c.counted ? ` · ${n(c.seats)} seats on the ${n(c.counted)} counted` : " · counts not available"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <details className="al-summary__more">
+                  <summary>
+                    <i className="pi pi-chevron-right" aria-hidden="true" />
+                    Seats by class <span className="al-muted">({s.classes.length})</span>
+                  </summary>
+                  <ul className="al-summary__classes">
+                    {s.classes.map((c) => (
+                      <li key={c.code}>
+                        <strong>{c.code}</strong> on {n(c.pairs)} pair{c.pairs === 1 ? "" : "s"}
+                        <span className="al-muted">
+                          {c.counted ? ` · ${n(c.seats)} seats on the ${n(c.counted)} counted` : " · counts not available"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               )}
               {oneTrain && (
                 <SelectButton
@@ -256,7 +269,13 @@ export default function Explorer({ meta, fetchList, canManage = false, onEdit, o
               )
             ) : data?.items.length ? (
               <>
-                <PairList items={data.items} oneTrain={oneTrain} canManage={canManage} onEdit={onEdit} />
+                <PairList
+                  items={data.items}
+                  oneTrain={oneTrain}
+                  canManage={canManage}
+                  onEdit={onEdit}
+                  newestChecked={s?.checkedTo}
+                />
                 {data.total > PAGE_SIZE && (
                   <Paginator
                     first={(page - 1) * PAGE_SIZE}
