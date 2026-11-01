@@ -1,21 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Select from "@/components/ui/Select";
 import { InputText } from "primereact/inputtext";
-import { InputTextarea } from "primereact/inputtextarea";
-import { Checkbox } from "primereact/checkbox";
 import { Button } from "primereact/button";
 import { Toast } from "primereact/toast";
 import { ProgressSpinner } from "primereact/progressspinner";
 import SeatGrid from "./SeatGrid";
+import { SeatPanel, BulkPanel, ChecksPanel } from "./EditorPanels";
+import { RowBuilderDialog, NumberingDialog, CopiesDialog } from "./EditorDialogs";
+import useHistory from "./useHistory";
+import { TIP } from "@/components/ui/tip";
 import { fetchAllReferences } from "@/lib/reference";
 import { listPlans, getPlan, createPlan, updatePlan, submitPlan, deletePlan, revisePlan } from "@/lib/plans";
 import * as L from "@/lib/layout";
 
 const refOptions = (items) => items.map((i) => ({ label: i.name, value: i.id }));
+const EMPTY = new Set();
+const ARROWS = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
 
+/** Keys typed here belong to the field, not the plan. */
+const typingIn = (el) =>
+  Boolean(el) &&
+  (el.isContentEditable ||
+    /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) ||
+    Boolean(el.closest?.(".p-dialog, .p-dropdown-panel, .p-multiselect-panel, .p-overlaypanel")));
+
+/**
+ * Drawing a seat plan: its details, its rows and seats, saved as a draft or
+ * submitted.
+ *
+ * Seats are chosen by click; Ctrl-click and Shift-click choose several (or
+ * "Select several", on a touch screen); a row's number chooses the row. What
+ * is chosen can be changed together, numbered, mirrored, swapped with as many
+ * others, made blank or removed, and its rows duplicated, repeated, copied
+ * and pasted. Rows come many at once from a pattern ("Add rows…"); numbering
+ * has a start, a prefix and a direction ("Numbering…"). Every change can be
+ * undone (Ctrl+Z) and redone; the keyboard moves between seats. The checks
+ * say what saving would refuse before it does, and the page asks before
+ * leaving with changes unsaved. "Save to more coaches" makes the same layout
+ * a plan for other coaches of the train.
+ */
 export default function PlanEditor({ planId }) {
   const router = useRouter();
   const toast = useRef(null);
@@ -28,19 +54,29 @@ export default function PlanEditor({ planId }) {
   const [templateId, setTemplateId] = useState(null);
 
   const [meta, setMeta] = useState({ coachNo: "", trainNameId: null, coachTypeId: null, coachClassId: null });
-  const [layout, setLayout] = useState(() => L.createEmptyLayout());
-  const [selected, setSelected] = useState(null); // { rowIdx, cellIdx }
+  const history = useHistory(L.createEmptyLayout());
+  const layout = history.value;
+  const setLayout = history.set;
   // Set when this is an editable copy of an approved plan: the plan's id.
   const [revisionOf, setRevisionOf] = useState(null);
+
+  const [sel, setSel] = useState(EMPTY); // the seats chosen, as "row:cell"
+  const [cursor, setCursor] = useState(null); // where the keyboard is
+  const anchor = useRef(null); // where Shift-click counts from
+  const [swapFrom, setSwapFrom] = useState(null); // the first group of a swap
+  const [several, setSeveral] = useState(false); // a tap adds to the choice
+  const [clipboard, setClipboard] = useState(null); // rows copied
+  const [dialog, setDialog] = useState(null); // "rows" | "numbering" | "copies"
+  const [saved, setSaved] = useState(null); // the plan as last saved or loaded
+  const numberRef = useRef(null);
+
+  const snapshot = (m, l) => JSON.stringify({ m, l });
 
   // Initial load: references, (edit) plan, (new) template options.
   useEffect(() => {
     (async () => {
       try {
-        const [r, tpls] = await Promise.all([
-          fetchAllReferences(),
-          listPlans({ templates: 1 }).catch(() => []),
-        ]);
+        const [r, tpls] = await Promise.all([fetchAllReferences(), listPlans({ templates: 1 }).catch(() => [])]);
         setRefs(r);
         setTemplates(tpls);
         if (isEdit) {
@@ -51,13 +87,18 @@ export default function PlanEditor({ planId }) {
             router.replace(`/dashboard/plans/${plan.id}/edit`);
           }
           setRevisionOf(plan.revisionOfId || null);
-          setMeta({
+          const m = {
             coachNo: plan.coachNo || "",
             trainNameId: plan.trainNameId,
             coachTypeId: plan.coachTypeId,
             coachClassId: plan.coachClassId,
-          });
-          setLayout(L.recompute(plan.layout));
+          };
+          const l = L.recompute(plan.layout);
+          setMeta(m);
+          history.reset(l);
+          setSaved(snapshot(m, l));
+        } else {
+          setSaved(snapshot(meta, layout));
         }
       } catch (err) {
         toast.current?.show({ severity: "error", summary: "Load failed", detail: err.message });
@@ -65,53 +106,255 @@ export default function PlanEditor({ planId }) {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, planId, router]);
 
-  const applyTemplate = useCallback(async (id) => {
-    setTemplateId(id);
-    if (!id) return;
-    try {
-      const plan = await getPlan(id);
-      setLayout(L.recompute(plan.layout));
-      setMeta((m) => ({
-        ...m,
-        coachTypeId: plan.coachTypeId,
-        coachClassId: plan.coachClassId,
-        trainNameId: plan.trainNameId,
-      }));
-      toast.current?.show({ severity: "info", summary: "Template loaded", detail: "Adjust and save as a new plan." });
-    } catch (err) {
-      toast.current?.show({ severity: "error", summary: "Template load failed", detail: err.message });
+  const dirty = saved !== null && snapshot(meta, layout) !== saved;
+
+  // Leaving with changes unsaved: the browser asks on reload or close, and a
+  // link inside the app asks first.
+  useEffect(() => {
+    if (!dirty) return undefined;
+    const beforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    const onClick = (e) => {
+      const a = e.target.closest?.("a[href]");
+      if (!a || a.target === "_blank" || e.button !== 0 || e.ctrlKey || e.metaKey) return;
+      const url = new URL(a.href, window.location.href);
+      if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return;
+      if (!window.confirm("Leave this plan without saving your changes?")) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", beforeUnload);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [dirty]);
+
+  const applyTemplate = useCallback(
+    async (id) => {
+      setTemplateId(id);
+      if (!id) return;
+      try {
+        const plan = await getPlan(id);
+        setLayout(L.recompute(plan.layout));
+        setMeta((m) => ({
+          ...m,
+          coachTypeId: plan.coachTypeId,
+          coachClassId: plan.coachClassId,
+          trainNameId: plan.trainNameId,
+        }));
+        toast.current?.show({ severity: "info", summary: "Template loaded", detail: "Adjust and save as a new plan." });
+      } catch (err) {
+        toast.current?.show({ severity: "error", summary: "Template load failed", detail: err.message });
+      }
+    },
+    [setLayout]
+  );
+
+  /* ---------------- choosing seats ---------------- */
+
+  const seatAt = (key) => {
+    const [r, c] = L.placeOf(key);
+    const cell = layout.rows[r]?.cells[c];
+    return cell?.kind === "seat" ? cell : null;
+  };
+  const chosen = useMemo(() => [...sel].filter((k) => seatAt(k)), [sel, layout]); // eslint-disable-line react-hooks/exhaustive-deps
+  const chosenSeats = chosen.map(seatAt);
+  const chosenRows = L.rowsOf(chosen);
+
+  const clearChoice = () => {
+    setSel(EMPTY);
+    setCursor(null);
+    setSwapFrom(null);
+  };
+  const choose = (keys, at = keys[0] ?? null) => {
+    setSel(new Set(keys));
+    setCursor(at);
+    if (at) anchor.current = at;
+  };
+
+  const onSeatClick = (rowIdx, cellIdx, e) => {
+    const key = L.keyOf(rowIdx, cellIdx);
+    setCursor(key);
+    if (e?.shiftKey && anchor.current) {
+      const range = L.seatKeysBetween(layout, anchor.current, key);
+      setSel((s) => new Set([...(e.ctrlKey || e.metaKey ? s : []), ...range]));
+      return;
     }
-  }, []);
+    anchor.current = key;
+    if (e?.ctrlKey || e?.metaKey || several) {
+      setSel((s) => {
+        const next = new Set(s);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    } else setSel(new Set([key]));
+  };
+  const onRowSelect = (rowIdx) => choose(L.allSeatKeys(layout).filter((k) => L.placeOf(k)[0] === rowIdx));
+  const selectAll = () => choose(L.allSeatKeys(layout));
 
-  const selectedSeat =
-    selected && layout.rows[selected.rowIdx]?.cells[selected.cellIdx]?.kind === "seat"
-      ? layout.rows[selected.rowIdx].cells[selected.cellIdx]
-      : null;
+  /* ---------------- changing the plan ---------------- */
 
-  // --- grid callbacks ---
-  const onSeatClick = (rowIdx, cellIdx) => setSelected({ rowIdx, cellIdx });
+  /** A change that moves rows or cells about: what was chosen no longer points at the same seats. */
+  const restructure = (fn) => {
+    setLayout(fn);
+    clearChoice();
+  };
+
   const onCellToggle = (rowIdx, cellIdx) => setLayout((l) => L.toggleCellKind(l, rowIdx, cellIdx));
   const onAddCell = (rowIdx) => setLayout((l) => L.addCell(l, rowIdx, "blank"));
-  const onAddRow = (rowIdx, pos) => setLayout((l) => L.addRowAt(l, rowIdx, pos));
-  const onDeleteRow = (rowIdx) => {
-    setLayout((l) => L.deleteRow(l, rowIdx));
-    setSelected(null);
-  };
-  const onMoveRow = (rowIdx, dir) => setLayout((l) => L.moveRow(l, rowIdx, dir));
+  const onAddRow = (rowIdx, pos) => restructure((l) => L.addRowAt(l, rowIdx, pos));
+  const onDeleteRow = (rowIdx) => restructure((l) => L.deleteRow(l, rowIdx));
+  const onMoveRow = (rowIdx, dir) => restructure((l) => L.moveRow(l, rowIdx, dir));
+  const onDuplicateRow = (rowIdx) => restructure((l) => L.duplicateRow(l, rowIdx));
   const onMoveDivider = (dir) => setLayout((l) => L.setSplitRow(l, l.direction.splitRow + dir));
 
-  const patchSeat = (patch) =>
-    setLayout((l) => L.updateSeat(l, selected.rowIdx, selected.cellIdx, patch));
-  const seatToBlank = () => {
-    setLayout((l) => L.toggleCellKind(l, selected.rowIdx, selected.cellIdx));
-    setSelected(null);
+  /** One seat: as before, typed numbers and notes merged into one step each. Several: the same change to all. */
+  const patchChosen = (patch, tag = null) => {
+    if (chosen.length === 1) {
+      const [r, c] = L.placeOf(chosen[0]);
+      setLayout((l) => L.updateSeat(l, r, c, patch), tag && `${tag}:${chosen[0]}`);
+    } else setLayout((l) => L.patchSeats(l, chosen, patch));
   };
-  const removeSelectedCell = () => {
-    setLayout((l) => L.removeCell(l, selected.rowIdx, selected.cellIdx));
-    setSelected(null);
+  const numberChosen = (start, prefix) => setLayout((l) => L.renumberSeats(l, chosen, start, prefix));
+  // The places stay: the keyboard stays where it was, on what is now a blank.
+  const blankChosen = () => {
+    setLayout((l) => L.seatsToBlanks(l, chosen));
+    setSel(EMPTY);
+    setSwapFrom(null);
   };
+  const removeChosen = () => restructure((l) => L.removeCells(l, chosen));
+  const mirrorChosen = () => restructure((l) => L.mirrorRows(l, chosenRows));
+  const duplicateChosen = () => restructure((l) => L.insertRows(l, Math.max(...chosenRows), chosenRows.map((i) => l.rows[i])));
+  const repeatChosen = (times) => restructure((l) => L.repeatRows(l, chosenRows, times));
+  const mirrorAll = () => restructure((l) => L.mirrorRows(l));
+
+  const copyRows = () => {
+    if (!chosenRows.length) return;
+    setClipboard(chosenRows.map((i) => layout.rows[i]));
+    toast.current?.show({ severity: "info", summary: `${chosenRows.length} row${chosenRows.length === 1 ? "" : "s"} copied`, life: 2000 });
+  };
+  const pasteRows = () => {
+    if (!clipboard) return;
+    const after = chosenRows.length ? Math.max(...chosenRows) : layout.rows.length - 1;
+    restructure((l) => L.insertRows(l, after, clipboard));
+  };
+
+  const startSwap = () => {
+    setSwapFrom(chosen);
+    setSel(EMPTY);
+  };
+  const overlap = swapFrom ? chosen.some((k) => swapFrom.includes(k)) : false;
+  const doSwap = () => {
+    try {
+      setLayout(L.swapSeats(layout, swapFrom, chosen));
+      toast.current?.show({ severity: "success", summary: `${chosen.length} seat${chosen.length === 1 ? "" : "s"} swapped`, life: 2000 });
+      clearChoice();
+    } catch (err) {
+      toast.current?.show({ severity: "warn", summary: "Cannot swap them", detail: err.message });
+    }
+  };
+
+  const showSeats = (keys) => {
+    choose(keys);
+    setTimeout(() => document.querySelector(".seat.selected")?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" }), 50);
+  };
+
+  /* ---------------- the keyboard ---------------- */
+
+  useEffect(() => {
+    if (loading) return undefined;
+    const onKey = (e) => {
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (typingIn(e.target)) return;
+      if (mod && key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) history.redo();
+        else history.undo();
+        return;
+      }
+      if (mod && key === "y") {
+        e.preventDefault();
+        history.redo();
+        return;
+      }
+      if (mod && key === "a") {
+        e.preventDefault();
+        selectAll();
+        return;
+      }
+      if (mod && key === "c" && chosen.length) {
+        e.preventDefault();
+        copyRows();
+        return;
+      }
+      if (mod && key === "v" && clipboard) {
+        e.preventDefault();
+        pasteRows();
+        return;
+      }
+      if (mod || e.altKey) return;
+      if (key === "Escape") {
+        clearChoice();
+        return;
+      }
+      if (ARROWS[key]) {
+        e.preventDefault();
+        const from = cursor || chosen[0] || "0:0";
+        const [r, c] = L.placeOf(from);
+        const [dr, dc] = ARROWS[key];
+        const row = Math.min(Math.max(r + dr, 0), layout.rows.length - 1);
+        const cell = Math.min(Math.max(c + dc, 0), Math.max(layout.rows[row]?.cells.length - 1, 0));
+        const next = L.keyOf(row, cell);
+        setCursor(next);
+        if (seatAt(next)) {
+          if (e.shiftKey) setSel((s) => new Set([...s, next]));
+          else {
+            setSel(new Set([next]));
+            anchor.current = next;
+          }
+        } else if (!e.shiftKey) setSel(EMPTY);
+        return;
+      }
+      if (key === " " && cursor) {
+        e.preventDefault();
+        const [r, c] = L.placeOf(cursor);
+        setLayout((l) => L.toggleCellKind(l, r, c));
+        setSel(seatAt(cursor) ? EMPTY : new Set([cursor]));
+        return;
+      }
+      if ((key === "Delete" || key === "Backspace") && chosen.length) {
+        e.preventDefault();
+        blankChosen();
+        return;
+      }
+      // A number typed with one seat chosen becomes its number.
+      if (chosen.length === 1 && /^[0-9a-z-]$/i.test(e.key)) {
+        e.preventDefault();
+        patchChosen({ number: e.key }, "number");
+        setTimeout(() => {
+          const input = numberRef.current;
+          if (input) {
+            input.focus();
+            input.setSelectionRange(input.value.length, input.value.length);
+          }
+        }, 0);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  });
+
+  /* ---------------- saving ---------------- */
 
   /**
    * What submitting needs. A draft saves with any of it missing — a layout can
@@ -125,6 +368,12 @@ export default function PlanEditor({ planId }) {
     if (!meta.coachNo.trim()) missing.push("a coach number");
     return missing;
   };
+
+  const checks = useMemo(() => L.checkLayout(layout), [layout]);
+  const problemKeys = useMemo(
+    () => new Set([...checks.duplicates.flatMap((d) => d.keys), ...checks.unnumbered]),
+    [checks]
+  );
 
   const persist = async () => {
     const payload = {
@@ -149,6 +398,7 @@ export default function PlanEditor({ planId }) {
     setSaving(true);
     try {
       const plan = await persist();
+      setSaved(snapshot(meta, layout));
       if (thenSubmit) {
         const after = await submitPlan(plan.id);
         // An approver's changes go straight into the plan.
@@ -173,6 +423,7 @@ export default function PlanEditor({ planId }) {
     setSaving(true);
     try {
       await deletePlan(planId);
+      setSaved(snapshot(meta, layout));
       toast.current?.show({ severity: "info", summary: "Changes thrown away" });
       router.push(`/dashboard/plans/${revisionOf}`);
     } catch (e) {
@@ -191,6 +442,14 @@ export default function PlanEditor({ planId }) {
       {node}
     </div>
   );
+  const selectionActions = {
+    onSwapWith: startSwap,
+    onMirrorRows: mirrorChosen,
+    onDuplicateRows: duplicateChosen,
+    onBlank: blankChosen,
+    onRemove: removeChosen,
+  };
+  const trainName = refs.trainNames.find((t) => t.id === meta.trainNameId)?.name;
 
   return (
     <div className="plan-page">
@@ -205,10 +464,13 @@ export default function PlanEditor({ planId }) {
               : "A draft saves with anything still unknown. Submitting needs a train, coach type, class and coach number."}
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        {/* Four of them: they may wrap, on a phone, rather than run off the edge. */}
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center", flexShrink: 1, maxWidth: "100%" }}>
+          {dirty && <span className="pe-unsaved">Unsaved changes</span>}
           {revisionOf && (
             <Button label="Throw changes away" icon="pi pi-trash" severity="danger" text disabled={saving} onClick={discard} />
           )}
+          <Button label="Save to more coaches…" icon="pi pi-copy" text disabled={saving} onClick={() => setDialog("copies")} />
           <Button label="Save draft" icon="pi pi-save" outlined loading={saving} onClick={() => save(false)} />
           <Button label="Save & submit" icon="pi pi-send" loading={saving} onClick={() => save(true)} />
         </div>
@@ -233,10 +495,10 @@ export default function PlanEditor({ planId }) {
             <InputText value={meta.coachNo} onChange={(e) => setMeta((m) => ({ ...m, coachNo: e.target.value }))} placeholder="e.g. KHA" />
           ))}
           {field("From station", (
-            <InputText value={layout.fromStation} onChange={(e) => setLayout((l) => ({ ...l, fromStation: e.target.value }))} placeholder="From" />
+            <InputText value={layout.fromStation} onChange={(e) => setLayout((l) => ({ ...l, fromStation: e.target.value }), "from")} placeholder="From" />
           ))}
           {field("To station", (
-            <InputText value={layout.toStation} onChange={(e) => setLayout((l) => ({ ...l, toStation: e.target.value }))} placeholder="To" />
+            <InputText value={layout.toStation} onChange={(e) => setLayout((l) => ({ ...l, toStation: e.target.value }), "to")} placeholder="To" />
           ))}
           {!isEdit && field("Start from template", (
             <Select value={templateId} options={[{ label: "— None —", value: null }, ...templates.map((t) => ({ label: `${t.trainName?.name || "No train"} · ${t.coachNo || "untitled draft"}`, value: t.id }))]}
@@ -246,22 +508,66 @@ export default function PlanEditor({ planId }) {
       </div>
 
       {/* Toolbar */}
-      <div className="card" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-        <Button label="Add row" icon="pi pi-plus" size="small" outlined onClick={() => onAddRow(layout.rows.length - 1, "below")} />
-        <Button label="Renumber all" icon="pi pi-sort-numeric-down" size="small" outlined onClick={() => setLayout((l) => L.renumberAll(l))} />
-        <Button label="Flip direction" icon="pi pi-sync" size="small" outlined onClick={() => setLayout((l) => L.flipDirection(l))} />
-        <Button label="Swap stations" icon="pi pi-arrows-v" size="small" outlined onClick={() => setLayout((l) => L.swapStations(l))} />
-        <span style={{ fontSize: "0.8rem", color: "#9ca3af", marginLeft: "auto" }}>
-          Click a blank (+) to add a seat · click a seat to edit it
+      <div className="card pe-toolbar">
+        <span className="pe-group">
+          <Button label="Undo" icon="pi pi-undo" size="small" text disabled={!history.canUndo} onClick={history.undo}
+            tooltip="Ctrl+Z" tooltipOptions={TIP} />
+          <Button label="Redo" icon="pi pi-replay" size="small" text disabled={!history.canRedo} onClick={history.redo}
+            tooltip="Ctrl+Y" tooltipOptions={TIP} />
+        </span>
+        <span className="pe-group">
+          <Button label="Add rows…" icon="pi pi-th-large" size="small" outlined onClick={() => setDialog("rows")} />
+          <Button label="Add row" icon="pi pi-plus" size="small" outlined onClick={() => onAddRow(layout.rows.length - 1, "below")} />
+          <Button label="Numbering…" icon="pi pi-sort-numeric-down" size="small" outlined onClick={() => setDialog("numbering")} />
+          <Button label="Renumber all" icon="pi pi-sort-numeric-down" size="small" outlined onClick={() => setLayout((l) => L.renumberAll(l))} />
+          <Button label="Mirror left ↔ right" icon="pi pi-arrows-h" size="small" outlined onClick={mirrorAll} />
+          <Button label="Flip direction" icon="pi pi-sync" size="small" outlined onClick={() => setLayout((l) => L.flipDirection(l))} />
+          <Button label="Swap stations" icon="pi pi-arrows-v" size="small" outlined onClick={() => setLayout((l) => L.swapStations(l))} />
+        </span>
+        <span className="pe-group">
+          <Button label="Select all" icon="pi pi-check-square" size="small" text onClick={selectAll} />
+          <Button
+            label="Select several"
+            icon={several ? "pi pi-check" : "pi pi-clone"}
+            size="small"
+            text={!several}
+            outlined={several}
+            onClick={() => setSeveral((s) => !s)}
+            aria-pressed={several}
+          />
+          {clipboard && (
+            <Button label={`Paste ${clipboard.length} row${clipboard.length === 1 ? "" : "s"}`} icon="pi pi-clipboard" size="small" text onClick={pasteRows} />
+          )}
+        </span>
+        <span className="pe-hint">
+          Click a seat to edit it · Ctrl- or Shift-click for several · a row&apos;s number selects the row · arrows move · Ctrl+Z undoes
         </span>
       </div>
 
-      {/* Grid + seat panel */}
-      <div style={{ display: "flex", gap: "1.5rem", alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div className="card" style={{ overflowX: "auto" }}>
+      {swapFrom && (
+        <div className="pe-swapbar" role="status">
+          <span>
+            <i className="pi pi-arrow-right-arrow-left" aria-hidden="true" /> Swapping <strong>{swapFrom.length}</strong> seat
+            {swapFrom.length === 1 ? "" : "s"} (in purple): now choose <strong>{swapFrom.length}</strong> to swap {swapFrom.length === 1 ? "it" : "them"} with —{" "}
+            {chosen.length} chosen.
+            {overlap && " A seat cannot be on both sides."}
+          </span>
+          <span className="pe-swapbar__buttons">
+            <Button label={`Swap ${swapFrom.length} ↔ ${chosen.length}`} size="small" onClick={doSwap} disabled={chosen.length !== swapFrom.length || overlap} />
+            <Button label="Cancel" size="small" text onClick={() => setSwapFrom(null)} />
+          </span>
+        </div>
+      )}
+
+      {/* Grid + side panels */}
+      <div className="pe-body">
+        <div className="card pe-grid">
           <SeatGrid
             layout={layout}
-            selected={selected}
+            selectedKeys={sel}
+            cursor={cursor}
+            swapKeys={swapFrom ? new Set(swapFrom) : EMPTY}
+            problemKeys={problemKeys}
             onSeatClick={onSeatClick}
             onCellToggle={onCellToggle}
             onAddCell={onAddCell}
@@ -269,45 +575,51 @@ export default function PlanEditor({ planId }) {
             onDeleteRow={onDeleteRow}
             onMoveRow={onMoveRow}
             onMoveDivider={onMoveDivider}
+            onRowSelect={onRowSelect}
+            onDuplicateRow={onDuplicateRow}
           />
         </div>
 
-        <div className="card" style={{ minWidth: 260, flex: 1 }}>
-          <h3 style={{ marginTop: 0 }}>Seat properties</h3>
-          {!selectedSeat ? (
-            <p style={{ color: "#9ca3af" }}>Select a seat to edit its properties.</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              {field("Seat number", (
-                <InputText value={selectedSeat.number} onChange={(e) => patchSeat({ number: e.target.value })} />
-              ))}
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <Checkbox inputId="win" checked={selectedSeat.isWindow} onChange={(e) => patchSeat({ isWindow: e.checked })} />
-                <label htmlFor="win">Window seat</label>
-              </div>
-              {selectedSeat.isWindow && field("Window type", (
-                <Select value={selectedSeat.windowType || "full"} options={[{ label: "Full", value: "full" }, { label: "Half", value: "half" }]}
-                  onChange={(e) => patchSeat({ windowType: e.value })} />
-              ))}
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <Checkbox inputId="charge" checked={selectedSeat.chargingPort} onChange={(e) => patchSeat({ chargingPort: e.checked })} />
-                <label htmlFor="charge">Charging port</label>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <Checkbox inputId="fan" checked={selectedSeat.fan} onChange={(e) => patchSeat({ fan: e.checked })} />
-                <label htmlFor="fan">Fan</label>
-              </div>
-              {field("Note", (
-                <InputTextarea value={selectedSeat.note} rows={2} autoResize onChange={(e) => patchSeat({ note: e.target.value })} />
-              ))}
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <Button label="Make blank" icon="pi pi-eraser" size="small" outlined severity="secondary" onClick={seatToBlank} />
-                <Button label="Remove cell" icon="pi pi-times" size="small" outlined severity="danger" onClick={removeSelectedCell} />
-              </div>
-            </div>
-          )}
+        <div className="pe-side">
+          <div className="card">
+            <h3 style={{ marginTop: 0 }}>{chosen.length > 1 ? "Selected seats" : "Seat properties"}</h3>
+            {chosen.length === 0 ? (
+              <p style={{ color: "#9ca3af" }}>Select a seat to edit its properties — or several, to change them together.</p>
+            ) : chosen.length === 1 ? (
+              <SeatPanel seat={chosenSeats[0]} numberRef={numberRef} onPatch={patchChosen} {...selectionActions} />
+            ) : (
+              <BulkPanel
+                seats={chosenSeats}
+                onPatch={patchChosen}
+                onNumber={numberChosen}
+                onRepeat={repeatChosen}
+                onClear={clearChoice}
+                {...selectionActions}
+              />
+            )}
+          </div>
+          <div className="card">
+            <h3 style={{ marginTop: 0 }}>Checks</h3>
+            <ChecksPanel checks={checks} missing={missingForSubmit()} onShow={showSeats} />
+          </div>
         </div>
       </div>
+
+      {/* Each built afresh when opened, from the plan as it is then. */}
+      {dialog === "rows" && (
+        <RowBuilderDialog visible onHide={() => setDialog(null)} onBuild={(opts) => restructure((l) => L.buildRows(l, opts))} />
+      )}
+      {dialog === "numbering" && (
+        <NumberingDialog
+          visible
+          onHide={() => setDialog(null)}
+          layout={layout}
+          onApply={(patch) => setLayout((l) => L.setNumbering(l, patch))}
+        />
+      )}
+      {dialog === "copies" && (
+        <CopiesDialog visible onHide={() => setDialog(null)} meta={{ ...meta, coachNo: undefined }} layout={layout} trainName={trainName} />
+      )}
     </div>
   );
 }

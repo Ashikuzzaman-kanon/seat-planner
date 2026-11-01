@@ -9,6 +9,7 @@
     "subscriptions": "node subscriptions-ui.js",
     "people": "node people-ui.js",
     "plans": "node plans-ui.js",
+    "plan-editor": "node plan-editor-ui.js",
     "railway-sync": "node railway-sync-ui.js",
     "features": "node feature-switches-ui.js",
     "allocation": "node allocation-ui.js",

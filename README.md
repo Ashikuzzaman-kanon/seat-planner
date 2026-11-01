@@ -402,6 +402,36 @@ week; the groups download as CSV. The tab carries today's count. Days whose
 requests have been folded into daily totals show as those totals only, the
 public page's and the app's apart.
 
+### Drawing a seat plan
+
+The seat plan editor (*Seat Plans → New*, or *Edit*):
+
+- **Choosing seats:** click one; Ctrl- or Shift-click for several (*Select
+  several* on a touch screen); a row's number chooses the row; Ctrl+A every
+  seat. What is chosen can be changed together (window, charging port, fan, a
+  note), numbered from a start, made blank or removed.
+- **Mirror left ↔ right:** a row's seats in reverse order, the corridor where
+  it was — every row, or the chosen rows. A seat takes its number and details
+  with it: the row numbers itself the other way from then on (`reversed`).
+- **Swap:** choose seats, *Swap with…*, choose as many others: they change
+  places, paired in reading order, numbers and all.
+- **Rows:** many at once from a pattern (*Add rows…*: 2 + 2, 2 + 3…), or
+  duplicated, repeated, copied (Ctrl+C) and pasted.
+- **Numbering…:** a start, a prefix, left to right, right to left or snaking.
+  Numbers typed in by hand keep theirs; *Renumber all* clears them.
+- **Undo and redo** every change (Ctrl+Z, Ctrl+Y); the arrows move between
+  seats, Space turns a place into a seat or a blank, Delete makes a blank,
+  typing a number sets the chosen seat's.
+- **Checks** as you go: a number on two seats (which cannot be submitted), seats
+  with no number, numbers skipped, what submitting still needs, and the seats,
+  windows and rows summed up. The page asks before you leave with changes
+  unsaved.
+- **Save to more coaches…:** the same layout as a plan of its own for other
+  coaches of the train, as drafts or submitted.
+
+The layout logic is plain functions in `frontend/src/lib/layout.js`, tested
+with `npm test` in `frontend/`.
+
 ### Audit log analysis
 
 *Audit Log → Analysis* (for whoever may read the log, `audit:view`) counts the

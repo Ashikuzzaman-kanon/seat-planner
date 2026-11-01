@@ -88,7 +88,27 @@
 .seat:hover:not(.readonly) { border-color: #60a5fa; }
 .seat.selected {
   border-color: #2563eb;
+  background: #dbeafe;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+}
+/* Where the keyboard is: a dashed ring, on a seat or a blank. */
+.seat.cursor,
+.seat-slot.blank.cursor .blank-box {
+  outline: 2px dashed #2563eb;
+  outline-offset: 2px;
+}
+/* Waiting to be swapped: the first group, kept while the second is chosen. */
+.seat.in-swap {
+  border-color: #7c3aed;
+  background: #ede9fe;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.25);
+}
+/* A number twice, or none: what the checks found. */
+.seat.problem {
+  border-color: #dc2626;
+}
+.seat.problem .seat-number {
+  color: #b91c1c;
 }
 .seat-number {
   font-weight: 700;
@@ -262,4 +282,219 @@
 }
 .plan-page > .page-head .page-subtitle {
   margin-bottom: 0;
+}
+
+/* ---------------- The editor (PlanEditor) ---------------- */
+
+.row-index--pick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 1.6rem;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+}
+.row-index--pick:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.row-mirrored {
+  color: #7c3aed;
+  font-size: 0.7rem;
+}
+
+.pe-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+.pe-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.pe-hint {
+  flex: 1 1 18rem;
+  color: #9ca3af;
+  font-size: 0.78rem;
+  text-align: right;
+}
+.pe-unsaved {
+  color: #b45309;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.pe-swapbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid #c4b5fd;
+  border-radius: 10px;
+  background: #f5f3ff;
+  color: #4c1d95;
+  font-size: 0.9rem;
+}
+.pe-swapbar__buttons {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+.pe-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+.pe-grid {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.pe-side {
+  display: grid;
+  flex: 1 1 18rem;
+  gap: 1rem;
+  min-width: min(18rem, 100%);
+}
+.pe-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.pe-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.pe-field > label {
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.pe-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pe-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.pe-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+}
+.pe-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.pe-toggle small,
+.pe-muted {
+  color: #9ca3af;
+}
+.pe-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+.pe-inline .p-inputnumber input {
+  width: 6rem;
+}
+.pe-prefix {
+  width: 5rem;
+}
+.pe-checks {
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+.pe-checks p {
+  margin: 0;
+}
+.pe-sum strong {
+  font-variant-numeric: tabular-nums;
+}
+.pe-problem {
+  color: #475569;
+  line-height: 1.5;
+}
+.pe-problem .pi {
+  margin-right: 0.25rem;
+}
+.pe-problem--bad {
+  color: #b91c1c;
+}
+.pe-problem--warn {
+  color: #b45309;
+}
+.pe-problem--ok {
+  color: #15803d;
+}
+.pe-problem .p-button {
+  padding: 0 0.4rem;
+}
+
+.pe-dialog__body {
+  display: grid;
+  gap: 1rem;
+}
+.pe-dialog__body p {
+  margin: 0;
+}
+.pe-dialog__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+.pe-patterns.p-selectbutton {
+  display: flex;
+  flex-wrap: wrap;
+}
+.pe-preview {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: #f8fafc;
+  overflow-x: auto;
+}
+.pe-preview code {
+  white-space: pre;
+}
+.pe-results {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pe-results .is-ok {
+  color: #15803d;
+}
+.pe-results .is-bad {
+  color: #b91c1c;
+}
+.pe-results .pi {
+  margin-right: 0.35rem;
+}
+.pe-toggle > span:last-child {
+  display: inline-flex;
+  flex-shrink: 0;
 }
