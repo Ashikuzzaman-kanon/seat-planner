@@ -1,5 +1,6 @@
 const asyncHandler = require("../utils/asyncHandler");
 const auditService = require("../services/auditService");
+const analysis = require("../services/auditAnalysisService");
 const { AUDIT_ACTIONS } = require("../constants/auditActions");
 
 const listEvents = asyncHandler(async (req, res) => {
@@ -23,4 +24,21 @@ const listEvents = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { listEvents };
+/** The log analysed: counted by operation, person, time… (services/auditAnalysisService). */
+const analyse = asyncHandler(async (req, res) => {
+  res.json(await analysis.analyse(req.query));
+});
+
+const analysisSheet = asyncHandler(async (req, res) => {
+  const text = await analysis.csv(req.query);
+  res.set("Content-Type", "text/csv; charset=utf-8");
+  res.set("Content-Disposition", 'attachment; filename="audit-analysis.csv"');
+  res.send(text);
+});
+
+/** People in the log, found by part of a name or email. */
+const people = asyncHandler(async (req, res) => {
+  res.json({ people: await analysis.people(req.query.q) });
+});
+
+module.exports = { listEvents, analyse, analysisSheet, people };

@@ -7,6 +7,11 @@ const { PERMISSIONS } = require("../constants/permissions");
 
 router.use(authenticate);
 
-router.get("/", requirePermission(PERMISSIONS.AUDIT_VIEW), auditController.listEvents);
+const canView = requirePermission(PERMISSIONS.AUDIT_VIEW);
+router.get("/", canView, auditController.listEvents);
+// The same events analysed — checked field by field in the service.
+router.get("/analysis", canView, auditController.analyse);
+router.get("/analysis.csv", canView, auditController.analysisSheet);
+router.get("/people", canView, auditController.people);
 
 module.exports = router;

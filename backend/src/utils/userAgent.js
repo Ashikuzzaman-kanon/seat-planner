@@ -23,6 +23,8 @@ const SYSTEMS = [
 ];
 
 const BOT = /bot|crawl|spider|slurp|facebookexternalhit|preview|headless|curl|wget|python|axios|node-fetch|go-http|java\//i;
+const TABLET = /iPad|Tablet/i;
+const PHONE = /Mobi|iPhone|Android/i;
 
 function parseUserAgent(ua = "") {
   const text = String(ua || "");
@@ -37,8 +39,10 @@ function parseUserAgent(ua = "") {
     }
   }
   const os = SYSTEMS.find(([, re]) => re.test(text))?.[0] || null;
-  const device = bot ? "bot" : /iPad|Tablet/i.test(text) ? "tablet" : /Mobi|iPhone|Android/i.test(text) ? "phone" : "computer";
+  const device = bot ? "bot" : TABLET.test(text) ? "tablet" : PHONE.test(text) ? "phone" : "computer";
   return { browser, os, device, bot };
 }
 
-module.exports = { parseUserAgent };
+// The rules themselves, for the audit analysis — which applies them inside the
+// database (services/auditAnalysisService), so both read a browser alike.
+module.exports = { parseUserAgent, BROWSERS, SYSTEMS, BOT, TABLET, PHONE };
