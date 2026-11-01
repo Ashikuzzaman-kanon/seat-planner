@@ -64,7 +64,21 @@ function normalizeRow(row, rowIndex, columns) {
   }
   return {
     id: asString(row && row.id) || crypto.randomUUID(),
+    // Mirrored: the row is numbered right to left (the editor's mirrorRows).
+    reversed: asBool(row && row.reversed),
     cells,
+  };
+}
+
+const NUMBERING_ORDERS = ["ltr", "rtl", "snake"];
+
+/** How the editor numbers seats on its own: from which number, with what in front, which way. */
+function normalizeNumbering(raw) {
+  const n = raw && typeof raw === "object" ? raw : {};
+  return {
+    start: clampInt(n.start, 0, 9999, 1),
+    prefix: asString(n.prefix).slice(0, 6),
+    order: NUMBERING_ORDERS.includes(n.order) ? n.order : "ltr",
   };
 }
 
@@ -89,6 +103,7 @@ function normalizeLayout(raw) {
     toStation: asString(layout.toStation),
     stationsSwapped: asBool(layout.stationsSwapped),
     direction: { splitRow, flipped: asBool(dir.flipped) },
+    numbering: normalizeNumbering(layout.numbering),
     rows,
   };
 }
