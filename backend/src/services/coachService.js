@@ -141,6 +141,7 @@ async function add(tripId, { seatPlanId, coachCode, position }, { actorId } = {}
 
   const plan = await SeatPlan.findByPk(seatPlanId);
   if (!plan) throw ApiError.notFound("No such seat plan");
+  if (plan.isTemplate) throw ApiError.badRequest("That is a template — a template is never put into service.");
   if (plan.status !== PLAN_STATUS.APPROVED) {
     throw ApiError.badRequest(
       `That plan is ${plan.status}. Only an approved plan can be put into service.`

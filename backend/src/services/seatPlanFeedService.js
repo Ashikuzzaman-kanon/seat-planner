@@ -88,6 +88,7 @@ async function forSubscriber(user, sent, asked, now = new Date()) {
       trainNameId: train.id,
       status: PLAN_STATUS.APPROVED,
       revisionOfId: null,
+      isTemplate: false,
       ...(query.coach ? { coachNo: query.coach } : {}),
     },
     include: [

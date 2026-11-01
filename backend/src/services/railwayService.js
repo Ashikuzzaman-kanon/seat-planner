@@ -273,7 +273,7 @@ async function loadPlans(report, trainIds, { byNumber }) {
   // A source that names no train: one draft, under the source's own label,
   // for a person to give a train and a coach.
   for (const l of LAYOUTS.filter((source) => !source.trains.length)) {
-    const existing = await SeatPlan.findOne({ where: { coachNo: l.coachNo, trainNameId: null, revisionOfId: null } });
+    const existing = await SeatPlan.findOne({ where: { coachNo: l.coachNo, trainNameId: null, revisionOfId: null, isTemplate: false } });
     if (existing) {
       report.plans.existing++;
       continue;
@@ -298,7 +298,7 @@ async function loadPlans(report, trainIds, { byNumber }) {
       const trainNameId = trainIds.get(number);
       for (const [coachCode, key] of rake.coaches) {
         const l = layoutByKey.get(key);
-        let plan = await SeatPlan.findOne({ where: { coachNo: coachCode, trainNameId, revisionOfId: null } });
+        let plan = await SeatPlan.findOne({ where: { coachNo: coachCode, trainNameId, revisionOfId: null, isTemplate: false } });
         if (plan) {
           report.plans.existing++;
           if (plan.status !== PLAN_STATUS.APPROVED) {

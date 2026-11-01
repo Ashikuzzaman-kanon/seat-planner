@@ -10,10 +10,24 @@ import { ProgressSpinner } from "primereact/progressspinner";
 import SeatGrid from "./SeatGrid";
 import { SeatPanel, BulkPanel, ChecksPanel } from "./EditorPanels";
 import { RowBuilderDialog, NumberingDialog, CopiesDialog } from "./EditorDialogs";
+import ConflictDialog from "./ConflictDialog";
+import { useAuth } from "@/contexts/AuthContext";
+import { PERMISSIONS } from "@/constants/permissions";
 import useHistory from "./useHistory";
 import { TIP } from "@/components/ui/tip";
 import { fetchAllReferences } from "@/lib/reference";
-import { listPlans, getPlan, createPlan, updatePlan, submitPlan, deletePlan, revisePlan } from "@/lib/plans";
+import {
+  listPlans,
+  getPlan,
+  createPlan,
+  updatePlan,
+  submitPlan,
+  deletePlan,
+  revisePlan,
+  moveToTemplates,
+  changePlanDetails,
+  replacePlan,
+} from "@/lib/plans";
 import * as L from "@/lib/layout";
 
 const refOptions = (items) => items.map((i) => ({ label: i.name, value: i.id }));
@@ -41,6 +55,12 @@ const typingIn = (el) =>
  * say what saving would refuse before it does, and the page asks before
  * leaving with changes unsaved. "Save to more coaches" makes the same layout
  * a plan for other coaches of the train.
+ *
+ * Saving into a train and coach another plan has opens ConflictDialog: mine
+ * replaces it (through approval), it moves to templates, it gets another
+ * coach number, or mine is kept as a template. A template (`?template=1`, or
+ * one opened) is saved as it is — never submitted; `?from=<id>` starts a new
+ * plan from a template or plan.
  */
 export default function PlanEditor({ planId }) {
   const router = useRouter();
@@ -59,6 +79,12 @@ export default function PlanEditor({ planId }) {
   const setLayout = history.set;
   // Set when this is an editable copy of an approved plan: the plan's id.
   const [revisionOf, setRevisionOf] = useState(null);
+  const [isTemplate, setIsTemplate] = useState(false);
+  // Saving met another plan with this train and coach: what it said, and whether to submit after.
+  const [clash, setClash] = useState(null);
+  const [clashBusy, setClashBusy] = useState(null);
+  const { hasPermission } = useAuth();
+  const canApprove = hasPermission(PERMISSIONS.PLAN_APPROVE);
 
   const [sel, setSel] = useState(EMPTY); // the seats chosen, as "row:cell"
   const [cursor, setCursor] = useState(null); // where the keyboard is
@@ -82,11 +108,12 @@ export default function PlanEditor({ planId }) {
         if (isEdit) {
           let plan = await getPlan(planId);
           // An approved plan is never edited in place: go to its copy.
-          if (plan.status === "approved" && !plan.revisionOfId) {
+          if (plan.status === "approved" && !plan.revisionOfId && !plan.isTemplate) {
             plan = await revisePlan(plan.id);
             router.replace(`/dashboard/plans/${plan.id}/edit`);
           }
           setRevisionOf(plan.revisionOfId || null);
+          setIsTemplate(Boolean(plan.isTemplate));
           const m = {
             coachNo: plan.coachNo || "",
             trainNameId: plan.trainNameId,
@@ -98,7 +125,10 @@ export default function PlanEditor({ planId }) {
           history.reset(l);
           setSaved(snapshot(m, l));
         } else {
+          const query = new URLSearchParams(window.location.search);
+          if (query.get("template") === "1") setIsTemplate(true);
           setSaved(snapshot(meta, layout));
+          if (query.get("from")) applyTemplate(Number(query.get("from")));
         }
       } catch (err) {
         toast.current?.show({ severity: "error", summary: "Load failed", detail: err.message });
@@ -383,10 +413,11 @@ export default function PlanEditor({ planId }) {
       coachClassId: meta.coachClassId ?? null,
       layout,
     };
-    return isEdit ? updatePlan(planId, payload) : createPlan(payload);
+    return isEdit ? updatePlan(planId, payload) : createPlan(isTemplate ? { ...payload, isTemplate: true } : payload);
   };
 
   const save = async (thenSubmit = false) => {
+    if (isTemplate) return saveTemplate();
     const missing = thenSubmit ? missingForSubmit() : [];
     if (missing.length) {
       return toast.current?.show({
@@ -413,11 +444,112 @@ export default function PlanEditor({ planId }) {
         if (!isEdit) router.replace(`/dashboard/plans/${plan.id}/edit`);
       }
     } catch (e) {
+      // Another plan has this train and coach: say what can be done about it.
+      if (e.code === "PLAN_COACH_TAKEN" && e.details?.plan) setClash({ ...e.details, thenSubmit });
+      else toast.current?.show({ severity: "error", summary: "Save failed", detail: e.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** A template is saved as it is: no train and coach to clash, nothing to submit. */
+  const saveTemplate = async () => {
+    setSaving(true);
+    try {
+      const plan = await persist();
+      setSaved(snapshot(meta, layout));
+      toast.current?.show({ severity: "success", summary: "Template saved" });
+      if (!isEdit) router.replace(`/dashboard/plans/${plan.id}/edit`);
+    } catch (e) {
       toast.current?.show({ severity: "error", summary: "Save failed", detail: e.message });
     } finally {
       setSaving(false);
     }
   };
+
+  /* ---------------- when another plan has this train and coach ---------------- */
+
+  const planPayload = () => ({
+    coachNo: meta.coachNo.trim() || null,
+    trainNameId: meta.trainNameId ?? null,
+    coachTypeId: meta.coachTypeId ?? null,
+    coachClassId: meta.coachClassId ?? null,
+    layout,
+  });
+  const resolving = async (which, work) => {
+    setClashBusy(which);
+    try {
+      await work();
+    } catch (err) {
+      toast.current?.show({ severity: "warn", summary: "That did not work", detail: err.message });
+    } finally {
+      setClashBusy(null);
+    }
+  };
+
+  /** a. Mine becomes the plan's new layout, through approval; the layout in use is kept as a template. */
+  const replaceTheirs = () =>
+    resolving("replace", async () => {
+      const mineToBe = isEdit && !revisionOf ? Number(planId) : null;
+      const { plan } = await replacePlan(clash.plan.id, planPayload(), mineToBe);
+      setSaved(snapshot(meta, layout));
+      const thenSubmit = clash.thenSubmit;
+      setClash(null);
+      if (thenSubmit) {
+        const after = await submitPlan(plan.id);
+        toast.current?.show({
+          severity: "success",
+          summary: after.id !== plan.id ? "Approved — the plan has your layout now" : "Submitted as the plan's new layout",
+        });
+        router.push(after.id !== plan.id ? `/dashboard/plans/${after.id}` : "/dashboard/plans");
+      } else {
+        toast.current?.show({
+          severity: "success",
+          summary: "Saved as the plan's new layout",
+          detail: "It takes the plan's place once approved. The layout in use now is kept as a template.",
+        });
+        window.location.assign(`/dashboard/plans/${plan.id}/edit`);
+      }
+    });
+
+  /** b. Theirs to templates, then mine saved into its place. */
+  const moveTheirs = () =>
+    resolving("move", async () => {
+      const [result] = await moveToTemplates([clash.plan.id]);
+      if (!result?.ok) throw new Error(result?.reason || "It could not be moved");
+      const thenSubmit = clash.thenSubmit;
+      setClash(null);
+      toast.current?.show({ severity: "info", summary: "Theirs is a template now", life: 2500 });
+      await save(thenSubmit);
+    });
+
+  /** c. Theirs given another coach number, then mine saved. */
+  const renameTheirs = (coachNo) =>
+    resolving("rename", async () => {
+      await changePlanDetails(clash.plan.id, { coachNo });
+      const thenSubmit = clash.thenSubmit;
+      setClash(null);
+      toast.current?.show({ severity: "info", summary: `Theirs is coach ${coachNo} now`, life: 2500 });
+      await save(thenSubmit);
+    });
+
+  /** d. Mine kept as a template instead. */
+  const keepAsTemplate = () =>
+    resolving("template", async () => {
+      let id = planId;
+      if (isEdit) {
+        const [result] = await moveToTemplates([Number(planId)]);
+        if (!result?.ok) throw new Error(result?.reason || "It could not be made a template");
+        await updatePlan(planId, planPayload());
+      } else {
+        id = (await createPlan({ ...planPayload(), isTemplate: true })).id;
+      }
+      setIsTemplate(true);
+      setSaved(snapshot(meta, layout));
+      setClash(null);
+      toast.current?.show({ severity: "success", summary: "Saved as a template" });
+      if (!isEdit) router.replace(`/dashboard/plans/${id}/edit`);
+    });
 
   const discard = async () => {
     setSaving(true);
@@ -457,9 +589,21 @@ export default function PlanEditor({ planId }) {
 
       <div className="page-head">
         <div>
-          <h1 className="page-title">{revisionOf ? "Change Seat Plan" : isEdit ? "Edit Seat Plan" : "New Seat Plan"}</h1>
+          <h1 className="page-title">
+            {isTemplate
+              ? isEdit
+                ? "Edit Template"
+                : "New Template"
+              : revisionOf
+              ? "Change Seat Plan"
+              : isEdit
+              ? "Edit Seat Plan"
+              : "New Seat Plan"}
+          </h1>
           <p className="page-subtitle">
-            {revisionOf
+            {isTemplate
+              ? "A template is kept to start plans from: never used by trains or departures, never in the way of a plan."
+              : revisionOf
               ? "These are changes to an approved plan. It keeps being used as it is until they are approved."
               : "A draft saves with anything still unknown. Submitting needs a train, coach type, class and coach number."}
           </p>
@@ -471,8 +615,14 @@ export default function PlanEditor({ planId }) {
             <Button label="Throw changes away" icon="pi pi-trash" severity="danger" text disabled={saving} onClick={discard} />
           )}
           <Button label="Save to more coaches…" icon="pi pi-copy" text disabled={saving} onClick={() => setDialog("copies")} />
-          <Button label="Save draft" icon="pi pi-save" outlined loading={saving} onClick={() => save(false)} />
-          <Button label="Save & submit" icon="pi pi-send" loading={saving} onClick={() => save(true)} />
+          {isTemplate ? (
+            <Button label="Save template" icon="pi pi-save" loading={saving} onClick={() => save(false)} />
+          ) : (
+            <>
+              <Button label="Save draft" icon="pi pi-save" outlined loading={saving} onClick={() => save(false)} />
+              <Button label="Save & submit" icon="pi pi-send" loading={saving} onClick={() => save(true)} />
+            </>
+          )}
         </div>
       </div>
 
@@ -615,6 +765,18 @@ export default function PlanEditor({ planId }) {
           onHide={() => setDialog(null)}
           layout={layout}
           onApply={(patch) => setLayout((l) => L.setNumbering(l, patch))}
+        />
+      )}
+      {clash && (
+        <ConflictDialog
+          clash={clash}
+          canApprove={canApprove}
+          busy={clashBusy}
+          onReplace={replaceTheirs}
+          onMoveTheirs={moveTheirs}
+          onRenameTheirs={renameTheirs}
+          onKeepAsTemplate={keepAsTemplate}
+          onHide={() => setClash(null)}
         />
       )}
       {dialog === "copies" && (

@@ -426,7 +426,7 @@ async function seedSeatPlans(report) {
   const adopted = [];
   const unapproved = [];
   for (const { plan, layout } of prepared) {
-    const existing = await SeatPlan.findOne({ where: { coachNo: plan.key } });
+    const existing = await SeatPlan.findOne({ where: { coachNo: plan.key, isTemplate: false } });
     if (existing) {
       if (!(await isTracked("SeatPlan", existing.id))) {
         adopted.push(plan.key);
@@ -521,7 +521,7 @@ async function seedTrains(report, state) {
 
     const spec = TRAINS.find((t) => t.name === trainName);
     if (spec && !(await TrainCoach.count({ where: { trainId: train.id } }))) {
-      const plans = await SeatPlan.findAll({ where: { coachNo: spec.coaches.map(([, coachNo]) => coachNo) } });
+      const plans = await SeatPlan.findAll({ where: { coachNo: spec.coaches.map(([, coachNo]) => coachNo), isTemplate: false } });
       const byCoachNo = new Map(plans.map((p) => [p.coachNo, p]));
       const coaches = spec.coaches
         .filter(([, coachNo]) => byCoachNo.has(coachNo))

@@ -49,6 +49,7 @@ class SeatPlan extends Model {
       id: this.id,
       coachNo: this.coachNo,
       status: this.status,
+      isTemplate: this.isTemplate,
       rejectionReason: this.rejectionReason,
       trainNameId: this.trainNameId,
       coachTypeId: this.coachTypeId,
@@ -84,6 +85,13 @@ SeatPlan.init(
       type: DataTypes.ENUM(...ALL_PLAN_STATUSES),
       allowNull: false,
       defaultValue: PLAN_STATUS.DRAFT,
+    },
+    // A layout kept to start plans from: never used by trains or
+    // departures, never in conflict with a plan (migration 20260204000000).
+    isTemplate: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
     },
     rejectionReason: {
       type: DataTypes.TEXT,

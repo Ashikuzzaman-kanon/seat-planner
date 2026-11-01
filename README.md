@@ -432,6 +432,29 @@ The seat plan editor (*Seat Plans → New*, or *Edit*):
 The layout logic is plain functions in `frontend/src/lib/layout.js`, tested
 with `npm test` in `frontend/`.
 
+### Templates, and plans that clash
+
+A train has one plan per coach number (train + coach number is all that makes
+a plan unique; type and class are not). A **template** (`is_template`) is a
+layout kept to start plans from: it keeps its train, coach, type and class as
+labels, but never clashes with a plan, is never submitted or approved, and is
+never used by a train's coaches, a departure, the seat-plan API or the railway
+loader. *Seat Plans → Templates* lists them (*New template*, *Make a plan from
+it*, *Move back to plans*); plans move there one or several at once.
+
+Saving a plan into a train and coach another plan has opens a choice:
+
+- **Replace it with mine** (an approved one): mine becomes its editable copy,
+  so it goes through approval, then takes the plan's place under its own id —
+  every train and departure keeps it. The layout in use is kept as a template.
+- **Move it to templates** — not one a train's coaches use.
+- **Give it another coach number** — trains and departures keep it.
+- **Save mine as a template instead.**
+
+Taking an approved plan out of use, or changing its coach number, needs
+`plan:approve`. Each is in the audit log (`plan.template`, `plan.restore`,
+`plan.details`, `plan.replace`).
+
 ### Switching tabs off
 
 *Settings → Features* (super admin only) turns any tab of the app off — for
