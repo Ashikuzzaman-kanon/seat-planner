@@ -13,6 +13,7 @@ import {
   countsOf,
   declineRequest,
   describeDevices,
+  endedLine,
   fetchMembers,
   longDate,
   sameCounts,
@@ -53,7 +54,8 @@ export default function RequestsQueue({ platforms, maxDevices, onDecided, notify
   }, [load]);
 
   const start = (intent, request) => {
-    setPeriod(DEFAULT_PERIOD);
+    // Continuing one: the same length as last time, from today.
+    setPeriod(request.lastLength ? { days: request.lastLength } : DEFAULT_PERIOD);
     setCounts(countsOf(request.devices, platforms));
     setDeciding({ intent, request });
   };
@@ -116,8 +118,13 @@ export default function RequestsQueue({ platforms, maxDevices, onDecided, notify
                 <span>{request.user.email}</span>
               </div>
               <div className="sub-request__what">
-                <span className="sub-request__label">asked for</span>
+                <span className="sub-request__label">{request.history?.length ? "asked to continue" : "asked for"}</span>
                 <strong>{request.subscription.name}</strong>
+                {request.history?.length > 0 && (
+                  <span className="sub-request__before">
+                    <i className="pi pi-history" aria-hidden="true" /> {endedLine(request.history.at(-1), { userId: request.user.id })}
+                  </span>
+                )}
                 <span className="sub-request__devices">on {describeDevices(request.devices)}</span>
                 <small title={new Date(request.requestedAt).toLocaleString("en-GB")}>{timeAgo(request.requestedAt)}</small>
               </div>

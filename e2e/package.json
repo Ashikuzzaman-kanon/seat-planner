@@ -7,6 +7,7 @@
     "dialogs": "node dialogs.js",
     "demo-data": "node demo-ui.js",
     "subscriptions": "node subscriptions-ui.js",
+    "subscription-continue": "node subscription-continue-ui.js",
     "people": "node people-ui.js",
     "plans": "node plans-ui.js",
     "plan-editor": "node plan-editor-ui.js",

@@ -10,6 +10,7 @@ import PersonLink from "@/components/people/PersonLink";
 import { tip } from "@/components/ui/tip";
 import {
   cancelSubscription,
+  countsOf,
   deleteSubscription,
   describeDevices,
   longDate,
@@ -56,7 +57,9 @@ export default function SubscriptionList({
   const [counts, setCounts] = useState({});
 
   const subscribe = (subscription) => {
-    setCounts(startingCounts(platforms));
+    // Asking to continue one: the devices it had, to begin with.
+    const had = subscription.mine ? countsOf(subscription.mine.devices, platforms) : null;
+    setCounts(had && totalOf(had) > 0 ? had : startingCounts(platforms));
     setAsking({ kind: "subscribe", subscription });
   };
 
@@ -234,7 +237,7 @@ export default function SubscriptionList({
                 )}
                 {!live && subscription.isOpen && (
                   <Button
-                    label={mine ? "Subscribe again" : "Subscribe"}
+                    label={mine ? "Ask to continue" : "Subscribe"}
                     icon="pi pi-plus"
                     size="small"
                     onClick={() => subscribe(subscription)}
@@ -308,8 +311,12 @@ export default function SubscriptionList({
 
       <ReasonDialog
         visible={asking?.kind === "subscribe"}
-        header={`Subscribe to ${asking?.subscription.name || ""}`}
-        message="On how many devices will you use it? Whoever reviews your request sees these numbers, and may change them."
+        header={`${asking?.subscription.mine ? "Ask to continue" : "Subscribe to"} ${asking?.subscription.name || ""}`}
+        message={
+          asking?.subscription.mine
+            ? "Your subscription carries on once it is approved. On how many devices will you use it? Whoever reviews your request sees these numbers, and may change them."
+            : "On how many devices will you use it? Whoever reviews your request sees these numbers, and may change them."
+        }
         confirmLabel="Send request"
         confirmIcon="pi pi-send"
         canConfirm={platforms.length > 0 && totalOf(counts) > 0}
@@ -327,7 +334,7 @@ export default function SubscriptionList({
         message={
           asking?.subscription.mine?.status === "pending"
             ? `Your request for ${asking?.subscription.name} will be closed. You can ask again whenever you like.`
-            : `${asking?.subscription.name} stops straight away — it would otherwise run until ${longDate(asking?.subscription.mine?.lastDay)}. To have it again you would need to ask and be approved.`
+            : `${asking?.subscription.name} stops straight away — it would otherwise run until ${longDate(asking?.subscription.mine?.lastDay)}. To have it again you would ask to continue it, and be approved.`
         }
         confirmLabel={asking?.subscription.mine?.status === "pending" ? "Withdraw request" : "Cancel subscription"}
         cancelLabel="Keep it"

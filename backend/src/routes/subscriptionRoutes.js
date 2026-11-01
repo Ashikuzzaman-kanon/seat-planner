@@ -277,6 +277,14 @@ router.patch(
   validate,
   c.amend
 );
+// One that ended — cancelled, run out or declined — continued: the same record, a new period.
+router.post(
+  "/members/:id/resume",
+  approve,
+  [...id, days, lastDay, given("days", "lastDay"), deviceCounts],
+  validate,
+  c.resume
+);
 // The subscriber ends their own; a reviewer ends anyone's. The service tells them apart.
 router.post("/members/:id/cancel", [...id, text("reason", 500)], validate, c.cancel);
 

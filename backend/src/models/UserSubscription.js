@@ -40,13 +40,14 @@ class UserSubscription extends Model {
   toPublicJSON(now = new Date()) {
     // An active row whose time is up reads as expired before the sweep says so.
     const lapsed = this.status === SUBSCRIPTION_STATUS.ACTIVE && !this.isValid(now);
+    const history = Array.isArray(this.history) ? this.history : [];
     return {
       id: this.id,
       subscriptionId: this.subscriptionId,
       userId: this.userId,
       status: lapsed ? SUBSCRIPTION_STATUS.EXPIRED : this.status,
       valid: this.isValid(now),
-      requestedAt: this.createdAt,
+      requestedAt: this.requestedAt || this.createdAt,
       decidedAt: this.decidedAt,
       decisionNote: this.decisionNote,
       startsAt: this.startsAt,
@@ -55,8 +56,21 @@ class UserSubscription extends Model {
       lastDay: this.expiresAt ? lastDayOf(this.expiresAt) : null,
       endedAt: this.endedAt,
       endReason: this.endReason,
+      // Its earlier periods, oldest first: the record carries on when continued.
+      history,
+      // How many days its last period ran (or was to run): what continuing it suggests.
+      lastLength:
+        daysBetween(this.startsAt, this.expiresAt) ??
+        [...history].reverse().map((h) => daysBetween(h.startsAt, h.expiresAt)).find(Boolean) ??
+        null,
     };
   }
+}
+
+/** Whole days from one moment to another, at least one; null without both. */
+function daysBetween(from, to) {
+  if (!from || !to) return null;
+  return Math.max(1, Math.round((new Date(to) - new Date(from)) / 86_400_000));
 }
 
 UserSubscription.init(
@@ -95,6 +109,15 @@ UserSubscription.init(
     endedById: { type: DataTypes.INTEGER, allowNull: true },
     endedAt: { type: DataTypes.DATE, allowNull: true },
     endReason: { type: DataTypes.STRING(500), allowNull: true },
+
+    /** When it was last asked for: a record asked for again waits from then. */
+    requestedAt: { type: DataTypes.DATE, allowNull: true },
+    /**
+     * Its earlier periods, oldest first — [{ status, requestedAt, startsAt,
+     * expiresAt, lastDay, endedAt, endedById, reason }]. Continued, a record
+     * carries on, and what it was is kept here (and in the audit log).
+     */
+    history: { type: DataTypes.JSON, allowNull: true },
   },
   {
     sequelize,
