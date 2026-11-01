@@ -160,6 +160,11 @@ const amend = asyncHandler(async (req, res) => {
   res.json({ subscription: await subscriptions.amend(req.params.id, req.body, actor(req)) });
 });
 
+/** One that ended — cancelled, run out or declined — continued for a new period. */
+const resume = asyncHandler(async (req, res) => {
+  res.json({ subscription: await subscriptions.resume(req.params.id, req.body, actor(req)) });
+});
+
 /* ---------------- Platforms ---------------- */
 
 const platforms = asyncHandler(async (req, res) => {
@@ -238,6 +243,7 @@ module.exports = {
   decline,
   cancel,
   amend,
+  resume,
   platforms,
   createPlatform,
   updatePlatform,

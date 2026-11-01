@@ -739,6 +739,18 @@ module.exports = {
         lastDay: { ...str("The last calendar day it is valid, in Dhaka (YYYY-MM-DD)"), nullable: true },
         endedAt: { type: "string", format: "date-time", nullable: true },
         endReason: { ...str(), nullable: true },
+        history: arr(
+          obj({
+            status: str("How that period ended: expired, cancelled or declined"),
+            requestedAt: { type: "string", format: "date-time" },
+            startsAt: { type: "string", format: "date-time", nullable: true },
+            lastDay: { ...str(), nullable: true },
+            endedAt: { type: "string", format: "date-time", nullable: true },
+            endedById: { ...int("Who ended it; the subscriber themselves when it is their own id"), nullable: true },
+            reason: { ...str("The reason given, or the note it was declined with"), nullable: true },
+          })
+        ),
+        lastLength: { ...int("Days its last period ran, or was to run: what continuing it suggests"), nullable: true },
         devices: arr(
           obj({
             platformId: int(),
@@ -3963,7 +3975,8 @@ module.exports = {
         summary: "Ask to be subscribed, saying on how many devices",
         description:
           "Refused while you already have a request waiting or a subscription running for it. Without " +
-          "`devices` it asks for one of each platform.",
+          "`devices` it asks for one of each platform. Had before and ended, the same record carries on — " +
+          "waiting again, its earlier period kept in its `history`.",
         security: [{ bearerAuth: [] }],
         parameters: [pathParam("id", "Subscription id")],
         requestBody: body(obj({ devices: ref("DeviceCounts") }), false),
@@ -4048,6 +4061,31 @@ module.exports = {
         parameters: [pathParam("id", "Request id")],
         requestBody: body(obj({ reason: str() }), false),
         responses: { 200: response("Cancelled", obj({ subscription: ref("UserSubscription") })), 404: errors[404], 409: errors[409] },
+      },
+    },
+
+    "/subscriptions/members/{id}/resume": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Continue a subscription that ended — run out, cancelled or declined — for a new period",
+        description: [
+          "The same record, active again from today until the day chosen; what it was is kept in its `history`.",
+          "The device counts it had stay unless others are given. The person is told. Refused (409) while it is",
+          "running or waiting, or while they have another one running or waiting.",
+        ].join("\n"),
+        ...secured("subscription:approve"),
+        parameters: [pathParam("id", "Request id")],
+        requestBody: body(obj({
+          days: int("Days from today; or"),
+          lastDay: str("The last day, YYYY-MM-DD"),
+          devices: { type: "object", description: "{ platform value: count }, to change them" },
+        })),
+        responses: {
+          200: response("Running again", obj({ subscription: ref("UserSubscription") })),
+          400: errors[400],
+          403: errors[403],
+          409: errors[409],
+        },
       },
     },
 

@@ -516,6 +516,23 @@ Dhaka**; an hourly job then marks it ended and tells the subscriber, and warns
 them a few days before (*Settings → Subscriptions*). Every request is kept, so
 who decided what stays on record.
 
+**Continuing one that ended.** A person has one record per subscription. When
+it ended — run out, cancelled (by them or a reviewer), or declined — it
+carries on rather than starting over:
+
+- a reviewer (`subscription:approve`) presses **Continue** on it under
+  *Subscribers*: it runs again from today until the day chosen (suggested: as
+  long as last time), with the device counts it had unless changed; the dialog
+  warns when the person cancelled it themselves; they are told
+  (`subscription.resumed`), and it is audited as `subscription.resume`;
+- or the person presses **Ask to continue** on its card: the same record waits
+  for approval again, queued from when they asked, and the reviewer sees it is
+  a continuation and how it last ended.
+
+What each earlier period was — how it ended, when, by whom, why — is kept in
+the record's `history` (and the audit log); *Subscribers* shows how often it
+was continued.
+
 Each subscription has a **code** — made from its name when it is created, or
 chosen then — which never changes, even if the subscription is renamed.
 

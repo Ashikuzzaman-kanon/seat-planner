@@ -35,6 +35,7 @@ export const ACTION_SEVERITY = {
   "subscription.decline": "warning",
   "subscription.cancel": "warning",
   "subscription.extend": "info",
+  "subscription.resume": "success",
   "subscription.expire": "secondary",
   "subscription.limits": "info",
   "subscription.platform_create": "success",

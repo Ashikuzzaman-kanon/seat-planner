@@ -51,6 +51,44 @@ const WITH_EVERYONE = [
 ];
 
 const liveKey = (userId, subscriptionId) => `${userId}:${subscriptionId}`;
+
+/** How a subscription can have ended: what can be continued. */
+const ENDED = Object.freeze([STATUS.CANCELLED, STATUS.EXPIRED, STATUS.DECLINED]);
+
+/** What a record was before it carries on, for its history. */
+function snapshotOf(row) {
+  const declined = row.status === STATUS.DECLINED;
+  return {
+    // An active one whose time is up had ended all the same.
+    status: row.status === STATUS.ACTIVE ? STATUS.EXPIRED : row.status,
+    requestedAt: row.requestedAt || row.createdAt,
+    startsAt: row.startsAt,
+    expiresAt: row.expiresAt,
+    lastDay: row.expiresAt ? lastDayOf(row.expiresAt) : null,
+    endedAt: row.endedAt || (declined ? row.decidedAt : row.expiresAt) || null,
+    endedById: row.endedById || (declined ? row.decidedById : null),
+    reason: row.endReason || (declined ? row.decisionNote : null),
+  };
+}
+
+/**
+ * Which period of its record a subscription is in: 0 for the first, one more
+ * each time it carries on. A notice about a moment of one period ("ended",
+ * "declined"…) is keyed with it, so the same moment of a later period is
+ * still told.
+ */
+const periodOf = (row) => (Array.isArray(row.history) ? row.history.length : 0);
+
+/** A record starting a new period: nothing of how the last one was decided or ended. */
+const FRESH = Object.freeze({
+  decidedById: null,
+  decidedAt: null,
+  decisionNote: null,
+  endedById: null,
+  endedAt: null,
+  endReason: null,
+  remindedAt: null,
+});
 const clean = (text) => (typeof text === "string" && text.trim() ? text.trim() : null);
 
 /** "9 Nov 2026" from a YYYY-MM-DD calendar day. */
@@ -210,7 +248,7 @@ async function update(id, { name, description, isOpen, includesSeatPlans }, acto
       title: `${subscription.name} is no longer offered`,
       body: "Your request to subscribe was closed because the subscription was withdrawn.",
       link: LINK.mine,
-      key: `subscription:${row.id}:decided`,
+      key: `subscription:${row.id}:${periodOf(row)}:decided`,
     });
   }
 
@@ -324,9 +362,9 @@ async function expire(row, subscription) {
     category: inbox.CATEGORY.SUBSCRIPTION,
     tone: "neutral",
     title: `Your ${subscription.name} subscription has ended`,
-    body: `It ran until ${longDate(lastDayOf(row.expiresAt))}. You can ask to subscribe again.`,
+    body: `It ran until ${longDate(lastDayOf(row.expiresAt))}. You can ask to continue it.`,
     link: LINK.mine,
-    key: `subscription:${row.id}:expired`,
+    key: `subscription:${row.id}:${periodOf(row)}:expired`,
   });
   return true;
 }
@@ -354,15 +392,29 @@ async function request(subscriptionId, user, requested) {
     );
   }
 
+  // Had before, and ended: the same record carries on, asked for again; what
+  // it was goes into its history. Otherwise a record of its own.
+  const earlier = await UserSubscription.findOne({
+    where: { userId: user.id, subscriptionId: subscription.id, liveKey: null, status: ENDED },
+    order: [["id", "DESC"]],
+  });
   let row;
   try {
-    row = await UserSubscription.create({
-      subscriptionId: subscription.id,
-      userId: user.id,
+    const asking = {
       status: STATUS.PENDING,
       liveKey: liveKey(user.id, subscription.id),
       deviceLimits: asked.limits,
-    });
+      requestedAt: new Date(),
+    };
+    row = earlier
+      ? await earlier.update({
+          ...asking,
+          ...FRESH,
+          startsAt: null,
+          expiresAt: null,
+          history: [...(earlier.history || []), snapshotOf(earlier)],
+        })
+      : await UserSubscription.create({ ...asking, subscriptionId: subscription.id, userId: user.id });
   } catch (err) {
     // Two requests at once: the unique key let one through.
     if (err.name === "SequelizeUniqueConstraintError") {
@@ -377,10 +429,10 @@ async function request(subscriptionId, user, requested) {
       type: "subscription.requested",
       category: inbox.CATEGORY.SUBSCRIPTION,
       tone: "info",
-      title: `${user.fullName} asked to subscribe to ${subscription.name}`,
+      title: `${user.fullName} asked to ${earlier ? "continue" : "subscribe to"} ${subscription.name}`,
       body: `${user.email} · for ${describeLimits(asked.limits, offered)} · waiting for someone to approve or decline it`,
       link: LINK.requests,
-      key: `subscription:${row.id}:requested`,
+      key: `subscription:${row.id}:${periodOf(row)}:requested`,
     },
     { except: [user.id] }
   );
@@ -388,8 +440,8 @@ async function request(subscriptionId, user, requested) {
   await audit.record({
     action: AUDIT_ACTIONS.SUBSCRIPTION_REQUEST,
     entity: memberEntity(row, subscription, user),
-    after: { status: row.status, devices: describeLimits(asked.limits, offered) },
-    message: `asked to subscribe to "${subscription.name}" on ${describeLimits(asked.limits, offered)}`,
+    after: { status: row.status, devices: describeLimits(asked.limits, offered), continues: Boolean(earlier) },
+    message: `asked to ${earlier ? "continue" : "subscribe to"} "${subscription.name}" on ${describeLimits(asked.limits, offered)}`,
   });
   return shape(row, offered);
 }
@@ -461,6 +513,7 @@ async function approve(id, { days, lastDay, note, devices: granted }, actor) {
     userId: row.userId,
     subscription,
     membershipId: row.id,
+    period: periodOf(row),
     approved: true,
     until: longDate(period.lastDay),
     devices: allowed,
@@ -497,6 +550,7 @@ async function decline(id, { note }, actor) {
     userId: row.userId,
     subscription,
     membershipId: row.id,
+    period: periodOf(row),
     approved: false,
     note: row.decisionNote,
     decidedBy: actor.fullName,
@@ -554,7 +608,7 @@ async function cancel(id, { reason }, actor, { staff = false } = {}) {
           : `Your ${subscription.name} subscription was cancelled`,
       body: [row.endReason && `“${row.endReason}”`, `By ${actor.fullName}`].filter(Boolean).join(" · "),
       link: LINK.mine,
-      key: `subscription:${row.id}:cancelled`,
+      key: `subscription:${row.id}:${periodOf(row)}:cancelled`,
     });
   }
 
@@ -661,6 +715,91 @@ async function amend(id, { days, lastDay, devices: granted }, actor) {
   return shape(row, platformRows);
 }
 
+/**
+ * Continue a subscription that ended — cancelled, run out or declined — for
+ * a new period: the same record, active again from today, what it was kept
+ * in its history. The device counts it had stay, unless others are given.
+ * Refused while the person has another running or waiting.
+ */
+async function resume(id, { days, lastDay, devices: granted }, actor) {
+  const period = resolvePeriod({ days, lastDay });
+  if (period.error) throw ApiError.badRequest(period.error);
+
+  const platformRows = await devices.allPlatforms();
+  let limits = null;
+  if (granted !== undefined && granted !== null) {
+    const settled = cleanLimits(granted, platformRows.filter((p) => p.isActive));
+    if (settled.error) throw ApiError.badRequest(settled.error);
+    limits = settled.limits;
+  }
+
+  let was;
+  let done;
+  try {
+    done = await change(id, {
+      from: (found) => {
+        const lapsed = found.status === STATUS.ACTIVE && !found.isValid();
+        if (!ENDED.includes(found.status) && !lapsed) {
+          throw ApiError.conflict(
+            found.status === STATUS.PENDING
+              ? "This one is waiting to be decided — approve it instead"
+              : "This one is still running — change its last day instead"
+          );
+        }
+        was = snapshotOf(found);
+      },
+      apply: async (found, { transaction }) => {
+        const other = await UserSubscription.findOne({
+          where: { liveKey: liveKey(found.userId, found.subscriptionId), id: { [Op.ne]: found.id } },
+          transaction,
+        });
+        if (other) {
+          throw ApiError.conflict(
+            other.status === STATUS.PENDING ? "They have asked for it again — decide that request instead" : "They have another one running"
+          );
+        }
+        return found.update(
+          {
+            ...FRESH,
+            status: STATUS.ACTIVE,
+            liveKey: liveKey(found.userId, found.subscriptionId),
+            startsAt: new Date(),
+            expiresAt: period.expiresAt,
+            decidedById: actor.id,
+            decidedAt: new Date(),
+            history: [...(found.history || []), was],
+            ...(limits ? { deviceLimits: overlayLimits(found.deviceLimits, limits, platformRows) } : {}),
+          },
+          { transaction }
+        );
+      },
+    });
+  } catch (err) {
+    if (err.name === "SequelizeUniqueConstraintError") throw ApiError.conflict("They have another one running or waiting");
+    throw err;
+  }
+
+  const { row, subscription, user } = done;
+  const allowed = describeLimits(row.deviceLimits, platformRows);
+  await inbox.tryAdd(row.userId, {
+    type: "subscription.resumed",
+    category: inbox.CATEGORY.SUBSCRIPTION,
+    tone: "info",
+    title: `Your ${subscription.name} subscription continues until ${longDate(period.lastDay)}`,
+    body: `On ${allowed}. Continued by ${actor.fullName}.`,
+    link: LINK.mine,
+    key: `subscription:${row.id}:resumed:${period.lastDay}`,
+  });
+  await audit.record({
+    action: AUDIT_ACTIONS.SUBSCRIPTION_RESUME,
+    entity: memberEntity(row, subscription, user),
+    before: { status: was.status, lastDay: was.lastDay, reason: was.reason, by: was.endedById === row.userId ? "subscriber" : null },
+    after: { status: row.status, lastDay: period.lastDay, devices: allowed },
+    message: `subscription to "${subscription.name}" continued through ${period.lastDay} (it had been ${was.status})`,
+  });
+  return shape(row, platformRows);
+}
+
 /* ------------------------------------------------------------------ *
  * Looking
  * ------------------------------------------------------------------ */
@@ -697,7 +836,8 @@ async function members({ status, subscriptionId, search, page = 1, limit = 25 } 
       where,
       include,
       // A queue is worked oldest first; everything else reads newest first.
-      order: [["id", status === STATUS.PENDING ? "ASC" : "DESC"]],
+      // Requests the longest-waiting first: from when they were asked for, not when the record was made.
+      order: status === STATUS.PENDING ? [["requestedAt", "ASC"], ["id", "ASC"]] : [["id", "DESC"]],
       limit,
       offset: (page - 1) * limit,
       distinct: true,
@@ -857,6 +997,7 @@ module.exports = {
   decline,
   cancel,
   amend,
+  resume,
   members,
   mine,
   pendingCount,

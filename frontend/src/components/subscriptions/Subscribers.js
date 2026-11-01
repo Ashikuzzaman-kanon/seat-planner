@@ -10,6 +10,7 @@ import SearchBox from "@/components/ui/SearchBox";
 import Select from "@/components/ui/Select";
 import { tip } from "@/components/ui/tip";
 import Chips from "./Chips";
+import DeviceCounts from "./DeviceCounts";
 import DevicesDialog from "./DevicesDialog";
 import PeriodPicker, { isChosen, lastDayOf } from "./PeriodPicker";
 import ReasonDialog from "./ReasonDialog";
@@ -17,10 +18,16 @@ import PersonLink from "@/components/people/PersonLink";
 import {
   amendSubscription,
   cancelSubscription,
+  countsOf,
   describeDevices,
+  endedLine,
   fetchMembers,
+  hasEnded,
   longDate,
+  resumeSubscription,
+  sameCounts,
   statusMeta,
+  totalOf,
 } from "@/lib/subscriptions";
 
 const STATUSES = [
@@ -37,9 +44,10 @@ const PAGE_SIZE = 25;
  * Who is subscribed to what, and who was.
  *
  * "Running" is the default because it is the list a reviewer acts on: each
- * row can be cancelled, or have its last day moved. Every row opens that
- * person's devices — what the subscription allows, what has signed in, and
- * what was turned away.
+ * row can be cancelled, or have its last day moved. One that ended — run
+ * out, cancelled, declined — can be continued: the same record, running
+ * again for a new period. Every row opens that person's devices — what the
+ * subscription allows, what has signed in, and what was turned away.
  */
 export default function Subscribers({ subscriptions, platforms, maxDevices, onChanged, notify }) {
   const [status, setStatus] = useState("active");
@@ -51,7 +59,15 @@ export default function Subscribers({ subscriptions, platforms, maxDevices, onCh
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(null); // { kind, member }
   const [period, setPeriod] = useState(null);
+  const [counts, setCounts] = useState({});
   const [showing, setShowing] = useState(null); // the row whose devices are open
+
+  /** Continue one that ended: the same length as last time, from today; the devices it had. */
+  const startResume = (m) => {
+    setPeriod({ days: m.lastLength || 30 });
+    setCounts(countsOf(m.devices, platforms));
+    setActing({ kind: "resume", member: m });
+  };
 
   // Search as the typing settles, not on every key.
   useEffect(() => {
@@ -88,6 +104,11 @@ export default function Subscribers({ subscriptions, platforms, maxDevices, onCh
       if (kind === "cancel") {
         await cancelSubscription(member.id, { reason });
         notify("info", "Cancelled", `${member.user.fullName} — ${member.subscription.name}`);
+      } else if (kind === "resume") {
+        // Sent only when changed, so an untouched one keeps the devices it had.
+        const had = countsOf(member.devices, platforms);
+        const done = await resumeSubscription(member.id, { period, devices: sameCounts(counts, had, platforms) ? undefined : counts });
+        notify("success", "Continued", `${member.user.fullName} — ${member.subscription.name} until ${longDate(done.lastDay)}`);
       } else {
         const done = await amendSubscription(member.id, period);
         notify("success", "Last day changed", `${member.user.fullName} — now until ${longDate(done.lastDay)}`);
@@ -215,6 +236,18 @@ export default function Subscribers({ subscriptions, platforms, maxDevices, onCh
             }}
           />
           <Column
+            header="Before"
+            body={(m) =>
+              m.history?.length ? (
+                <span className="sub-continued" title={m.history.map((h) => endedLine(h, { userId: m.user.id })).join("\n")}>
+                  <i className="pi pi-history" aria-hidden="true" /> continued {m.history.length}×
+                </span>
+              ) : (
+                <span className="sub-muted">—</span>
+              )
+            }
+          />
+          <Column
             header=""
             className="sub-table__actions"
             body={(m) => (
@@ -227,6 +260,18 @@ export default function Subscribers({ subscriptions, platforms, maxDevices, onCh
                   onClick={() => setShowing(m)}
                   {...tip("Devices")}
                 />
+                {hasEnded(m) && (
+                  <Button
+                    icon="pi pi-replay"
+                    size="small"
+                    text
+                    rounded
+                    severity="success"
+                    onClick={() => startResume(m)}
+                    aria-label="Continue it"
+                    {...tip("Continue it")}
+                  />
+                )}
                 {m.valid && (
                   <>
                     <Button
@@ -300,6 +345,50 @@ export default function Subscribers({ subscriptions, platforms, maxDevices, onCh
         onHide={() => setActing(null)}
       >
         {acting?.kind === "extend" && <PeriodPicker value={period} onChange={setPeriod} id="extend-period" />}
+      </ReasonDialog>
+
+      <ReasonDialog
+        visible={acting?.kind === "resume"}
+        header={`Continue ${acting?.member.user.fullName || ""}’s subscription`}
+        message={
+          acting?.kind === "resume"
+            ? `${acting.member.subscription.name}: ${endedLine(
+                {
+                  status: acting.member.status,
+                  startsAt: acting.member.startsAt,
+                  lastDay: acting.member.lastDay,
+                  endedAt: acting.member.status === "declined" ? acting.member.decidedAt : acting.member.endedAt,
+                  endedById: acting.member.status === "cancelled" ? acting.member.endedById : null,
+                  reason: acting.member.status === "declined" ? acting.member.decisionNote : acting.member.endReason,
+                },
+                { userId: acting.member.user.id }
+              )}. It runs again from today — the same subscription, its history kept — and they are told.`
+            : ""
+        }
+        confirmLabel={`Continue until ${longDate(lastDayOf(period)) || "…"}`}
+        confirmIcon="pi pi-replay"
+        canConfirm={isChosen(period) && totalOf(counts) > 0}
+        onConfirm={confirm}
+        onHide={() => setActing(null)}
+      >
+        {acting?.kind === "resume" && (
+          <>
+            {acting.member.status === "cancelled" && acting.member.endedById === acting.member.user.id && (
+              <p className="sub-warning" role="note">
+                <i className="pi pi-exclamation-triangle" aria-hidden="true" /> They cancelled it themselves
+                {acting.member.endedAt ? ` on ${new Date(acting.member.endedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                {acting.member.endReason ? ` — “${acting.member.endReason}”` : ""}. Make sure they want it back.
+              </p>
+            )}
+            <PeriodPicker value={period} onChange={setPeriod} id="resume-period" />
+            <div className="sub-field">
+              <span className="sub-field__label">
+                Devices <span className="sub-field__optional">as it had — change them if you need to</span>
+              </span>
+              <DeviceCounts platforms={platforms} value={counts} onChange={setCounts} max={maxDevices} id="resume-devices" />
+            </div>
+          </>
+        )}
       </ReasonDialog>
     </>
   );

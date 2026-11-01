@@ -138,6 +138,7 @@ const AUDIT_ACTIONS = Object.freeze({
   SUBSCRIPTION_DECLINE: "subscription.decline",
   SUBSCRIPTION_CANCEL: "subscription.cancel",
   SUBSCRIPTION_EXTEND: "subscription.extend",
+  SUBSCRIPTION_RESUME: "subscription.resume",
   SUBSCRIPTION_EXPIRE: "subscription.expire",
 
   // Every check from outside the app that got as far as an answer: who, from

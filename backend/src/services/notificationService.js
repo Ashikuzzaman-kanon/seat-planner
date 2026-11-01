@@ -418,7 +418,7 @@ async function approvalDecided({ userId, request, approved, note: decisionNote, 
  * `devices` what it may be used on ("2 Windows, 1 Android") — which may not be
  * what was asked for, so it is said.
  */
-async function subscriptionDecided({ userId, subscription, membershipId, approved, until, devices, note: decisionNote, decidedBy }) {
+async function subscriptionDecided({ userId, subscription, membershipId, period = 0, approved, until, devices, note: decisionNote, decidedBy }) {
   const title = approved
     ? `You are subscribed to ${subscription.name} until ${until}`
     : `Your request for ${subscription.name} was not approved`;
@@ -435,7 +435,8 @@ async function subscriptionDecided({ userId, subscription, membershipId, approve
         .filter(Boolean)
         .join(" · "),
       link: "/dashboard/subscriptions",
-      key: `subscription:${membershipId}:decided`,
+      // Per period: a record that carries on is decided again, and told again.
+      key: `subscription:${membershipId}:${period}:decided`,
     },
     html: ui.page({
       subject,

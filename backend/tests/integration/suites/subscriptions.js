@@ -223,7 +223,9 @@ const validOf = (response, code) => response.body?.subscriptions?.find((s) => s.
     (await call("POST", `/subscriptions/members/${g1.id}/approve`, { token: dt, body: { days: 7 } })).status === 409);
 
   const g2 = (await call("POST", `/subscriptions/${gold.id}/requests`, { token: ut })).body.subscription;
-  check("and asked for again", g2?.status === "pending" && g2.id !== g1.id, JSON.stringify(g2));
+  // Asked for again, the same record carries on; what it was is kept in its history.
+  check("and asked for again: the same record, waiting again", g2?.status === "pending" && g2.id === g1.id &&
+    g2.history?.length === 1 && g2.history[0].status === "cancelled", JSON.stringify(g2));
   const declined = await call("POST", `/subscriptions/members/${g2.id}/decline`, { token: dt, body: { note: "Not this month." } });
   check("a reviewer can decline, with a note", declined.status === 200 && declined.body.subscription.status === "declined", say(declined));
   await pause(300);
@@ -250,13 +252,16 @@ const validOf = (response, code) => response.body?.subscriptions?.find((s) => s.
     (await call("PATCH", `/subscriptions/members/${request1.id}`, { token: dt, body: { days: 30 } })).status === 409);
 
   const history = (await call("GET", "/subscriptions/mine", { token: ut })).body.subscriptions;
-  check("every request stays in the subscriber's history", history.length === 4 &&
-    history.filter((h) => h.status === "cancelled").length === 3 && history.some((h) => h.status === "declined"),
-    JSON.stringify(history.map((h) => `${h.subscription.code}:${h.status}`)));
+  // A record per subscription; each time it was asked for again is an earlier period of it.
+  const periods = history.flatMap((h) => [...h.history.map((p) => p.status), h.status]);
+  check("every request stays in the subscriber's history, as periods of one record each", history.length === 2 &&
+    periods.length === 4 && periods.filter((s) => s === "cancelled").length === 3 && periods.includes("declined"),
+    JSON.stringify(history.map((h) => `${h.subscription.code}:${h.history.map((p) => p.status).join(">")}>${h.status}`)));
   const all = (await call("GET", "/subscriptions/members?search=unittest-user", { token: dt })).body;
-  check("and in the reviewer's list, searchable by email", all.pagination.total === 4 && all.members[0].endedBy !== undefined, JSON.stringify(all.pagination));
-  check("filtered by subscription",
-    (await call("GET", `/subscriptions/members?subscriptionId=${gold.id}`, { token: dt })).body.pagination.total === 3);
+  check("and in the reviewer's list, searchable by email", all.pagination.total === 2 && all.members[0].endedBy !== undefined, JSON.stringify(all.pagination));
+  const goldOnly = (await call("GET", `/subscriptions/members?subscriptionId=${gold.id}`, { token: dt })).body;
+  check("filtered by subscription: one record, its earlier periods in its history",
+    goldOnly.pagination.total === 1 && goldOnly.members[0].history.length === 2, JSON.stringify(goldOnly.pagination));
 
   console.log("\n== running out ==");
   const p2 = (await call("POST", `/subscriptions/${premium.id}/requests`, { token: ut })).body.subscription;
@@ -275,7 +280,9 @@ const validOf = (response, code) => response.body?.subscriptions?.find((s) => s.
 
   const p3 = await call("POST", `/subscriptions/${premium.id}/requests`, { token: ut });
   check("the person can ask again without waiting for the sweep", p3.status === 201, say(p3));
-  check("which marks the old one expired", (await UserSubscription.findByPk(p2.id)).status === "expired");
+  check("which carries the same record on, its run-out period kept in its history",
+    p3.body.subscription.id === p2.id && p3.body.subscription.history.at(-1)?.status === "expired" &&
+      (await UserSubscription.findByPk(p2.id)).status === "pending", JSON.stringify(p3.body.subscription));
 
   await call("POST", `/subscriptions/members/${p3.body.subscription.id}/approve`, { token: dt, body: { days: 30 } });
   await UserSubscription.update({ expiresAt: new Date(Date.now() - 60_000) }, { where: { id: p3.body.subscription.id } });

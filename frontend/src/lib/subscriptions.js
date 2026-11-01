@@ -79,6 +79,39 @@ export async function cancelSubscription(id, { reason } = {}) {
   return data.subscription;
 }
 
+/**
+ * Continue one that ended — run out, cancelled or declined — for a new
+ * period: `period` is `{ days }` or `{ lastDay }`; `devices` only when changed.
+ */
+export async function resumeSubscription(id, { period, devices }) {
+  const { data } = await api.post(`/subscriptions/members/${id}/resume`, { ...period, devices: devices || undefined });
+  return data.subscription;
+}
+
+/** Whether a subscription can be continued: it ended. */
+export const hasEnded = (m) => ["cancelled", "expired", "declined"].includes(m?.status);
+
+/** How the last period of a record ended, in a line: "Cancelled 12 Oct 2026 by them — “Too dear”". */
+export function endedLine(period, { userId } = {}) {
+  if (!period) return null;
+  const day = period.endedAt ? shortDay(period.endedAt) : period.lastDay ? longDate(period.lastDay) : null;
+  const why = period.reason ? ` — “${period.reason}”` : "";
+  switch (period.status) {
+    case "expired":
+      return `Ran until ${period.lastDay ? longDate(period.lastDay) : day}`;
+    case "declined":
+      return `Declined${day ? ` ${day}` : ""}${why}`;
+    case "cancelled":
+      return `${period.startsAt ? "Cancelled" : "Withdrawn"}${day ? ` ${day}` : ""}${period.endedById && period.endedById === userId ? " by them" : ""}${why}`;
+    default:
+      return period.status;
+  }
+}
+
+/** A moment as a day, "12 Oct 2026", in Dhaka. */
+const shortDay = (iso) =>
+  new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Dhaka" });
+
 /** Change a running subscription: `{ days }` or `{ lastDay }`, `{ devices }`, or both. */
 export async function amendSubscription(id, changes) {
   const { data } = await api.patch(`/subscriptions/members/${id}`, changes);
@@ -290,7 +323,7 @@ export function standing(mine) {
   if (!mine) return "Not subscribed";
   switch (mine.status) {
     case "pending":
-      return "Requested — waiting for approval";
+      return mine.history?.length ? "Asked to continue — waiting for approval" : "Requested — waiting for approval";
     case "active":
       return `Active until ${longDate(mine.lastDay)}`;
     case "declined":

@@ -552,7 +552,7 @@ const clickLabelled = (page, within, mention, label) =>
     const el = [...document.querySelectorAll(".sub-card")].find((c) => c.querySelector("h3")?.textContent === name);
     return el?.querySelector(".sub-standing")?.textContent.trim() === "Cancelled";
   }, NAME);
-  check("then it reads as cancelled, and can be asked for again", Boolean(ended) && (await card(passenger.page, NAME)).buttons.join() === "Subscribe again");
+  check("then it reads as cancelled, and can be asked for again", Boolean(ended) && (await card(passenger.page, NAME)).buttons.join() === "Ask to continue");
   check("and is in their earlier requests", /Your earlier requests/.test(await text(passenger.page)));
   check("and no device is valid for it any more", (await checkFrom(DEVICE_A)).entry?.valid === false);
 
