@@ -2886,6 +2886,109 @@ module.exports = {
       },
     },
 
+    "/audit/analysis": {
+      get: {
+        tags: ["Audit"],
+        summary: "The audit log analysed: events grouped and counted, over time, by weekday and hour",
+        description: [
+          "Picks events — operations or whole groups of them, people, outcome, days or the last so many minutes,",
+          "hours of the day, days of the week — and groups them by one or two fields, each counted: events,",
+          "people, internet addresses, failures. With the totals, the counts over time (by 5 minutes, hour, day",
+          "or week, as the span suits), a weekday × hour grid, the latest 50 events and, with compare=1 and two",
+          "to five people, each person's own totals, counts over time and grid. Times are Dhaka's.",
+          "",
+          "Fields: action, area, outcome, targetType, target, person, role, ip, browser, os, device, hour, weekday, day, week, month. Without the document store: available false.",
+        ].join("\n"),
+        ...secured("audit:view"),
+        parameters: [...[
+          queryParam("action", "Operations, such as auth.login — repeat, or comma-separate"),
+          queryParam("area", "Whole groups of operations, such as subscription"),
+          queryParam("person", "People by id; none is events with no one signed in"),
+          queryParam("outcome", "success or failure"),
+          queryParam("since", "First day, YYYY-MM-DD (30 days back by default)"),
+          queryParam("until", "Last day, YYYY-MM-DD (today by default)"),
+          queryParam("last", "Instead of days: the last so many minutes, 5 to 1440", "integer"),
+          queryParam("hours", "Hours of the day, such as 9-13, or 22-3 past midnight"),
+          queryParam("days", "Days of the week, 1 Sunday … 7 Saturday, comma-separated"),
+          queryParam("tests", "1 to count the automated test accounts too"),
+          queryParam("by", "One or two fields (action by default), such as person,hour"),
+          queryParam("w", "A filter, field:value — repeat it; field: alone means none"),
+        ], queryParam("compare", "1: each chosen person side by side (2 to 5)")],
+        responses: {
+          200: response(
+            "The analysis",
+            obj({
+              available: bool(),
+              totals: obj({ events: int(), people: int(), ips: int(), failures: int() }),
+              groups: arr(
+                obj({
+                  values: arr(str("A field's value, as a filter takes it; null for none")),
+                  labels: arr(str("The same, for people to read")),
+                  events: int(),
+                  people: int(),
+                  ips: int(),
+                  failures: int(),
+                  lastAt: { type: "string", format: "date-time" },
+                })
+              ),
+              truncated: bool("More than 500 groups: the rest left out"),
+              series: obj({ size: str("5min, hour, day or week"), points: arr({ type: "object" }) }),
+              heatmap: arr(obj({ weekday: int("1 Sunday … 7 Saturday"), name: str(), hours: arr(int()) })),
+              latest: arr(ref("AuditEvent")),
+              compare: { type: "array", nullable: true, items: { type: "object" } },
+              operations: arr(str()),
+              dimensions: arr(obj({ key: str(), group: str(), label: str() })),
+            })
+          ),
+          400: errors[400],
+          403: errors[403],
+        },
+      },
+    },
+
+    "/audit/analysis.csv": {
+      get: {
+        tags: ["Audit"],
+        summary: "The same groups as a spreadsheet",
+        ...secured("audit:view"),
+        parameters: [
+          queryParam("action", "Operations, such as auth.login — repeat, or comma-separate"),
+          queryParam("area", "Whole groups of operations, such as subscription"),
+          queryParam("person", "People by id; none is events with no one signed in"),
+          queryParam("outcome", "success or failure"),
+          queryParam("since", "First day, YYYY-MM-DD (30 days back by default)"),
+          queryParam("until", "Last day, YYYY-MM-DD (today by default)"),
+          queryParam("last", "Instead of days: the last so many minutes, 5 to 1440", "integer"),
+          queryParam("hours", "Hours of the day, such as 9-13, or 22-3 past midnight"),
+          queryParam("days", "Days of the week, 1 Sunday … 7 Saturday, comma-separated"),
+          queryParam("tests", "1 to count the automated test accounts too"),
+          queryParam("by", "One or two fields (action by default), such as person,hour"),
+          queryParam("w", "A filter, field:value — repeat it; field: alone means none"),
+        ],
+        responses: {
+          200: { description: "CSV", content: { "text/csv": { schema: { type: "string" } } } },
+          400: errors[400],
+          403: errors[403],
+        },
+      },
+    },
+
+    "/audit/people": {
+      get: {
+        tags: ["Audit"],
+        summary: "People in the audit log, by part of a name or email, the busiest first",
+        ...secured("audit:view"),
+        parameters: [queryParam("q", "Part of a name or email")],
+        responses: {
+          200: response(
+            "People",
+            obj({ people: arr(obj({ id: int(), label: str(), email: str(), events: int() })) })
+          ),
+          403: errors[403],
+        },
+      },
+    },
+
     /* ---------------- Wallet ---------------- */
 
     "/wallet": {

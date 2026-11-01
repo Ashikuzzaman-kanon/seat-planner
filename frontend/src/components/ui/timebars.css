@@ -1,0 +1,75 @@
+/* Counts over time, as bars (TimeBars). One hue; an empty bar is a hairline. */
+
+.tb {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+}
+.tb figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  font-weight: 650;
+}
+.tb figcaption small {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.8rem;
+}
+.tb-plot {
+  position: relative;
+  padding-top: 1.1rem;
+  border-bottom: 1px solid var(--border-strong);
+}
+.tb-max {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.tb-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 9rem;
+  border-top: 1px dashed var(--border);
+}
+.tb-bar {
+  flex: 1 1 0;
+  min-width: 2px;
+  height: var(--h);
+  padding: 0;
+  border: 0;
+  border-radius: 3px 3px 0 0;
+  background: var(--brand-500);
+  cursor: pointer;
+}
+.tb-bar:hover,
+.tb-bar:focus-visible {
+  background: var(--brand-700);
+  outline: none;
+}
+.tb-bar.is-empty {
+  height: 2px;
+  background: var(--border);
+}
+.tb-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* Small, beside others (side by side): no caption, a shorter plot. */
+.tb--compact .tb-plot {
+  padding-top: 0.9rem;
+}
+.tb--compact .tb-bars {
+  height: 4rem;
+  gap: 1px;
+}

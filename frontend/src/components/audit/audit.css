@@ -1,0 +1,400 @@
+/* The audit log analysed (AuditAnalysis), and its weekday × hour grid (Heatmap). */
+
+.audit-tabs.p-tabview .p-tabview-panels {
+  padding: 1rem 0 0;
+  background: transparent;
+}
+.audit-tabs.p-tabview .p-tabview-nav {
+  background: transparent;
+}
+
+.aa {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.aa-muted {
+  color: var(--muted);
+}
+.aa-warn {
+  color: var(--warn);
+}
+
+/* ---------------- What to count ---------------- */
+
+.aa-controls {
+  display: grid;
+  gap: 0.9rem;
+}
+.aa-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1.25rem;
+}
+.aa-field {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.aa-field > span:first-child {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.aa-field .p-dropdown {
+  width: 15rem;
+  max-width: 100%;
+}
+.aa-field--wide {
+  flex: 1 1 22rem;
+}
+.aa-field--wide .p-multiselect,
+.aa-field--wide .p-autocomplete,
+.aa-field--wide .p-autocomplete-multiple-container {
+  width: 100%;
+}
+.aa-hours {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.aa-hours .p-dropdown {
+  width: 9.5rem;
+}
+.aa-range.p-selectbutton,
+.aa-weekdays.p-selectbutton {
+  display: flex;
+  flex-wrap: wrap;
+}
+.aa-controls .p-selectbutton .p-button {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.88rem;
+}
+.aa-checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  padding-bottom: 0.55rem;
+}
+.aa-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.aa-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+}
+.aa-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 100%;
+  padding: 0.15rem 0.2rem 0.15rem 0.65rem;
+  border: 1px solid var(--brand-200);
+  border-radius: 999px;
+  background: var(--brand-50);
+  color: var(--ink-2);
+}
+.aa-chip strong {
+  color: var(--brand-800);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.aa-chip button {
+  display: inline-grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.aa-chip button:hover {
+  background: var(--brand-100);
+  color: var(--ink);
+}
+.aa-chip .pi {
+  font-size: 0.65rem;
+}
+
+/* ---------------- Counted ---------------- */
+
+.aa-totals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.aa-total {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  min-width: 0;
+}
+.aa-total > span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.aa-total strong {
+  color: var(--ink);
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.aa-total small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* Two to five people, side by side: the same small charts for each. */
+.aa-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 0.75rem;
+}
+.aa-person {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.aa-person h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+.aa-person__counts,
+.aa-person__peak {
+  margin: 0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------- Grouped ---------------- */
+
+.aa-groups {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.aa-groups__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.aa-groups__head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.aa-groups__head h2 small {
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+.aa-groups__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.aa-hint {
+  margin: 0;
+  font-size: 0.82rem;
+}
+.aa-table .aa-row-pick {
+  cursor: pointer;
+}
+.aa-table td {
+  font-variant-numeric: tabular-nums;
+}
+.aa-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.aa-count strong {
+  min-width: 2.5rem;
+  text-align: right;
+}
+.aa-share {
+  display: inline-block;
+  width: 5rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.aa-share > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand-500);
+}
+.aa-count small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.aa-failed {
+  color: var(--bad);
+  font-weight: 650;
+}
+.aa-menu .aa-menu__picked {
+  font-weight: 650;
+}
+.aa-menu .aa-menu__picked .p-menuitem-text {
+  color: var(--ink);
+}
+.aa-latest summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  margin-bottom: 0.25rem;
+  cursor: pointer;
+  font-weight: 650;
+}
+.aa-latest summary small {
+  font-weight: 400;
+}
+
+/* ---------------- Weekday × hour ---------------- */
+
+.hm {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  min-width: 0;
+}
+.hm figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  font-weight: 650;
+}
+.hm figcaption small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+.hm-scroll {
+  overflow-x: auto;
+}
+.hm-grid {
+  display: grid;
+  grid-template-columns: 2.4rem repeat(24, minmax(1.1rem, 1fr)) 3.2rem;
+  gap: 2px;
+  min-width: 36rem;
+  font-variant-numeric: tabular-nums;
+}
+.hm-row {
+  display: contents;
+}
+.hm-hour,
+.hm-colsum {
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-align: center;
+  white-space: nowrap;
+}
+.hm-hour {
+  text-align: left;
+}
+.hm-day {
+  align-self: center;
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.hm-cell {
+  height: 1.55rem;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+button.hm-cell {
+  cursor: pointer;
+}
+button.hm-cell:hover,
+button.hm-cell:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -1px;
+}
+.hm-total {
+  align-self: center;
+  color: var(--ink-2);
+  font-size: 0.75rem;
+  text-align: right;
+}
+.hm-row--totals .hm-total {
+  font-weight: 650;
+}
+.hm-legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.hm-legend span {
+  padding: 0 0.35rem;
+}
+.hm-legend i {
+  width: 1.1rem;
+  height: 0.7rem;
+  border-radius: 2px;
+}
+
+/* Small, beside others: no labels but the first, no totals. */
+.hm--compact .hm-grid {
+  grid-template-columns: 1.8rem repeat(24, minmax(0, 1fr));
+  gap: 1px;
+  min-width: 0;
+}
+.hm--compact .hm-cell {
+  height: 0.75rem;
+  border-radius: 2px;
+}
+.hm--compact .hm-day,
+.hm--compact .hm-hour {
+  font-size: 0.6rem;
+}
+
+@media (max-width: 720px) {
+  .aa-totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .aa-field,
+  .aa-field .p-dropdown {
+    width: 100%;
+  }
+  .aa-hours .p-dropdown {
+    width: 8rem;
+  }
+  .aa-share {
+    width: 3rem;
+  }
+}

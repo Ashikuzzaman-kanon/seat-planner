@@ -455,6 +455,32 @@ Taking an approved plan out of use, or changing its coach number, needs
 `plan:approve`. Each is in the audit log (`plan.template`, `plan.restore`,
 `plan.details`, `plan.replace`).
 
+### Audit log analysis
+
+*Audit Log → Analysis* (for whoever may read the log, `audit:view`) counts the
+log's events. Pick the events — operations or whole groups of them
+(`subscription.*`), people (or no one signed in), success or failure, the last
+hour or a span of days, hours of the day (`22:00–03:00` runs past midnight),
+days of the week, test accounts or not — and see:
+
+- the totals: events, people, internet addresses, failures;
+- the events over time (by 5 minutes, hour, day or week, as the span suits)
+  and a weekday × hour grid of when it is busiest, Saturday first — a bar or a
+  square narrows to itself;
+- the events grouped by one field and then another — operation, operation
+  group, outcome, target, person, role, internet address, browser, operating
+  system, device, hour, weekday, day, week, month — each group counted; a row
+  breaks down further or lists its events one by one; the groups download as
+  CSV;
+- with two to five people chosen, each side by side: their own totals, days and
+  grid.
+
+It can refresh itself every 30 seconds. Times are Dhaka's. Browser, system and
+device are read from each event's browser description inside the database, by
+the same rules as the public page's visits (`utils/userAgent.js`). It all runs
+as MongoDB aggregations (`services/auditAnalysisService.js`); every field and
+its expression are fixed there, and what a caller sends goes in only as values.
+
 ### Switching tabs off
 
 *Settings → Features* (super admin only) turns any tab of the app off — for
