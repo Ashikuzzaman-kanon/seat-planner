@@ -701,6 +701,7 @@ module.exports = {
         id: int(),
         coachNo: { ...str("The railway's coach letter — KA, KHA, GA… A train has one plan per coach"), nullable: true },
         status: { type: "string", enum: ["draft", "pending", "approved", "rejected"] },
+        isTemplate: bool("A template: a layout to start plans from, never used by trains or departures, never in conflict"),
         rejectionReason: { ...str(), nullable: true },
         trainNameId: { ...int(), nullable: true },
         coachTypeId: { ...int(), nullable: true },
@@ -3677,28 +3678,35 @@ module.exports = {
         tags: ["Seat plans"],
         summary: "Seat plans you may see",
         description:
-          "Holders of plan:create see every plan; everyone else only approved ones. An editable copy of an approved " +
-          "plan is listed too, with `revisionOfId`; `templates=1` leaves copies out.",
+          "Holders of plan:create see every plan; everyone else only approved ones, and never templates. An editable " +
+          "copy of an approved plan is listed too, with `revisionOfId`. `kind=templates` lists the templates instead " +
+          "of the plans; `templates=1` everything a new plan can start from — templates, approved plans, your own — " +
+          "without copies.",
         ...secured("plan:view"),
         parameters: [
           queryParam("status", "draft, pending, approved or rejected"),
           queryParam("search", "Part of a coach number"),
           queryParam("trainNameId", "One train's plans", "integer"),
           queryParam("mine", "1 for your own"),
-          queryParam("templates", "1 for plans to start a new one from"),
+          queryParam("kind", "plans (the default) or templates"),
+          queryParam("templates", "1 for what to start a new one from"),
         ],
         responses: { 200: response("Plans, without their layouts", obj({ plans: arr(ref("SeatPlan")) })) },
       },
       post: {
         tags: ["Seat plans"],
         summary: "Start a plan, as a draft",
-        description: "Anything may be left out of a draft. A train has one plan per coach number: a second is a 409.",
+        description:
+          "Anything may be left out of a draft. A train has one plan per coach number: a second is a 409 with " +
+          "code PLAN_COACH_TAKEN and, in details, the plan in the way and the trains whose coaches use it. A template " +
+          "(isTemplate) is never in conflict.",
         ...secured("plan:create"),
         requestBody: body(obj({
             coachNo: str("The railway's coach letter: KA, KHA, GA…"),
             trainNameId: { ...int(), nullable: true },
             coachTypeId: { ...int(), nullable: true },
             coachClassId: { ...int(), nullable: true },
+            isTemplate: bool("Save it as a template"),
             layout: { type: "object", description: "The seat grid: rows of cells" },
           })),
         responses: { 201: response("Created", obj({ plan: ref("SeatPlan") })), 400: errors[400], 409: errors[409] },
@@ -3737,6 +3745,77 @@ module.exports = {
         ...secured("plan:delete"),
         parameters: [pathParam("id", "Plan id")],
         responses: { 200: response("Deleted", obj({ message: str() })), 404: errors[404] },
+      },
+    },
+
+    "/plans/templates": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Move plans to templates — one or several",
+        description: [
+          "Each on its own: one refused does not stop the rest. Refused: a plan a train's coaches use, one with",
+          "changes waiting, an editable copy, and — without plan:approve — an approved one. A pending plan leaves",
+          "the approval queue. A template keeps its train and coach as labels, freeing them for a new plan.",
+        ].join("\n"),
+        ...secured("plan:update"),
+        requestBody: body(obj({ ids: arr(int()) })),
+        responses: {
+          200: response(
+            "What happened to each",
+            obj({ results: arr(obj({ id: int(), ok: bool(), label: str(), reason: str("Why it was refused") })) })
+          ),
+          400: errors[400],
+        },
+      },
+    },
+
+    "/plans/{id}/restore": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "A template back among the plans",
+        description: "Its train and coach must be free (409 PLAN_COACH_TAKEN otherwise). An approved one needs plan:approve.",
+        ...secured("plan:update"),
+        parameters: [pathParam("id", "Template id")],
+        responses: { 200: response("The plan", obj({ plan: ref("SeatPlan") })), 403: errors[403], 409: errors[409] },
+      },
+    },
+
+    "/plans/{id}/details": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Change a plan's train or coach number — to make room for another",
+        description:
+          "Trains and departures that use it keep it (they point at its id); changes waiting on it follow. An approved " +
+          "plan needs plan:approve.",
+        ...secured("plan:update"),
+        parameters: [pathParam("id", "Plan id")],
+        requestBody: body(obj({ coachNo: str(), trainNameId: { ...int(), nullable: true } })),
+        responses: { 200: response("The plan", obj({ plan: ref("SeatPlan") })), 403: errors[403], 409: errors[409] },
+      },
+    },
+
+    "/plans/{id}/replace": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Replace an approved plan's layout with a new one, through approval",
+        description: [
+          "The new layout becomes the plan's editable copy: once approved, it takes the plan's place under the",
+          "plan's own id, so every train and departure keeps it. The plan as it is now is kept as a template.",
+          "planId: a draft of the new one, already saved, to become the copy instead of a new one.",
+        ].join("\n"),
+        ...secured("plan:create"),
+        parameters: [pathParam("id", "The approved plan")],
+        requestBody: body(obj({
+          coachTypeId: { ...int(), nullable: true },
+          coachClassId: { ...int(), nullable: true },
+          layout: { type: "object" },
+          planId: { ...int(), nullable: true },
+        })),
+        responses: {
+          201: response("The copy, and the template kept", obj({ plan: ref("SeatPlan"), templateId: int() })),
+          400: errors[400],
+          409: errors[409],
+        },
       },
     },
 

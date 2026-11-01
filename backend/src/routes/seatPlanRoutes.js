@@ -9,6 +9,9 @@ const {
   createPlanRules,
   updatePlanRules,
   rejectRules,
+  templateRules,
+  detailsRules,
+  replaceRules,
 } = require("../validators/seatPlanValidators");
 const { PERMISSIONS } = require("../constants/permissions");
 
@@ -22,6 +25,15 @@ router.get("/:id", requirePermission(PERMISSIONS.PLAN_VIEW), idRule, validate, c
 router.post("/", requirePermission(PERMISSIONS.PLAN_CREATE), createPlanRules, validate, ctrl.createPlan);
 router.put("/:id", requirePermission(PERMISSIONS.PLAN_UPDATE), idRule, updatePlanRules, validate, ctrl.updatePlan);
 router.delete("/:id", requirePermission(PERMISSIONS.PLAN_DELETE), idRule, validate, ctrl.deletePlan);
+
+// Templates: plans moved there (one or several), and back again.
+router.post("/templates", requirePermission(PERMISSIONS.PLAN_UPDATE), templateRules, validate, ctrl.moveToTemplates);
+router.post("/:id/restore", requirePermission(PERMISSIONS.PLAN_UPDATE), idRule, validate, ctrl.restore);
+
+// When a new plan clashes with this one: change this one's train or coach,
+// or replace its layout (through approval, keeping the old as a template).
+router.post("/:id/details", requirePermission(PERMISSIONS.PLAN_UPDATE), idRule, detailsRules, validate, ctrl.changeDetails);
+router.post("/:id/replace", requirePermission(PERMISSIONS.PLAN_CREATE), idRule, replaceRules, validate, ctrl.replace);
 
 // Change an approved plan: open an editable copy of it (or the one already open).
 router.post("/:id/revise", requirePermission(PERMISSIONS.PLAN_UPDATE), idRule, validate, ctrl.revise);

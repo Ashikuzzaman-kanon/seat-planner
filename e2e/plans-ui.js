@@ -77,7 +77,7 @@ const planRow = (page, { click = false } = {}) =>
   page.evaluate(
     (train, coach, click) => {
       const row = [...document.querySelectorAll(".p-datatable tbody tr")].find((r) => {
-        const cells = [...r.querySelectorAll("td")].map((td) => td.innerText.trim());
+        const cells = [...r.querySelectorAll("td:not(.p-selection-column)")].map((td) => td.innerText.trim());
         return cells[0] === train && cells[1] === coach;
       });
       if (row && click) row.querySelector('button[aria-label^="Edit"], button[aria-label^="Open the changes"]').click();
@@ -104,7 +104,7 @@ const planRow = (page, { click = false } = {}) =>
   await planner.page.type('input[aria-label="Search seat plans"]', `${TRAIN.split(" (")[0]} ${COACH}`);
   const listed = await waitFor(planner.page, (args) => {
     const row = [...document.querySelectorAll(".p-datatable tbody tr")].find((r) => {
-      const cells = [...r.querySelectorAll("td")].map((td) => td.innerText.trim());
+      const cells = [...r.querySelectorAll("td:not(.p-selection-column)")].map((td) => td.innerText.trim());
       return cells[0] === args[0] && cells[1] === args[1];
     });
     return row ? row.innerText : null;
@@ -128,7 +128,7 @@ const planRow = (page, { click = false } = {}) =>
   check("the list shows one row, still approved, with changes in draft", /Approved/.test(row) && /Changes in draft/.test(row), row);
   check("the copy is not a second row",
     (await planner.page.$$eval(".p-datatable tbody tr", (rows, args) => rows.filter((r) => {
-      const cells = [...r.querySelectorAll("td")].map((td) => td.innerText.trim());
+      const cells = [...r.querySelectorAll("td:not(.p-selection-column)")].map((td) => td.innerText.trim());
       return cells[0] === args[0] && cells[1] === args[1];
     }).length, [TRAIN, COACH])) === 1);
 

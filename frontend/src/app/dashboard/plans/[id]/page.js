@@ -11,7 +11,7 @@ import { ProgressSpinner } from "primereact/progressspinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/constants/permissions";
 import { PLAN_STATUS, PLAN_STATUS_LABELS, PLAN_STATUS_SEVERITY } from "@/constants/planStatus";
-import { getPlan, idToEdit, REVISION_WORDS } from "@/lib/plans";
+import { getPlan, idToEdit, REVISION_WORDS, moveToTemplates, restorePlan } from "@/lib/plans";
 import SeatGrid from "@/components/plans/SeatGrid";
 
 export default function ViewPlanPage() {
@@ -73,6 +73,24 @@ export default function ViewPlanPage() {
     return <div className="card"><p>Plan not found.</p></div>;
   }
 
+  /** To templates, or back: what is refused says why. */
+  const toTemplates = async () => {
+    const [result] = await moveToTemplates([plan.id]);
+    if (result?.ok) {
+      toast.current?.show({ severity: "success", summary: "Moved to templates" });
+      load();
+    } else toast.current?.show({ severity: "warn", summary: "Not moved", detail: result?.reason, life: 8000 });
+  };
+  const toPlans = async () => {
+    try {
+      await restorePlan(plan.id);
+      toast.current?.show({ severity: "success", summary: "Back among the plans" });
+      load();
+    } catch (err) {
+      toast.current?.show({ severity: "warn", summary: "Not moved back", detail: err.message, life: 8000 });
+    }
+  };
+
   // An approved plan is edited too — through a copy, so it keeps working meanwhile.
   const edit = async () => {
     try {
@@ -101,21 +119,44 @@ export default function ViewPlanPage() {
         <div>
           <h1 className="page-title" style={{ marginBottom: 4 }}>
             {title}{" "}
-            <Tag value={PLAN_STATUS_LABELS[plan.status]} severity={PLAN_STATUS_SEVERITY[plan.status]} />
+            {plan.isTemplate ? (
+              <Tag value="Template" severity="info" icon="pi pi-inbox" />
+            ) : (
+              <Tag value={PLAN_STATUS_LABELS[plan.status]} severity={PLAN_STATUS_SEVERITY[plan.status]} />
+            )}
           </h1>
           <p className="page-subtitle">
             {[plan.coachType?.name, plan.coachClass?.name].filter(Boolean).join(" · ") ||
               "No coach type or class yet"}
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        {/* Several of them: they wrap, on a phone, rather than run off the edge. */}
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", flexShrink: 1, maxWidth: "100%" }}>
           <Button label="Back" icon="pi pi-arrow-left" outlined severity="secondary" onClick={() => router.push("/dashboard/plans")} />
           <Button label="Export PDF" icon="pi pi-file-pdf" loading={exporting} onClick={exportPdf} />
+          {plan.isTemplate && hasPermission(PERMISSIONS.PLAN_CREATE) && (
+            <Button label="Make a plan from it" icon="pi pi-copy" outlined onClick={() => router.push(`/dashboard/plans/new?from=${plan.id}`)} />
+          )}
+          {hasPermission(PERMISSIONS.PLAN_UPDATE) && !plan.revisionOfId && (
+            plan.isTemplate ? (
+              <Button label="Move back to plans" icon="pi pi-replay" outlined onClick={toPlans} />
+            ) : (
+              <Button label="Move to templates" icon="pi pi-inbox" outlined severity="secondary" onClick={toTemplates} />
+            )
+          )}
           {hasPermission(PERMISSIONS.PLAN_UPDATE) && (
             <Button label="Edit" icon="pi pi-pencil" onClick={edit} />
           )}
         </div>
       </div>
+
+      {plan.isTemplate && (
+        <Message
+          severity="info"
+          style={{ width: "100%" }}
+          text="A template: kept to start plans from. It is never used by trains or departures, and never in the way of a plan with the same train and coach."
+        />
+      )}
 
       {plan.revisionOfId && (
         <div className="plan-revision-note" role="note">

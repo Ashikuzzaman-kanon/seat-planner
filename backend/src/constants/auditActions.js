@@ -163,6 +163,12 @@ const AUDIT_ACTIONS = Object.freeze({
   // An app outside, signed in as a subscriber, asking for seat plans.
   SUBSCRIPTION_SEAT_PLANS: "subscription.seat_plans",
 
+  // Seat plans: templates, and what saving one that clashes with another can do.
+  PLAN_TEMPLATE: "plan.template",
+  PLAN_RESTORE: "plan.restore",
+  PLAN_DETAILS: "plan.details",
+  PLAN_REPLACE: "plan.replace",
+
   // A subscription's app: where it is got from, and notices about its versions.
   SUBSCRIPTION_APP_LINK: "subscription.app_link",
   SUBSCRIPTION_APP_NOTICE: "subscription.app_notice",
