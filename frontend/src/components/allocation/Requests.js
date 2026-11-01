@@ -11,7 +11,7 @@ import { TieredMenu } from "primereact/tieredmenu";
 import { Tag } from "primereact/tag";
 import DataTable from "@/components/ui/DataTable";
 import { fetchAllocationRequests, downloadAllocationRequests, when } from "@/lib/allocation";
-import RequestChart from "./RequestChart";
+import TimeBars from "@/components/ui/TimeBars";
 import PublicVisits, { journeyText, OUTCOMES } from "./PublicVisits";
 
 const DHAKA = "Asia/Dhaka";
@@ -304,7 +304,13 @@ export default function Requests({ active, onLoaded }) {
           </section>
 
           <section className="card">
-            <RequestChart series={data.series} measure={measure} onPick={pickBucket} />
+            <TimeBars
+              series={data.series}
+              valueKey="requests"
+              measure={measure}
+              detail={(p) => `${n(p.people)} people · ${n(p.visitors)} visitors`}
+              onPick={pickBucket}
+            />
           </section>
 
           <section className="card rq-groups">

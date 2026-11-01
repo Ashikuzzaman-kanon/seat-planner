@@ -112,7 +112,7 @@ const settled = (page, pattern) => waitFor(page, (p) => new RegExp(p, "i").test(
     /Found nothing/i.test(totals) && /in the app/.test(totals), totals.replace(/\n/g, " "));
   const byWhere = await su.evaluate(() => [...document.querySelectorAll(".rq-table tbody tr")].map((r) => r.innerText.replace(/\s+/g, " ")));
   check("grouped by public page or app to begin with", byWhere.some((r) => /^In the app/.test(r)), JSON.stringify(byWhere));
-  check("over the last 30 days, a bar a day", (await su.evaluate(() => document.querySelectorAll(".rq-chart__bar").length)) === 30);
+  check("over the last 30 days, a bar a day", (await su.evaluate(() => document.querySelectorAll(".tb-bar").length)) === 30);
   await su.screenshot({ path: path.join(OUT, "requests-1-tab.png"), fullPage: true });
 
   console.log("\n== grouped ==");
@@ -148,7 +148,7 @@ const settled = (page, pattern) => waitFor(page, (p) => new RegExp(p, "i").test(
 
   console.log("\n== a bar of the chart ==");
   await settled(su, "by from → to");
-  await su.evaluate(() => [...document.querySelectorAll(".rq-chart__bar")].at(-1).click());
+  await su.evaluate(() => [...document.querySelectorAll(".tb-bar")].at(-1).click());
   const day = await waitFor(su, () => [...document.querySelectorAll(".rq-chip")].map((c) => c.innerText.replace(/\s+/g, " ").trim()).find((c) => /^Day:/.test(c)));
   check("today's bar: only today", Boolean(day), JSON.stringify(await chips(su)));
 
