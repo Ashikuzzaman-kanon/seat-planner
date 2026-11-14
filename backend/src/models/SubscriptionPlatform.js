@@ -17,7 +17,12 @@ const sequelize = require("../config/database");
  */
 class SubscriptionPlatform extends Model {
   toPublicJSON() {
-    return { id: this.id, value: this.value, name: this.name, isActive: this.isActive };
+    return {
+      id: this.id,
+      value: this.value,
+      name: this.name,
+      isActive: this.isActive,
+    };
   }
 }
 
@@ -32,8 +37,9 @@ SubscriptionPlatform.init(
   { sequelize, modelName: "SubscriptionPlatform", tableName: "subscription_platforms" }
 );
 
-SubscriptionPlatform.associate = ({ UserDevice }) => {
+SubscriptionPlatform.associate = ({ UserDevice, SubscriptionVersionRule }) => {
   SubscriptionPlatform.hasMany(UserDevice, { foreignKey: "platformId", as: "devices" });
+  SubscriptionPlatform.hasMany(SubscriptionVersionRule, { foreignKey: "platformId", as: "versionRules" });
 };
 
 module.exports = SubscriptionPlatform;

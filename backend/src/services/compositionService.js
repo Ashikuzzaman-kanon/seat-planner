@@ -69,6 +69,11 @@ async function set(trainId, coachesInput) {
   if (plans.length !== planIds.length) {
     throw ApiError.badRequest("One or more coaches reference a seat plan that does not exist");
   }
+  const template = plans.find((p) => p.isTemplate);
+  if (template) {
+    const code = coaches.find((c) => c.seatPlanId === template.id)?.coachCode;
+    throw ApiError.badRequest(`Coach ${code} has a template — choose a plan: a template is never used by trains`);
+  }
 
   const before = await get(trainId);
 

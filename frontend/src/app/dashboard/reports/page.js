@@ -6,6 +6,7 @@ import { InputTextarea } from "primereact/inputtextarea";
 import { Dialog } from "primereact/dialog";
 import { Toast } from "primereact/toast";
 import { Tag } from "primereact/tag";
+import PersonLink from "@/components/people/PersonLink";
 import { Message } from "primereact/message";
 import { SelectButton } from "primereact/selectbutton";
 import { ConfirmDialog } from "primereact/confirmdialog";
@@ -144,10 +145,18 @@ export default function ReportsPage() {
             {held.map((h) => (
               <li key={h.id}>
                 <div>
-                  <strong>{h.user?.name || `User ${h.userId}`}</strong>
+                  <strong>
+                    <PersonLink id={h.user?.id || h.userId} name={h.user?.name || `User ${h.userId}`} />
+                  </strong>
                   <span>{h.detail}</span>
                   <small>
-                    {h.automatic ? "Placed automatically" : `Placed by ${h.placedBy || "staff"}`}
+                    {h.automatic ? (
+                      "Placed automatically"
+                    ) : (
+                      <>
+                        Placed by <PersonLink id={h.placedById} name={h.placedBy || "staff"} />
+                      </>
+                    )}
                     {h.scoreAtHold != null && ` · score ${h.scoreAtHold}`}
                   </small>
                 </div>
@@ -220,11 +229,11 @@ export default function ReportsPage() {
                 </div>
                 <div>
                   <dt>Account</dt>
-                  <dd>{r.reportedUser?.name || "—"}</dd>
+                  <dd>{r.reportedUser ? <PersonLink id={r.reportedUser.id} name={r.reportedUser.name} /> : "—"}</dd>
                 </div>
                 <div>
                   <dt>Reported by</dt>
-                  <dd>{r.reportedBy || "—"}</dd>
+                  <dd>{r.reportedBy ? <PersonLink id={r.reportedById} name={r.reportedBy} /> : "—"}</dd>
                 </div>
                 <div>
                   <dt>When</dt>
@@ -234,7 +243,10 @@ export default function ReportsPage() {
 
               {r.reviewNote && (
                 <p className="report__review">
-                  <strong>{r.reviewedBy || "Reviewer"}:</strong> {r.reviewNote}
+                  <strong>
+                    {r.reviewedBy ? <PersonLink id={r.reviewedById} name={r.reviewedBy} /> : "Reviewer"}:
+                  </strong>{" "}
+                  {r.reviewNote}
                 </p>
               )}
 

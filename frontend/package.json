@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --experimental-detect-module --test tests/"
   },
   "dependencies": {
     "axios": "^1.7.9",

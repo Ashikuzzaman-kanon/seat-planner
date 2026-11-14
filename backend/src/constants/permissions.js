@@ -69,6 +69,7 @@ const PERMISSIONS = Object.freeze({
   // Users
   USER_VIEW: "user:view",
   USER_MANAGE_ROLES: "user:manage_roles",
+  USER_RESTRICT: "user:restrict",
 
   // Roles & permissions
   ROLE_VIEW: "role:view",
@@ -93,9 +94,15 @@ const PERMISSIONS = Object.freeze({
   // Real railway data
   RAILWAY_MANAGE: "railway:manage",
 
+  // Seat allocation: the railway's own, as scanned (kept apart from booking data)
+  ALLOCATION_VIEW: "allocation:view",
+  ALLOCATION_MANAGE: "allocation:manage",
+  ALLOCATION_REQUESTS: "allocation:requests",
+
   // Subscriptions. Asking for one needs no permission — everyone signed in can.
   SUBSCRIPTION_MANAGE: "subscription:manage",
   SUBSCRIPTION_APPROVE: "subscription:approve",
+  SUBSCRIPTION_VERSIONS: "subscription:versions",
 });
 
 /**
@@ -374,6 +381,14 @@ const PERMISSION_CATALOGUE = Object.freeze([
       "Grant and revoke roles. Limited to roles whose permissions the grantor already holds.",
   },
   {
+    key: PERMISSIONS.USER_RESTRICT,
+    group: "Users",
+    label: "Restrict accounts",
+    description:
+      "Stop an account signing in at all, and lift that again — one at a time or several at once. " +
+      "Not your own account, not a super admin's, and not one that holds a permission you do not.",
+  },
+  {
     key: PERMISSIONS.ROLE_VIEW,
     group: "Roles & permissions",
     label: "View roles",
@@ -453,6 +468,32 @@ const PERMISSION_CATALOGUE = Object.freeze([
   },
 
   {
+    key: PERMISSIONS.ALLOCATION_VIEW,
+    group: "Seat allocation",
+    label: "See the railway's seat allocation",
+    description:
+      "See which station pairs Bangladesh Railway actually sets seats aside for, train by train and class " +
+      "by class, with the seat counts where they are known. A view of the railway's own data, kept apart " +
+      "from this site's trains and bookings.",
+  },
+  {
+    key: PERMISSIONS.ALLOCATION_MANAGE,
+    group: "Seat allocation",
+    label: "Upload and correct the seat allocation",
+    description:
+      "Upload the train routes, the census of which pairs have seats, and the sheet of seat counts — each " +
+      "shown before it is applied — and correct a pair by hand. Changes nothing the site books on.",
+  },
+  {
+    key: PERMISSIONS.ALLOCATION_REQUESTS,
+    group: "Seat allocation",
+    label: "See allocation requests",
+    description:
+      "Analyse who looks at the seat allocation — on the public page and in the app — and what they look for: " +
+      "grouped by person, train, station, place, device or time, with names and internet addresses.",
+  },
+
+  {
     key: PERMISSIONS.SUBSCRIPTION_MANAGE,
     group: "Subscriptions",
     label: "Manage subscriptions",
@@ -470,6 +511,15 @@ const PERMISSION_CATALOGUE = Object.freeze([
       "decline it, change when a running subscription ends or how many devices it allows, and cancel " +
       "anyone's subscription. Also see the devices on a subscriber's account and why any were turned " +
       "away, and note, block or remove a device.",
+  },
+  {
+    key: PERMISSIONS.SUBSCRIPTION_VERSIONS,
+    group: "Subscriptions",
+    label: "Manage apps",
+    description:
+      "Look after each subscription's app: which versions of it each platform accepts (whether one must be " +
+      "sent, the oldest allowed, single versions turned away), the link subscribers get it from, and notices " +
+      "to subscribers about a new version or one going away.",
   },
 ]);
 

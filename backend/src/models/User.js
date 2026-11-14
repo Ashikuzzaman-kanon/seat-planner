@@ -44,6 +44,8 @@ class User extends Model {
       hasTravelProfile: this.hasTravelProfile,
       // Present only when the caller eager-loaded roles.
       roles: this.roles?.map((r) => ({ id: r.id, name: r.name })),
+      restrictedAt: this.restrictedAt || null,
+      lastSignInAt: this.lastSignInAt || null,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
@@ -105,6 +107,16 @@ User.init(
     failedSignIns: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
     lastFailedSignInAt: { type: DataTypes.DATE, allowNull: true },
     lockedUntil: { type: DataTypes.DATE, allowNull: true },
+
+    /** When the account last signed in with its password (not a token refresh). */
+    lastSignInAt: { type: DataTypes.DATE, allowNull: true },
+
+    /**
+     * Set while the account is restricted: it cannot sign in, and every
+     * request it makes is refused (middleware/auth). The flag is what is read
+     * on every request; AccountRestriction holds who decided, when and why.
+     */
+    restrictedAt: { type: DataTypes.DATE, allowNull: true },
   },
   {
     sequelize,
@@ -113,7 +125,7 @@ User.init(
   }
 );
 
-User.associate = ({ Role, UserRole, RefreshToken }) => {
+User.associate = ({ Role, UserRole, RefreshToken, AccountRestriction }) => {
   User.belongsToMany(Role, {
     through: UserRole,
     foreignKey: "userId",
@@ -122,6 +134,7 @@ User.associate = ({ Role, UserRole, RefreshToken }) => {
   });
 
   User.hasMany(RefreshToken, { foreignKey: "userId", as: "refreshTokens" });
+  User.hasMany(AccountRestriction, { foreignKey: "userId", as: "restrictions" });
 };
 
 module.exports = User;

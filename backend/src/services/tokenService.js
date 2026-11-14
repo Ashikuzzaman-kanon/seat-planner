@@ -85,12 +85,17 @@ async function revokeRefreshToken(rawToken) {
   return true;
 }
 
-/** Revoke every live session for a user — used when access is withdrawn. */
+/**
+ * Revoke every live session for a user — used when access is withdrawn: a new
+ * password, a restriction. That includes the sign-ins their apps hold
+ * (appTokenService), so an app that knew the old password is out too.
+ */
 async function revokeAllForUser(userId) {
   const [count] = await RefreshToken.update(
     { revokedAt: new Date() },
     { where: { userId, revokedAt: null, expiresAt: { [Op.gt]: new Date() } } }
   );
+  await require("./appTokenService").revokeAllForUser(userId);
   return count;
 }
 

@@ -1,5 +1,6 @@
 const { PERMISSION_CATALOGUE } = require("../constants/permissions");
 const { AUDIT_ACTIONS } = require("../constants/auditActions");
+const { FEATURE_KEYS, SWITCH_STATES } = require("../constants/features");
 
 /**
  * The API contract, served at `GET /api/v1/openapi.json`.
@@ -24,7 +25,11 @@ const response = (description, schema) => ({
 const errors = {
   400: response("Validation failed", ref("Error")),
   401: response("Missing, invalid or expired credentials", ref("Error")),
-  403: response("Authenticated, but lacking the required permission", ref("Error")),
+  403: response(
+    "Authenticated, but lacking the required permission — or the feature is switched off for the caller " +
+      "(code FEATURE_UNAVAILABLE)",
+    ref("Error")
+  ),
   404: response("Not found", ref("Error")),
   409: response("Conflicts with existing data", ref("Error")),
 };
@@ -82,6 +87,12 @@ module.exports = {
       "re-resolved on every request, so revoking a role takes effect almost",
       "immediately. Clients exchange a refresh token for a new pair when the",
       "access token expires; the presented refresh token is rotated out.",
+      "",
+      "Feature switches: the super admin can turn any tab of the app off, for everyone or for chosen",
+      "users and roles (the super admin included). The API then refuses the calls only that tab makes,",
+      "with 403 and code FEATURE_UNAVAILABLE; a call another tab still needs keeps working. A session",
+      "and /auth/me list the caller's switched-off features in unavailableFeatures. Settings has no",
+      "switch, and the outside APIs (the subscription check and seat plans) are never switched.",
     ].join("\n"),
   },
 
@@ -95,6 +106,19 @@ module.exports = {
     { name: "Roles", description: "Runtime-created roles and the permission catalogue" },
     { name: "Users", description: "User directory and role assignment" },
     { name: "Settings", description: "Runtime-configurable values" },
+    { name: "Features", description: "Switching tabs of the app off, for everyone or for chosen users and roles" },
+    {
+      name: "Public seat allocation",
+      description:
+        "Seat Allocation for everyone, without signing in (/seat-allocation): read-only, rate-limited, with a bot " +
+        "check and a number of free searches a day. Switched on in Settings.",
+    },
+    {
+      name: "Seat allocation",
+      description:
+        "Which station pairs the railway actually sets seats aside for, per train and class — the railway's own " +
+        "data, uploaded from a census of its booking site and kept apart from the site's trains and bookings",
+    },
     { name: "Audit", description: "Record of privileged actions" },
     { name: "Network", description: "Stations, trains, routes, fares and seat attributes" },
     { name: "Departures", description: "Composition, schedules, and the trips generated from them" },
@@ -106,6 +130,7 @@ module.exports = {
     { name: "After the sale", description: "Returning a ticket, moving it to another passenger, and the decisions a person has to make" },
     { name: "Background jobs", description: "Work done after the request that asked for it — mass refunds and the messages about them" },
     { name: "Demo data", description: "Filling the system with demonstration data, and removing exactly that again" },
+    { name: "Seat plans", description: "Coach seat layouts, their approval, and changing one that is already approved" },
     { name: "Railway data", description: "Loading Bangladesh Railway's timetable and the seat plans transcribed for it" },
     { name: "Notifications", description: "Each person's in-app inbox: what happened, and what is waiting on them" },
     {
@@ -118,12 +143,94 @@ module.exports = {
   components: {
     securitySchemes: {
       bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+      appToken: {
+        type: "http",
+        scheme: "bearer",
+        description:
+          "A subscriber's app's sign-in token, from an earlier POST /subscriptions/check with the password: " +
+          "`spa_…`. In place of the email and password, on the check and on seat plans.",
+      },
     },
 
     schemas: {
       Error: obj({
         message: str("Human-readable explanation"),
+        code: str("Set on some refusals: FEATURE_UNAVAILABLE when the feature is switched off for the caller"),
+        details: {
+          description:
+            "Validation: the fields at fault. FEATURE_UNAVAILABLE: { features, note } — the features the call " +
+            "serves, and the message the super admin left",
+        },
         errors: arr(obj({ field: str(), message: str() })),
+      }),
+
+      AllocationClass: obj({
+        code: str("The railway's class code, such as S_CHAIR"),
+        seats: { ...int("Seats set aside. null while the count is not known — not the same as 0"), nullable: true },
+        seatsUpdatedAt: {
+          type: "string",
+          format: "date-time",
+          nullable: true,
+          description: "When the count was last set or cleared (by the counts sheet or by hand) — not when a census kept the class",
+        },
+      }),
+
+      AllocationUpload: obj({
+        id: int(),
+        kind: { type: "string", enum: ["stops", "census", "counts"] },
+        fileName: { ...str(), nullable: true },
+        summary: { type: "object", description: "What it did: added, changed, set, cleared, left out…" },
+        scannedFrom: { type: "string", format: "date-time", nullable: true, description: "A census: the earliest scan in it" },
+        scannedTo: { type: "string", format: "date-time", nullable: true, description: "A census: the latest scan in it" },
+        uploadedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        uploadedAt: { type: "string", format: "date-time" },
+      }),
+
+      AllocationPair: obj({
+        train: obj({ number: int(), name: str() }),
+        from: str("Station, named as the railway names it"),
+        to: str(),
+        status: { type: "string", enum: ["allocated", "not_allocated", "not_checked"] },
+        checkedAt: { type: "string", format: "date-time", nullable: true },
+        source: { type: "string", enum: ["census", "manual"], nullable: true },
+        onRoute: { ...bool("Both stations on the train's uploaded route, in that order; null with no route"), nullable: true },
+        classes: arr(ref("AllocationClass")),
+      }),
+
+      AllocationSummary: obj({
+        trains: int(),
+        pairs: int(),
+        stations: int(),
+        allocated: int(),
+        notAllocated: int(),
+        notChecked: int(),
+        checkedFrom: { type: "string", format: "date-time", nullable: true, description: "The oldest railway check among the pairs matched" },
+        checkedTo: { type: "string", format: "date-time", nullable: true, description: "The newest" },
+        countsFrom: { type: "string", format: "date-time", nullable: true, description: "When the oldest seat count shown was set" },
+        countsTo: { type: "string", format: "date-time", nullable: true, description: "When the newest was set" },
+        classes: arr(obj({ code: str(), pairs: int(), counted: int("Pairs with a count known"), seats: int("Their total") })),
+      }),
+
+      UnavailableFeature: obj({
+        key: { ...str("Feature key"), enum: FEATURE_KEYS },
+        message: { ...str("The message left for the people it is off for"), nullable: true },
+      }),
+
+      FeatureSwitch: obj({
+        key: { ...str(), enum: FEATURE_KEYS },
+        label: str("The tab's name"),
+        group: str("The menu group"),
+        path: str("The tab's address in the web app"),
+        state: {
+          type: "string",
+          enum: Object.values(SWITCH_STATES),
+          description: "off_some: off for the users and roles listed",
+        },
+        message: { ...str(), nullable: true },
+        users: arr(obj({ id: int(), fullName: str(), email: str() })),
+        roles: arr(obj({ id: int(), name: str() })),
+        updatedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        updatedAt: { type: "string", format: "date-time", nullable: true },
       }),
 
       Permission: obj({
@@ -148,9 +255,51 @@ module.exports = {
         fullName: str(),
         email: { type: "string", format: "email" },
         isVerified: bool(),
+        restrictedAt: { type: "string", format: "date-time", nullable: true, description: "Set while the account is restricted" },
+        lastSignInAt: { type: "string", format: "date-time", nullable: true, description: "Its last password sign-in or email verification" },
         roles: arr(obj({ id: int(), name: str() })),
         createdAt: { type: "string", format: "date-time" },
         updatedAt: { type: "string", format: "date-time" },
+      }),
+
+      AccountRestriction: obj({
+        id: int(),
+        userId: int(),
+        reason: str("Why it was restricted. Staff only; the account itself is never told it"),
+        restrictedAt: { type: "string", format: "date-time" },
+        restrictedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        liftedAt: { type: "string", format: "date-time", nullable: true },
+        liftedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        liftNote: { ...str(), nullable: true },
+        inForce: bool("Not yet lifted"),
+      }),
+
+      Profile: obj({
+        id: int(),
+        fullName: str(),
+        roles: arr(str("Role name")),
+        isSelf: bool(),
+        limited: bool("True when only the name and roles are sent: the caller is neither the account nor holds user:view"),
+        email: { type: "string", format: "email", description: "From here down, only when not limited" },
+        dateOfBirth: { type: "string", format: "date", nullable: true },
+        nidLast4: { ...str("The last four characters of the national ID; the rest is never sent"), nullable: true },
+        memberSince: { type: "string", format: "date-time" },
+        lastSignInAt: { type: "string", format: "date-time", nullable: true },
+        isVerified: bool(),
+        restriction: { ...ref("AccountRestriction"), nullable: true },
+        signInPausedUntil: { type: "string", format: "date-time", nullable: true },
+        buyingHold: { ...obj({ since: { type: "string", format: "date-time" }, detail: str() }), nullable: true },
+        restrictions: { ...arr(ref("AccountRestriction")), description: "Every restriction, newest first. Only to user:view holders" },
+        can: obj({
+          restrict: bool("The caller may restrict this account now"),
+          lift: bool("The caller may lift its restriction now"),
+          editRoles: bool(),
+        }),
+      }),
+
+      BulkOutcome: obj({
+        results: arr(obj({ userId: int(), done: bool(), error: str("Why this one was left alone") })),
+        done: int("How many were changed"),
       }),
 
       Session: obj({
@@ -159,6 +308,8 @@ module.exports = {
         user: ref("User"),
         roles: arr(obj({ id: int(), name: str() })),
         permissions: arr(str("Effective permission keys")),
+        unavailableFeatures: arr(ref("UnavailableFeature")),
+        publicFeatures: arr(str("Features open to the public, and so to everyone signed in: seat-allocation")),
       }),
 
       Setting: obj({
@@ -538,7 +689,36 @@ module.exports = {
         name: str(),
         description: { ...str(), nullable: true },
         isOpen: bool("Whether it takes new requests. Closing leaves running subscriptions alone"),
+        includesSeatPlans: bool("Whether its subscribers' apps may fetch seat plans (POST /subscriptions/seat-plans)"),
+        appUrl: {
+          ...str("Where its app is got from — an https address. In the list, sent only to staff and to whoever is subscribed now"),
+          nullable: true,
+        },
         createdAt: { type: "string", format: "date-time" },
+      }),
+
+      SeatPlan: obj({
+        id: int(),
+        coachNo: { ...str("The railway's coach letter — KA, KHA, GA… A train has one plan per coach"), nullable: true },
+        status: { type: "string", enum: ["draft", "pending", "approved", "rejected"] },
+        isTemplate: bool("A template: a layout to start plans from, never used by trains or departures, never in conflict"),
+        rejectionReason: { ...str(), nullable: true },
+        trainNameId: { ...int(), nullable: true },
+        coachTypeId: { ...int(), nullable: true },
+        coachClassId: { ...int("A class named with the railway's code: S_CHAIR, SNIGDHA, AC_B…"), nullable: true },
+        trainName: { ...obj({ id: int(), name: str() }), nullable: true },
+        coachType: { ...obj({ id: int(), name: str() }), nullable: true },
+        coachClass: { ...obj({ id: int(), name: str() }), nullable: true },
+        layout: { type: "object", description: "The seat grid. Left out of lists" },
+        approvedAt: { type: "string", format: "date-time", nullable: true },
+        revisionOfId: { ...int("Set on an editable copy of an approved plan: the plan it changes"), nullable: true },
+        revision: {
+          ...obj({ id: int(), status: str(), rejectionReason: { ...str(), nullable: true } }),
+          nullable: true,
+          description: "On an approved plan: its editable copy, while one is open",
+        },
+        createdAt: { type: "string", format: "date-time" },
+        updatedAt: { type: "string", format: "date-time" },
       }),
 
       UserSubscription: obj({
@@ -559,6 +739,18 @@ module.exports = {
         lastDay: { ...str("The last calendar day it is valid, in Dhaka (YYYY-MM-DD)"), nullable: true },
         endedAt: { type: "string", format: "date-time", nullable: true },
         endReason: { ...str(), nullable: true },
+        history: arr(
+          obj({
+            status: str("How that period ended: expired, cancelled or declined"),
+            requestedAt: { type: "string", format: "date-time" },
+            startsAt: { type: "string", format: "date-time", nullable: true },
+            lastDay: { ...str(), nullable: true },
+            endedAt: { type: "string", format: "date-time", nullable: true },
+            endedById: { ...int("Who ended it; the subscriber themselves when it is their own id"), nullable: true },
+            reason: { ...str("The reason given, or the note it was declined with"), nullable: true },
+          })
+        ),
+        lastLength: { ...int("Days its last period ran, or was to run: what continuing it suggests"), nullable: true },
         devices: arr(
           obj({
             platformId: int(),
@@ -586,6 +778,27 @@ module.exports = {
         isActive: bool("Switched off, nobody can ask for devices on it and no check from it is valid"),
       }),
 
+      AppNotice: obj({
+        id: int(),
+        subscriptionId: int(),
+        platformId: int(),
+        kind: { type: "string", enum: ["released", "retiring"] },
+        version: str(),
+        message: str(),
+        emailed: bool(),
+        recipients: int("How many it went to"),
+        sentAt: { type: "string", format: "date-time" },
+        sentBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+      }),
+
+      BlockedVersion: obj({
+        id: int(),
+        version: str("Clean: v1.04 is stored as 1.4"),
+        note: { ...str(), nullable: true },
+        createdAt: { type: "string", format: "date-time" },
+        createdBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+      }),
+
       UserDevice: obj({
         id: int(),
         userId: int(),
@@ -597,6 +810,7 @@ module.exports = {
         firstSeenAt: { type: "string", format: "date-time" },
         lastSeenAt: { type: "string", format: "date-time" },
         checks: int("How many times it has checked in"),
+        appVersion: { ...str("The app version it last checked in with"), nullable: true },
       }),
 
       DeviceUsage: obj({
@@ -634,7 +848,9 @@ module.exports = {
           fetchedAt: str("When the committed snapshot was taken"),
           trains: int(),
           stations: int(),
-          plans: int("Transcribed layouts"),
+          plans: int("Plans a load makes: one per coach of every line-up, plus the drafts"),
+          coachPlans: int("Coaches the line-ups put on trains, each with a plan of its own"),
+          layouts: int("Transcribed layouts the plans are built from"),
           draftPlans: int("Layouts whose source names no train, saved as drafts"),
           readyTrains: int("Trains a seat-plan source names, made ready for departures"),
         }),
@@ -669,6 +885,70 @@ module.exports = {
         ),
         job: { ...ref("Job"), nullable: true, description: "A load still running" },
         lastJob: { ...ref("Job"), nullable: true, description: "The last load that finished, with its report" },
+        sync: obj({
+          pending: { ...ref("RailwayTimetable"), nullable: true, description: "A check waiting to be applied" },
+          lastApplied: { ...ref("RailwayTimetable"), nullable: true, description: "The timetable the server works from now" },
+          job: { ...ref("Job"), nullable: true, description: "A check or apply still running" },
+          lastJob: { ...ref("Job"), nullable: true, description: "The last check or apply that finished" },
+        }),
+      }),
+
+      RailwayTimetable: obj({
+        id: int(),
+        status: { type: "string", enum: ["checked", "applied"] },
+        requestedFor: { type: "string", format: "date", description: "The day the railway was asked for" },
+        fetchedAt: { type: "string", format: "date-time" },
+        unpublished: arr(int("Train numbers the railway said it has no timetable for")),
+        failed: arr(obj({ number: int(), error: str() })),
+        diff: obj({
+          counts: obj({
+            published: int(),
+            newStations: int(),
+            newTrains: int(),
+            renamed: int(),
+            times: int(),
+            stations: int(),
+            days: int(),
+            unpublished: int(),
+            failed: int(),
+            unchanged: int(),
+          }),
+          upToDate: bool("Nothing to apply"),
+          newStations: arr(str()),
+          newTrains: arr(obj({ number: int(), name: str(), stops: int(), from: str(), to: str(), runsOn: arr(int()) })),
+          renamed: arr(obj({ trainId: int(), number: int(), from: str(), to: str() })),
+          times: arr(obj({ trainId: int(), number: int(), name: str(), stops: arr(obj({ station: str(), from: obj({}), to: obj({}) })) })),
+          stations: arr(
+            obj({
+              trainId: int(),
+              number: int(),
+              name: str(),
+              added: arr(str()),
+              removed: arr(str()),
+              reordered: bool(),
+              newRoute: bool(),
+              upcoming: int("Departures still to run"),
+              willApply: bool("False while departures are still to run: the route is left and named"),
+            })
+          ),
+          days: arr(
+            obj({
+              trainId: int(),
+              number: int(),
+              name: str(),
+              from: arr(int()),
+              to: arr(int()),
+              willApply: bool("False when its running days were set by hand"),
+              stranded: arr(str("Departures already generated on a day it will no longer run")),
+            })
+          ),
+          unpublished: arr(obj({ trainId: int(), number: int(), name: str() })),
+          failed: arr(int()),
+        }),
+        report: { type: "object", nullable: true, description: "What applying did, skipped and why — once applied" },
+        checkedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        appliedBy: { ...obj({ id: int(), fullName: str() }), nullable: true },
+        appliedAt: { type: "string", format: "date-time", nullable: true },
       }),
 
       AccountHold: obj({
@@ -1196,6 +1476,8 @@ module.exports = {
               user: ref("User"),
               roles: arr(obj({ id: int(), name: str() })),
               permissions: arr(str()),
+              unavailableFeatures: arr(ref("UnavailableFeature")),
+              publicFeatures: arr(str()),
             })
           ),
           401: errors[401],
@@ -1290,6 +1572,7 @@ module.exports = {
           queryParam("limit", "Page size, max 100", "integer"),
           queryParam("search", "Matches name or email"),
           queryParam("roleId", "Only users holding this role", "integer"),
+          { ...queryParam("status", "restricted, or active for every account that is not"), schema: { type: "string", enum: ["restricted", "active"] } },
         ],
         responses: {
           200: response(
@@ -1297,6 +1580,83 @@ module.exports = {
             obj({ users: arr(ref("User")), pagination: ref("Pagination") })
           ),
           403: errors[403],
+        },
+      },
+    },
+
+    "/users/restrict": {
+      post: {
+        tags: ["Users"],
+        summary: "Restrict several accounts at once",
+        description:
+          "Each is restricted as if one at a time, under the same guards; one refused does not stop the rest. " +
+          "The answer says which were done and why the others were not.",
+        ...secured("user:restrict"),
+        requestBody: body(obj({ userIds: arr(int()), reason: str() }, ["userIds", "reason"])),
+        responses: { 200: response("What happened to each", ref("BulkOutcome")), 400: errors[400], 403: errors[403] },
+      },
+    },
+
+    "/users/lift-restriction": {
+      post: {
+        tags: ["Users"],
+        summary: "Lift the restriction on several accounts at once",
+        ...secured("user:restrict"),
+        requestBody: body(obj({ userIds: arr(int()), note: str("Optional") }, ["userIds"])),
+        responses: { 200: response("What happened to each", ref("BulkOutcome")), 400: errors[400], 403: errors[403] },
+      },
+    },
+
+    "/users/{id}/profile": {
+      get: {
+        tags: ["Users"],
+        summary: "Someone's profile — what the caller may see of it",
+        description:
+          "Anyone signed in gets the name and roles. The account itself, and whoever holds user:view, gets the " +
+          "rest: email, date of birth, the national ID's last four, when they joined and last signed in, and " +
+          "whether anything stops them. Only user:view holders get the restriction history.",
+        security: [{ bearerAuth: [] }],
+        parameters: [pathParam("id", "User id")],
+        responses: { 200: response("The profile", obj({ profile: ref("Profile") })), 401: errors[401], 404: errors[404] },
+      },
+    },
+
+    "/users/{id}/restrict": {
+      post: {
+        tags: ["Users"],
+        summary: "Restrict an account until someone lifts it",
+        description: [
+          "It is signed out everywhere at once and cannot sign in, refresh a session, verify its email or pass",
+          "the subscription check until the restriction is lifted. Guards: nobody restricts their own account,",
+          "a super admin's account cannot be restricted, and an account holding a permission the caller lacks",
+          "(beyond what every new account gets) can only be restricted by someone who holds it too.",
+        ].join(" "),
+        ...secured("user:restrict"),
+        parameters: [pathParam("id", "User id")],
+        requestBody: body(obj({ reason: str("Up to 500 characters") }, ["reason"])),
+        responses: {
+          201: response("Restricted", obj({ restriction: ref("AccountRestriction") })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+          409: response("Already restricted", ref("Error")),
+        },
+      },
+    },
+
+    "/users/{id}/lift-restriction": {
+      post: {
+        tags: ["Users"],
+        summary: "Lift an account's restriction",
+        description: "Under the same guards as restricting. It can sign in again straight away.",
+        ...secured("user:restrict"),
+        parameters: [pathParam("id", "User id")],
+        requestBody: body(obj({ note: str("Optional, up to 500 characters") }), false),
+        responses: {
+          200: response("Lifted", obj({ lifted: bool() })),
+          403: errors[403],
+          404: errors[404],
+          409: response("Not restricted", ref("Error")),
         },
       },
     },
@@ -1356,6 +1716,423 @@ module.exports = {
           400: errors[400],
           403: errors[403],
         },
+      },
+    },
+
+    "/features": {
+      get: {
+        tags: ["Features"],
+        summary: "Every feature with its switch, and the roles one can be switched off for",
+        description: "Super admin only. A feature with no switch stored is on.",
+        security: [{ bearerAuth: [] }],
+        "x-required-permissions": [],
+        "x-super-admin-only": true,
+        responses: {
+          200: response(
+            "Features",
+            obj({ features: arr(ref("FeatureSwitch")), roles: arr(obj({ id: int(), name: str() })) })
+          ),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/features/people": {
+      get: {
+        tags: ["Features"],
+        summary: "People to switch a feature off for, by name or email (at most 20)",
+        security: [{ bearerAuth: [] }],
+        "x-required-permissions": [],
+        "x-super-admin-only": true,
+        parameters: [queryParam("search", "Part of a name or email")],
+        responses: {
+          200: response("People", obj({ people: arr(obj({ id: int(), fullName: str(), email: str() })) })),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/features/{key}": {
+      put: {
+        tags: ["Features"],
+        summary: "Switch a feature on, off for everyone, or off for chosen users and roles",
+        description: [
+          "Super admin only, and it applies to the super admin too. off_some needs at least one user or role.",
+          "The message is shown to the people it is off for, and cleared when it is switched on. Audited.",
+        ].join("\n"),
+        security: [{ bearerAuth: [] }],
+        "x-required-permissions": [],
+        "x-super-admin-only": true,
+        parameters: [pathParam("key", `One of: ${FEATURE_KEYS.join(", ")}`, "string")],
+        requestBody: body(
+          obj(
+            {
+              state: { type: "string", enum: Object.values(SWITCH_STATES) },
+              message: { ...str("At most 300 characters"), nullable: true },
+              userIds: arr(int()),
+              roleIds: arr(int()),
+            },
+            ["state"]
+          )
+        ),
+        responses: {
+          200: response("Switched", obj({ message: str(), feature: ref("FeatureSwitch") })),
+          400: errors[400],
+          403: errors[403],
+          404: response("No feature by that name (Settings has none)", ref("Error")),
+        },
+      },
+    },
+
+    "/allocation/meta": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "What there is to filter by, and how much data there is",
+        ...secured("allocation:view"),
+        responses: {
+          200: response(
+            "Trains, stations and classes, with totals",
+            obj({
+              trains: arr(obj({ number: int(), name: str(), hasStops: bool() })),
+              stations: arr(str()),
+              classes: arr(str()),
+              totals: obj({
+                trains: int(),
+                trainsWithStops: int(),
+                pairs: int(),
+                allocated: int(),
+                notAllocated: int(),
+                classes: int(),
+                counted: int(),
+              }),
+              updatedAt: { type: "string", format: "date-time", nullable: true },
+              latest: obj({
+                stops: {
+                  type: "object",
+                  nullable: true,
+                  description: "The routes: { at, by, fileName, summary } — by and fileName null for data applied before uploads were recorded",
+                },
+                census: {
+                  type: "object",
+                  nullable: true,
+                  description: "The census: as stops, plus scannedFrom and scannedTo, when the railway was checked",
+                },
+                counts: { type: "object", nullable: true, description: "The last count set: { at, by }, by the counts sheet or by hand" },
+              }),
+            })
+          ),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/public/allocation/status": {
+      get: {
+        tags: ["Public seat allocation"],
+        summary: "Whether the public page is open, and the bot check's site key",
+        security: [],
+        responses: { 200: response("Status", obj({ enabled: bool(), botCheck: { ...obj({ siteKey: str() }), nullable: true } })) },
+      },
+    },
+
+    "/public/allocation/meta": {
+      get: {
+        tags: ["Public seat allocation"],
+        summary: "The filters, and how current the data is — no sign-in",
+        description: [
+          "Headers: x-sp-visitor (a random id the browser keeps), x-sp-referrer (the page the visitor came from).",
+          "Reached through the web app's server, which adds the visitor's address and, with PUBLIC_EDGE_SECRET set,",
+          "a secret; without the secret such requests are refused (REFUSED). Recorded in public_visits and the audit log.",
+        ].join("\n"),
+        security: [],
+        responses: {
+          200: response(
+            "Filters and freshness",
+            obj({
+              trains: arr(obj({ number: int(), name: str() })),
+              stations: arr(str()),
+              classes: arr(str()),
+              totals: obj({ trains: int(), pairs: int(), allocated: int() }),
+              lastUpdated: { type: "string", format: "date-time", nullable: true },
+              railwayChecked: { ...obj({ from: str(), to: str() }), nullable: true },
+              enabled: bool(),
+              botCheck: { ...obj({ siteKey: str() }), nullable: true },
+              signedIn: bool(),
+            })
+          ),
+          403: response("REFUSED: not through the web app", ref("Error")),
+          404: response("PUBLIC_OFF: not open to the public", ref("Error")),
+          429: response("RATE_LIMITED, with Retry-After", ref("Error")),
+        },
+      },
+    },
+
+    "/public/allocation": {
+      get: {
+        tags: ["Public seat allocation"],
+        summary: "A search — the same answer as GET /allocation, without where pairs came from",
+        description: [
+          "Needs x-sp-visitor, and x-sp-pass (from POST /public/allocation/pass) when the bot check is on.",
+          "Without a sign-in, a visitor has the free searches of the day set in Settings (different from, to, train,",
+          "class; paging and the opening view do not count), per browser and per address; then SIGN_IN_REQUIRED.",
+          "Signed in (Authorization: Bearer), searches are unlimited.",
+        ].join("\n"),
+        security: [],
+        parameters: [
+          queryParam("from", "Boarding station"),
+          queryParam("to", "Destination"),
+          queryParam("train", "Train number", "integer"),
+          queryParam("class", "Class code"),
+          queryParam("show", "allocated (default) or all"),
+          queryParam("page", "From 1", "integer"),
+          queryParam("pageSize", "1 to 1000", "integer"),
+        ],
+        responses: {
+          200: response(
+            "Pairs",
+            obj({ items: arr(ref("AllocationPair")), total: int(), page: int(), pageSize: int(), summary: ref("AllocationSummary") })
+          ),
+          400: response("No visitor id, or a bad filter", ref("Error")),
+          403: response("SIGN_IN_REQUIRED (details.freeSearches), BOT_CHECK (details.siteKey) or REFUSED", ref("Error")),
+          404: response("PUBLIC_OFF", ref("Error")),
+          429: response("RATE_LIMITED, with Retry-After", ref("Error")),
+        },
+      },
+    },
+
+    "/public/allocation/pass": {
+      post: {
+        tags: ["Public seat allocation"],
+        summary: "Trade a Cloudflare Turnstile token for a pass lasting an hour",
+        security: [],
+        requestBody: body(obj({ token: str("Turnstile's answer") }, ["token"])),
+        responses: {
+          200: response(
+            "The pass (null when no bot check is set up)",
+            obj({ required: bool(), pass: { ...str(), nullable: true }, expiresAt: { type: "string", format: "date-time", nullable: true } })
+          ),
+          403: response("BOT_CHECK: the token did not pass", ref("Error")),
+        },
+      },
+    },
+
+    "/allocation/public-visits": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "How the public page is used: totals, most searched journeys, where from, the latest visits",
+        ...secured("allocation:requests"),
+        responses: { 200: response("Visits", { type: "object" }), 403: errors[403] },
+      },
+    },
+
+    "/allocation/requests": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "Who looks at the seat allocation, and for what: requests grouped and counted",
+        description: [
+          "The requests from the public page (channel public) and the searches made in the app (channel app),",
+          "within a span of Dhaka days, grouped by one or two fields and counted: requests, people (signed in),",
+          "visitors (browsers), and the searches that found nothing. Searches only, unless all=1. With the",
+          "totals, the counts over time (by hour over a day or two, by day up to three months, by week beyond),",
+          "the latest 50 requests that match, and — for days whose requests are gone — the daily totals kept.",
+          "",
+          "Fields: channel, signedIn, person, role, visitor, ip, journey, station, from, to, train, class, show, search, outcome, found, kind, country, city, device, browser, os, language, site, hour, weekday, day, week, month.",
+        ].join("\n"),
+        ...secured("allocation:requests"),
+        parameters: [
+          queryParam("by", "One or two fields, comma-separated (channel by default), such as train,outcome"),
+          queryParam("w", "A filter, field:value — repeat it for more; field: alone means none (not signed in…)"),
+          queryParam("since", "First day, YYYY-MM-DD (30 days back by default)"),
+          queryParam("until", "Last day, YYYY-MM-DD (today by default)"),
+          queryParam("all", "1 to count every request — page opens and bot checks too — not only searches"),
+        ],
+        responses: {
+          200: response(
+            "The analysis",
+            obj({
+              totals: obj({ requests: int(), people: int(), visitors: int(), nothing: int(), public: int(), app: int() }),
+              groups: arr(
+                obj({
+                  values: arr(str("A field's value, as a filter takes it; null for none")),
+                  labels: arr(str("The same, for people to read")),
+                  requests: int(),
+                  people: int(),
+                  visitors: int(),
+                  nothing: int("Searches shown that found nothing"),
+                  lastAt: { type: "string", format: "date-time" },
+                })
+              ),
+              truncated: bool("More than 500 groups: the rest left out"),
+              series: obj({ size: str("hour, day or week"), points: arr({ type: "object" }) }),
+              latest: arr({ type: "object" }),
+              dimensions: arr(obj({ key: str(), group: str(), label: str() })),
+            })
+          ),
+          400: errors[400],
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation/requests.csv": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "The same groups as a spreadsheet",
+        ...secured("allocation:requests"),
+        parameters: [
+          queryParam("by", "As for /allocation/requests"),
+          queryParam("w", "As for /allocation/requests"),
+          queryParam("since", "As for /allocation/requests"),
+          queryParam("until", "As for /allocation/requests"),
+          queryParam("all", "As for /allocation/requests"),
+        ],
+        responses: {
+          200: { description: "CSV", content: { "text/csv": { schema: { type: "string" } } } },
+          400: errors[400],
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation/requests/today": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "Today's searches, on the public page and in the app",
+        ...secured("allocation:requests"),
+        responses: { 200: response("Today", obj({ searches: int(), people: int(), visitors: int() })), 403: errors[403] },
+      },
+    },
+
+    "/allocation/uploads": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "Every file applied, newest first",
+        ...secured("allocation:view"),
+        parameters: [queryParam("limit", "1 to 100; 20 by default", "integer")],
+        responses: {
+          200: response("Uploads", obj({ uploads: arr(ref("AllocationUpload")) })),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "The pairs that match: any of from, to, train and class",
+        description: [
+          "Each filter left out means all. From and to together: the trains with seats on that journey; from",
+          "alone: everywhere a train with seats goes from there; a train alone: its pairs in route order, with",
+          "its route. Only allocated pairs unless show=all, which adds pairs found not allocated and — from the",
+          "uploaded routes — the pairs nobody has checked. The summary covers every match, not just the page.",
+          "Each search is recorded as a request (channel app; see /allocation/requests).",
+        ].join("\n"),
+        ...secured("allocation:view"),
+        parameters: [
+          queryParam("from", "Boarding station"),
+          queryParam("to", "Destination"),
+          queryParam("train", "Train number", "integer"),
+          queryParam("class", "Class code"),
+          queryParam("show", "allocated (default) or all"),
+          queryParam("page", "From 1", "integer"),
+          queryParam("pageSize", "1 to 1000; 50 by default", "integer"),
+        ],
+        responses: {
+          200: response(
+            "Pairs",
+            obj({
+              items: arr(ref("AllocationPair")),
+              total: int(),
+              page: int(),
+              pageSize: int(),
+              summary: ref("AllocationSummary"),
+              route: { ...arr(str()), nullable: true, description: "With train: its stations in order, if uploaded" },
+            })
+          ),
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation/counts.csv": {
+      get: {
+        tags: ["Seat allocation"],
+        summary: "The counts sheet: one line per allocated class, for the same filters",
+        description: "Columns train, train_name, from, to, class, seats — seats blank where the count is not known. Fill it in and upload it back.",
+        ...secured("allocation:view"),
+        parameters: [queryParam("from", "Boarding station"), queryParam("to", "Destination"), queryParam("train", "Train number", "integer"), queryParam("class", "Class code")],
+        responses: {
+          200: { description: "CSV", content: { "text/csv": { schema: { type: "string" } } } },
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation/import/{kind}": {
+      post: {
+        tags: ["Seat allocation"],
+        summary: "Upload a file: read it, and with ?apply=1 apply it",
+        description: [
+          "The file is the request body, sent as text/plain (it may be several megabytes). kind:",
+          "- stops: train-stoppages.json, each train's stations in order. Trains not in the file are left alone.",
+          "- census: the census CSV (From, To, Result, Trains with seats (classes), Trains on the route, Scanned at).",
+          "  Pairs in the file replace what is stored for them; the rest are left alone. A class still allocated keeps",
+          "  its count; one no longer allocated goes. Failed scans, and Allocated without the trains named, are left out.",
+          "- counts: the counts sheet. Only classes already allocated take a count; blank means not known.",
+          "Without apply nothing changes: the preview says what applying would do, and what is left out and why.",
+        ].join("\n"),
+        ...secured("allocation:manage"),
+        parameters: [
+          pathParam("kind", "stops, census or counts", "string"),
+          queryParam("apply", "1 to apply; otherwise only read"),
+          queryParam("name", "The file's name, kept in the upload history"),
+        ],
+        requestBody: { required: true, content: { "text/plain": { schema: { type: "string" } } } },
+        responses: {
+          200: response(
+            "Read, or applied",
+            obj({ message: str(), applied: bool(), preview: { type: "object", description: "What the file holds and does" } })
+          ),
+          400: errors[400],
+          403: errors[403],
+        },
+      },
+    },
+
+    "/allocation/pairs": {
+      put: {
+        tags: ["Seat allocation"],
+        summary: "Set one train's pair by hand: allocated with its classes and counts, or not allocated",
+        ...secured("allocation:manage"),
+        requestBody: body(
+          obj(
+            {
+              train: int(),
+              from: str(),
+              to: str(),
+              status: { type: "string", enum: ["allocated", "not_allocated"] },
+              classes: arr(ref("AllocationClass")),
+            },
+            ["train", "from", "to", "status"]
+          )
+        ),
+        responses: {
+          200: response("Saved", obj({ message: str(), pair: ref("AllocationPair") })),
+          400: response("Not on the train's route in that order, or a class or count that is not one", ref("Error")),
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+      delete: {
+        tags: ["Seat allocation"],
+        summary: "Forget a pair: back to not checked",
+        ...secured("allocation:manage"),
+        parameters: [
+          { name: "train", in: "query", required: true, schema: { type: "integer" } },
+          { name: "from", in: "query", required: true, schema: { type: "string" } },
+          { name: "to", in: "query", required: true, schema: { type: "string" } },
+        ],
+        responses: { 200: response("Forgotten", obj({ message: str() })), 403: errors[403], 404: errors[404] },
       },
     },
 
@@ -2121,6 +2898,109 @@ module.exports = {
       },
     },
 
+    "/audit/analysis": {
+      get: {
+        tags: ["Audit"],
+        summary: "The audit log analysed: events grouped and counted, over time, by weekday and hour",
+        description: [
+          "Picks events — operations or whole groups of them, people, outcome, days or the last so many minutes,",
+          "hours of the day, days of the week — and groups them by one or two fields, each counted: events,",
+          "people, internet addresses, failures. With the totals, the counts over time (by 5 minutes, hour, day",
+          "or week, as the span suits), a weekday × hour grid, the latest 50 events and, with compare=1 and two",
+          "to five people, each person's own totals, counts over time and grid. Times are Dhaka's.",
+          "",
+          "Fields: action, area, outcome, targetType, target, person, role, ip, browser, os, device, hour, weekday, day, week, month. Without the document store: available false.",
+        ].join("\n"),
+        ...secured("audit:view"),
+        parameters: [...[
+          queryParam("action", "Operations, such as auth.login — repeat, or comma-separate"),
+          queryParam("area", "Whole groups of operations, such as subscription"),
+          queryParam("person", "People by id; none is events with no one signed in"),
+          queryParam("outcome", "success or failure"),
+          queryParam("since", "First day, YYYY-MM-DD (30 days back by default)"),
+          queryParam("until", "Last day, YYYY-MM-DD (today by default)"),
+          queryParam("last", "Instead of days: the last so many minutes, 5 to 1440", "integer"),
+          queryParam("hours", "Hours of the day, such as 9-13, or 22-3 past midnight"),
+          queryParam("days", "Days of the week, 1 Sunday … 7 Saturday, comma-separated"),
+          queryParam("tests", "1 to count the automated test accounts too"),
+          queryParam("by", "One or two fields (action by default), such as person,hour"),
+          queryParam("w", "A filter, field:value — repeat it; field: alone means none"),
+        ], queryParam("compare", "1: each chosen person side by side (2 to 5)")],
+        responses: {
+          200: response(
+            "The analysis",
+            obj({
+              available: bool(),
+              totals: obj({ events: int(), people: int(), ips: int(), failures: int() }),
+              groups: arr(
+                obj({
+                  values: arr(str("A field's value, as a filter takes it; null for none")),
+                  labels: arr(str("The same, for people to read")),
+                  events: int(),
+                  people: int(),
+                  ips: int(),
+                  failures: int(),
+                  lastAt: { type: "string", format: "date-time" },
+                })
+              ),
+              truncated: bool("More than 500 groups: the rest left out"),
+              series: obj({ size: str("5min, hour, day or week"), points: arr({ type: "object" }) }),
+              heatmap: arr(obj({ weekday: int("1 Sunday … 7 Saturday"), name: str(), hours: arr(int()) })),
+              latest: arr(ref("AuditEvent")),
+              compare: { type: "array", nullable: true, items: { type: "object" } },
+              operations: arr(str()),
+              dimensions: arr(obj({ key: str(), group: str(), label: str() })),
+            })
+          ),
+          400: errors[400],
+          403: errors[403],
+        },
+      },
+    },
+
+    "/audit/analysis.csv": {
+      get: {
+        tags: ["Audit"],
+        summary: "The same groups as a spreadsheet",
+        ...secured("audit:view"),
+        parameters: [
+          queryParam("action", "Operations, such as auth.login — repeat, or comma-separate"),
+          queryParam("area", "Whole groups of operations, such as subscription"),
+          queryParam("person", "People by id; none is events with no one signed in"),
+          queryParam("outcome", "success or failure"),
+          queryParam("since", "First day, YYYY-MM-DD (30 days back by default)"),
+          queryParam("until", "Last day, YYYY-MM-DD (today by default)"),
+          queryParam("last", "Instead of days: the last so many minutes, 5 to 1440", "integer"),
+          queryParam("hours", "Hours of the day, such as 9-13, or 22-3 past midnight"),
+          queryParam("days", "Days of the week, 1 Sunday … 7 Saturday, comma-separated"),
+          queryParam("tests", "1 to count the automated test accounts too"),
+          queryParam("by", "One or two fields (action by default), such as person,hour"),
+          queryParam("w", "A filter, field:value — repeat it; field: alone means none"),
+        ],
+        responses: {
+          200: { description: "CSV", content: { "text/csv": { schema: { type: "string" } } } },
+          400: errors[400],
+          403: errors[403],
+        },
+      },
+    },
+
+    "/audit/people": {
+      get: {
+        tags: ["Audit"],
+        summary: "People in the audit log, by part of a name or email, the busiest first",
+        ...secured("audit:view"),
+        parameters: [queryParam("q", "Part of a name or email")],
+        responses: {
+          200: response(
+            "People",
+            obj({ people: arr(obj({ id: int(), label: str(), email: str(), events: int() })) })
+          ),
+          403: errors[403],
+        },
+      },
+    },
+
     /* ---------------- Wallet ---------------- */
 
     "/wallet": {
@@ -2692,19 +3572,35 @@ module.exports = {
           "place is free it takes one, and keeps it; places are held in the order devices arrived. A device " +
           "with no place — the limit is reached, it is blocked, the platform is unknown or switched off, or " +
           "`deviceId` or `platform` is missing or malformed — is answered `valid: false` and nothing else: " +
-          "still a 200, in the same shape, with no reason. Staff can read the reason on the account's devices.",
+          "still a 200, in the same shape, with no reason. Staff can read the reason on the account's devices.\n\n" +
+          "Each subscription can set its own rules on the app's `version`, platform by platform: require one, set " +
+          "the oldest it accepts, block single versions. Each subscription is answered on its own: when its rules " +
+          "turn the version away and that is the only thing in the way — the account holds it and the device has a " +
+          "place — its entry is `valid: false` with a `message` the app can show (\"A version is required\", or " +
+          "\"This version is no longer supported. Please update.\"); the others are answered as usual. A version " +
+          "that is not numbers and dots at all is a 400 for the whole call, before the password. A subscription " +
+          "without rules ignores `version`; the device remembers the last one sent.\n\n" +
+          "**Signing in.** Answered with the right password from a named device (`deviceId` and `platform` " +
+          "well-formed), the answer also carries `token` and `tokenExpiresAt`. Send the token as " +
+          "`Authorization: Bearer <token>` in place of the email and password, here and on seat plans, until it " +
+          "expires (setting `subscription.app_token_hours`, a week by default). It is tied to the account and the " +
+          "device it was issued for — a call with it uses that device whatever the body says — and `version` " +
+          "is still sent each time. A new sign-in from the same device replaces it; a new password, a restriction, " +
+          "or staff removing or blocking the device end it. A token that no longer works is a 401 \"Sign in " +
+          "again\": sign in with the password once more.",
+        security: [{}, { appToken: [] }],
         requestBody: body(
           obj(
             {
-              email: str(),
-              password: str(),
+              email: str("Required unless the call carries the app's token"),
+              password: str("Required unless the call carries the app's token"),
               deviceId: str(
                 "The caller's own stable id for this installation: 4 to 128 letters, digits and . _ : -. Send the " +
-                  "same one every time; a new id is a new device"
+                  "same one every time; a new id is a new device. Ignored with a token: the token's device is used"
               ),
               platform: str("A platform's value, such as windows or android"),
-            },
-            ["email", "password"]
+              version: str("The app's version, such as 1.4.2: one to four numbers joined by dots, optionally after a v"),
+            }
           )
         ),
         responses: {
@@ -2712,14 +3608,278 @@ module.exports = {
             "The account, and yes or no for each subscription",
             obj({
               user: obj({ name: str(), email: str() }),
-              subscriptions: arr(obj({ code: str("The subscription's fixed code"), valid: bool() })),
+              subscriptions: arr(
+                obj({
+                  code: str("The subscription's fixed code"),
+                  valid: bool(),
+                  message: str("Only when this subscription turns the app's version away, and nothing else stood in the way"),
+                })
+              ),
+              token: str("Only when signed in with the password from a named device: the app's sign-in token"),
+              tokenExpiresAt: { type: "string", format: "date-time", description: "When the token stops working" },
             })
           ),
-          400: errors[400],
-          401: errors[401],
-          403: response("Email not yet verified", ref("Error")),
+          400: response("Missing email or password, or a version that is not numbers and dots", ref("Error")),
+          401: response("Wrong password or unknown email (\"Invalid credentials\"), or a token that no longer works (\"Sign in again\")", ref("Error")),
+          403: response("Email not yet verified, or the account is restricted", ref("Error")),
           429: response("Paused after too many wrong passwords; see Retry-After", ref("Error")),
         },
+      },
+    },
+
+    "/subscriptions/seat-plans": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "A train's seat plans, for an app signed in as a subscriber",
+        description:
+          "The same sign-in as the check — email, password, deviceId, platform, version, or the app's token from " +
+          "the check as `Authorization: Bearer` with `version` — and answered only when " +
+          "the account holds a subscription that includes seat plans and is valid on this device, under that " +
+          "subscription's device limits and version rules. Asking takes a new device's place, as a check does. " +
+          "Answers from any origin, compressed.\n\n" +
+          "Name the train, or give its number; add `class` for one class, `coach` for one coach. Only approved " +
+          "plans are sent, front to back as the train's line-up runs. A refused call says nothing about the device: " +
+          "a 403, unless the app's version is the one thing in the way — then 400 \"A version is required\" or 426 " +
+          "\"This version is no longer supported. Please update.\" Every call is in the audit log as " +
+          "`subscription.seat_plans`.",
+        requestBody: body(
+          obj(
+            {
+              email: str(),
+              password: str(),
+              deviceId: str("As for the check"),
+              platform: str("As for the check"),
+              version: str("As for the check"),
+              train: str("The train's name, such as EKOTA EXPRESS (705), or its number, 705"),
+              class: str("Optional: a class code, such as S_CHAIR"),
+              coach: str("Optional: a coach letter, such as KA"),
+            },
+            ["train"]
+          )
+        ),
+        security: [{}, { appToken: [] }],
+        responses: {
+          200: response(
+            "The plans",
+            obj({
+              train: obj({ name: str(), number: { ...str(), nullable: true } }),
+              coaches: arr(
+                obj({
+                  coach: str("The coach letter"),
+                  class: { ...str(), nullable: true },
+                  type: { ...str(), nullable: true },
+                  planId: int(),
+                  updatedAt: { type: "string", format: "date-time", description: "When the plan last changed; cache by it" },
+                  layout: { type: "object", description: "The seat grid, as stored" },
+                })
+              ),
+            })
+          ),
+          400: response("Missing fields, a version that is not one, or one the subscription requires and none was sent", ref("Error")),
+          401: response("Wrong password or unknown email, or a token that no longer works (\"Sign in again\")", ref("Error")),
+          403: response("No subscription that includes seat plans is valid on this device, or the account is restricted", ref("Error")),
+          404: response("No such train, or no plan matches", ref("Error")),
+          426: response("This version of the app is no longer supported by the subscription", ref("Error")),
+          429: response("Paused after too many wrong passwords; see Retry-After", ref("Error")),
+        },
+      },
+    },
+
+    "/plans": {
+      get: {
+        tags: ["Seat plans"],
+        summary: "Seat plans you may see",
+        description:
+          "Holders of plan:create see every plan; everyone else only approved ones, and never templates. An editable " +
+          "copy of an approved plan is listed too, with `revisionOfId`. `kind=templates` lists the templates instead " +
+          "of the plans; `templates=1` everything a new plan can start from — templates, approved plans, your own — " +
+          "without copies.",
+        ...secured("plan:view"),
+        parameters: [
+          queryParam("status", "draft, pending, approved or rejected"),
+          queryParam("search", "Part of a coach number"),
+          queryParam("trainNameId", "One train's plans", "integer"),
+          queryParam("mine", "1 for your own"),
+          queryParam("kind", "plans (the default) or templates"),
+          queryParam("templates", "1 for what to start a new one from"),
+        ],
+        responses: { 200: response("Plans, without their layouts", obj({ plans: arr(ref("SeatPlan")) })) },
+      },
+      post: {
+        tags: ["Seat plans"],
+        summary: "Start a plan, as a draft",
+        description:
+          "Anything may be left out of a draft. A train has one plan per coach number: a second is a 409 with " +
+          "code PLAN_COACH_TAKEN and, in details, the plan in the way and the trains whose coaches use it. A template " +
+          "(isTemplate) is never in conflict.",
+        ...secured("plan:create"),
+        requestBody: body(obj({
+            coachNo: str("The railway's coach letter: KA, KHA, GA…"),
+            trainNameId: { ...int(), nullable: true },
+            coachTypeId: { ...int(), nullable: true },
+            coachClassId: { ...int(), nullable: true },
+            isTemplate: bool("Save it as a template"),
+            layout: { type: "object", description: "The seat grid: rows of cells" },
+          })),
+        responses: { 201: response("Created", obj({ plan: ref("SeatPlan") })), 400: errors[400], 409: errors[409] },
+      },
+    },
+
+    "/plans/{id}": {
+      get: {
+        tags: ["Seat plans"],
+        summary: "One plan, with its layout",
+        ...secured("plan:view"),
+        parameters: [pathParam("id", "Plan id")],
+        responses: { 200: response("The plan", obj({ plan: ref("SeatPlan") })), 404: errors[404] },
+      },
+      put: {
+        tags: ["Seat plans"],
+        summary: "Change a plan that is not approved yet",
+        description:
+          "An approved plan is refused with 409: it is changed through an editable copy (POST /plans/{id}/revise), " +
+          "so it keeps being used until the changes are approved.",
+        ...secured("plan:update"),
+        parameters: [pathParam("id", "Plan id")],
+        requestBody: body(obj({
+            coachNo: str("The railway's coach letter: KA, KHA, GA…"),
+            trainNameId: { ...int(), nullable: true },
+            coachTypeId: { ...int(), nullable: true },
+            coachClassId: { ...int(), nullable: true },
+            layout: { type: "object", description: "The seat grid: rows of cells" },
+          })),
+        responses: { 200: response("Saved", obj({ plan: ref("SeatPlan") })), 400: errors[400], 404: errors[404], 409: errors[409] },
+      },
+      delete: {
+        tags: ["Seat plans"],
+        summary: "Delete a plan — or throw a copy's changes away",
+        description: "Deleting a plan deletes its open copy with it.",
+        ...secured("plan:delete"),
+        parameters: [pathParam("id", "Plan id")],
+        responses: { 200: response("Deleted", obj({ message: str() })), 404: errors[404] },
+      },
+    },
+
+    "/plans/templates": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Move plans to templates — one or several",
+        description: [
+          "Each on its own: one refused does not stop the rest. Refused: a plan a train's coaches use, one with",
+          "changes waiting, an editable copy, and — without plan:approve — an approved one. A pending plan leaves",
+          "the approval queue. A template keeps its train and coach as labels, freeing them for a new plan.",
+        ].join("\n"),
+        ...secured("plan:update"),
+        requestBody: body(obj({ ids: arr(int()) })),
+        responses: {
+          200: response(
+            "What happened to each",
+            obj({ results: arr(obj({ id: int(), ok: bool(), label: str(), reason: str("Why it was refused") })) })
+          ),
+          400: errors[400],
+        },
+      },
+    },
+
+    "/plans/{id}/restore": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "A template back among the plans",
+        description: "Its train and coach must be free (409 PLAN_COACH_TAKEN otherwise). An approved one needs plan:approve.",
+        ...secured("plan:update"),
+        parameters: [pathParam("id", "Template id")],
+        responses: { 200: response("The plan", obj({ plan: ref("SeatPlan") })), 403: errors[403], 409: errors[409] },
+      },
+    },
+
+    "/plans/{id}/details": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Change a plan's train or coach number — to make room for another",
+        description:
+          "Trains and departures that use it keep it (they point at its id); changes waiting on it follow. An approved " +
+          "plan needs plan:approve.",
+        ...secured("plan:update"),
+        parameters: [pathParam("id", "Plan id")],
+        requestBody: body(obj({ coachNo: str(), trainNameId: { ...int(), nullable: true } })),
+        responses: { 200: response("The plan", obj({ plan: ref("SeatPlan") })), 403: errors[403], 409: errors[409] },
+      },
+    },
+
+    "/plans/{id}/replace": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Replace an approved plan's layout with a new one, through approval",
+        description: [
+          "The new layout becomes the plan's editable copy: once approved, it takes the plan's place under the",
+          "plan's own id, so every train and departure keeps it. The plan as it is now is kept as a template.",
+          "planId: a draft of the new one, already saved, to become the copy instead of a new one.",
+        ].join("\n"),
+        ...secured("plan:create"),
+        parameters: [pathParam("id", "The approved plan")],
+        requestBody: body(obj({
+          coachTypeId: { ...int(), nullable: true },
+          coachClassId: { ...int(), nullable: true },
+          layout: { type: "object" },
+          planId: { ...int(), nullable: true },
+        })),
+        responses: {
+          201: response("The copy, and the template kept", obj({ plan: ref("SeatPlan"), templateId: int() })),
+          400: errors[400],
+          409: errors[409],
+        },
+      },
+    },
+
+    "/plans/{id}/revise": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Open an editable copy of an approved plan",
+        description:
+          "Or the one already open (200). The plan keeps being used — new departures, coaches added on the day — " +
+          "while the copy is drafted and reviewed. Approving the copy puts its content into the plan, under the " +
+          "plan's own id, and removes the copy. Departures already generated keep their seats.",
+        ...secured("plan:update"),
+        parameters: [pathParam("id", "The approved plan's id")],
+        responses: {
+          201: response("Opened", obj({ message: str(), plan: ref("SeatPlan") })),
+          200: response("Already open", obj({ message: str(), plan: ref("SeatPlan") })),
+          400: response("The plan is not approved, or is itself a copy", ref("Error")),
+          404: errors[404],
+        },
+      },
+    },
+
+    "/plans/{id}/submit": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Send a draft or sent-back plan for approval",
+        description: "Someone who may approve plans approves it as they submit it; a copy goes straight into its plan.",
+        ...secured("plan:update"),
+        parameters: [pathParam("id", "Plan id")],
+        responses: { 200: response("Submitted, or approved", obj({ plan: ref("SeatPlan") })), 400: errors[400], 409: errors[409] },
+      },
+    },
+
+    "/plans/{id}/approve": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Approve a plan waiting for it",
+        description: "An editable copy is folded into the plan it changes, and the answer is that plan.",
+        ...secured("plan:approve"),
+        parameters: [pathParam("id", "Plan id")],
+        responses: { 200: response("Approved", obj({ plan: ref("SeatPlan") })), 400: errors[400], 409: errors[409] },
+      },
+    },
+
+    "/plans/{id}/reject": {
+      post: {
+        tags: ["Seat plans"],
+        summary: "Send a plan back, with a reason",
+        ...secured("plan:approve"),
+        parameters: [pathParam("id", "Plan id")],
+        requestBody: body(obj({ reason: str() }, ["reason"])),
+        responses: { 200: response("Sent back", obj({ plan: ref("SeatPlan") })), 400: errors[400] },
       },
     },
 
@@ -2759,6 +3919,7 @@ module.exports = {
               name: str(),
               description: str(),
               code: str("Optional; made from the name when left out. Lowercase letters, digits and hyphens"),
+              includesSeatPlans: bool("Optional, false by default"),
             },
             ["name"]
           )
@@ -2791,7 +3952,7 @@ module.exports = {
         description: "Closing declines whatever requests are still waiting. The code never changes.",
         ...secured("subscription:manage"),
         parameters: [pathParam("id", "Subscription id")],
-        requestBody: body(obj({ name: str(), description: str(), isOpen: bool() })),
+        requestBody: body(obj({ name: str(), description: str(), isOpen: bool(), includesSeatPlans: bool() })),
         responses: {
           200: response("Updated", obj({ subscription: ref("Subscription") })),
           400: errors[400],
@@ -2814,7 +3975,8 @@ module.exports = {
         summary: "Ask to be subscribed, saying on how many devices",
         description:
           "Refused while you already have a request waiting or a subscription running for it. Without " +
-          "`devices` it asks for one of each platform.",
+          "`devices` it asks for one of each platform. Had before and ended, the same record carries on — " +
+          "waiting again, its earlier period kept in its `history`.",
         security: [{ bearerAuth: [] }],
         parameters: [pathParam("id", "Subscription id")],
         requestBody: body(obj({ devices: ref("DeviceCounts") }), false),
@@ -2902,6 +4064,31 @@ module.exports = {
       },
     },
 
+    "/subscriptions/members/{id}/resume": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Continue a subscription that ended — run out, cancelled or declined — for a new period",
+        description: [
+          "The same record, active again from today until the day chosen; what it was is kept in its `history`.",
+          "The device counts it had stay unless others are given. The person is told. Refused (409) while it is",
+          "running or waiting, or while they have another one running or waiting.",
+        ].join("\n"),
+        ...secured("subscription:approve"),
+        parameters: [pathParam("id", "Request id")],
+        requestBody: body(obj({
+          days: int("Days from today; or"),
+          lastDay: str("The last day, YYYY-MM-DD"),
+          devices: { type: "object", description: "{ platform value: count }, to change them" },
+        })),
+        responses: {
+          200: response("Running again", obj({ subscription: ref("UserSubscription") })),
+          400: errors[400],
+          403: errors[403],
+          409: errors[409],
+        },
+      },
+    },
+
     "/subscriptions/members/{id}": {
       patch: {
         tags: ["Subscriptions"],
@@ -2985,6 +4172,139 @@ module.exports = {
       },
     },
 
+    "/subscriptions/{id}/versions": {
+      get: {
+        tags: ["Subscriptions"],
+        summary: "One subscription's version rules on every platform, and the versions its subscribers use",
+        description:
+          "A platform it has set nothing for has no rules: any version, or none. `inUse` is the version each device " +
+          "of a current subscriber last checked in with, counted, newest first; null for devices that never said.",
+        ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Subscription id")],
+        responses: {
+          200: response(
+            "The rules",
+            obj({
+              subscription: obj({ id: int(), code: str(), name: str(), appUrl: { ...str(), nullable: true } }),
+              notices: arr(ref("AppNotice")),
+              platforms: arr({
+                allOf: [
+                  ref("SubscriptionPlatform"),
+                  obj({
+                    blocked: arr(ref("BlockedVersion")),
+                    reach: int("How many current subscribers have a device on this platform — whom a notice would reach"),
+                    noticeTemplates: obj({
+                      released: str("The words a release notice starts from, with {version} to fill in"),
+                      retiring: str("The words a retirement notice starts from"),
+                    }),
+                    versionRequired: bool("A check must send `version` to be valid for this subscription"),
+                    minVersion: { ...str("The oldest app version this subscription accepts"), nullable: true },
+                    inUse: arr(obj({ version: { ...str(), nullable: true }, devices: int(), lastSeenAt: { type: "string", format: "date-time" } })),
+                  }),
+                ],
+              }),
+            })
+          ),
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+    },
+
+    "/subscriptions/{id}/versions/{platformId}": {
+      patch: {
+        tags: ["Subscriptions"],
+        summary: "Require a version for a subscription on a platform, or set its minimum there",
+        description: "Either or both. An empty or null `minVersion` removes the minimum. A change to what it already is (2 for 2.0) is a 400.",
+        ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Subscription id"), pathParam("platformId", "Platform id")],
+        requestBody: body(obj({ versionRequired: bool(), minVersion: { ...str(), nullable: true } })),
+        responses: {
+          200: response("Updated", obj({ policy: obj({ versionRequired: bool(), minVersion: { ...str(), nullable: true } }) })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+    },
+
+    "/subscriptions/{id}/app-link": {
+      patch: {
+        tags: ["Subscriptions"],
+        summary: "Set where a subscription's app is got from",
+        description:
+          "A full https:// address; empty or null removes it. Subscribers whose subscription is running get a button " +
+          "that goes there. Setting it to what it already is, is a 400.",
+        ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Subscription id")],
+        requestBody: body(obj({ appUrl: { ...str(), nullable: true } })),
+        responses: {
+          200: response("Saved", obj({ appUrl: { ...str(), nullable: true } })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+    },
+
+    "/subscriptions/{id}/versions/{platformId}/notices": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Tell a platform's subscribers about a version of the app",
+        description:
+          "To everyone currently subscribed with a device on that platform: in the app at once, and by email too " +
+          "when `email` is true — each email a queued job of its own, retried if the mail server refuses. " +
+          "`released`: a new version is out. `retiring`: an old one is going away. Nobody to tell is a 400.",
+        ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Subscription id"), pathParam("platformId", "Platform id")],
+        requestBody: body(
+          obj(
+            {
+              kind: { type: "string", enum: ["released", "retiring"] },
+              version: str("Such as 2.0.1"),
+              message: str("What subscribers read, up to 1000 characters"),
+              email: bool("Email them too. False by default"),
+            },
+            ["kind", "version", "message"]
+          )
+        ),
+        responses: {
+          201: response("Sent", obj({ notice: ref("AppNotice") })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+        },
+      },
+    },
+
+    "/subscriptions/{id}/versions/{platformId}/blocked": {
+      post: {
+        tags: ["Subscriptions"],
+        summary: "Block one version of a platform's app for a subscription",
+        description: "That subscription turns it away whatever its minimum; other subscriptions are not affected.",
+        ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Subscription id"), pathParam("platformId", "Platform id")],
+        requestBody: body(obj({ version: str(), note: str("Optional, up to 200 characters") }, ["version"])),
+        responses: {
+          201: response("Blocked", obj({ blocked: ref("BlockedVersion") })),
+          400: errors[400],
+          403: errors[403],
+          404: errors[404],
+          409: response("Already blocked", ref("Error")),
+        },
+      },
+    },
+
+    "/subscriptions/{id}/versions/{platformId}/blocked/{blockedId}": {
+      delete: {
+        tags: ["Subscriptions"],
+        summary: "Unblock a version for a subscription",
+        ...secured("subscription:versions"),
+        parameters: [pathParam("id", "Subscription id"), pathParam("platformId", "Platform id"), pathParam("blockedId", "The blocked version's id")],
+        responses: { 200: response("Unblocked", obj({ unblocked: bool() })), 403: errors[403], 404: errors[404] },
+      },
+    },
+
     "/subscriptions/devices/mine": {
       get: {
         tags: ["Subscriptions"],
@@ -3055,8 +4375,9 @@ module.exports = {
         tags: ["Railway data"],
         summary: "What of the real railway is loaded",
         description:
-          "The committed timetable snapshot, how much of it is loaded, the trains ready for departures with " +
-          "their line-ups and seats, whether departures are generated automatically, and the load in progress.",
+          "The current timetable (the newest applied from the railway, else the one committed with the code), " +
+          "how much of it is loaded, the trains ready for departures with their line-ups and seats, whether " +
+          "departures are generated automatically, the load in progress, and the sync with the railway.",
         ...secured("railway:manage"),
         responses: {
           200: response("Status", ref("RailwayStatus")),
@@ -3071,9 +4392,9 @@ module.exports = {
         summary: "Load the timetable and seat plans",
         description: [
           "Queues a background job that adds whatever is missing of: every station and train in the snapshot",
-          "with its route, running days and estimated distances; the transcribed seat plans — an approved copy",
-          "for each train a source names, a draft for each source that names none; and coaches, running days",
-          "and per-kilometre fares for the trains that have plans. It never generates departures.",
+          "with its route, running days and estimated distances; an approved seat plan for every coach of every",
+          "train with a line-up, numbered with the coach's letter, and a draft for each source that names no",
+          "train; and coaches, running days and per-kilometre fares for those trains. It never generates departures.",
           "",
           "Anything already there is used as it is. A route is replaced only where the timetable differs, and",
           "never on a train with departures. Refused with 409 while demo data exists.",
@@ -3083,6 +4404,50 @@ module.exports = {
           202: response("Queued — follow it at /jobs/{id}", obj({ message: str(), job: ref("Job") })),
           403: errors[403],
           409: response("Demo data has to be deleted first", ref("Error")),
+        },
+      },
+    },
+
+    "/railway-data/check": {
+      post: {
+        tags: ["Railway data"],
+        summary: "Check the server against what the railway publishes now",
+        description: [
+          "Queues a background job that asks the railway for every train on its list, for the timetable two days",
+          "ahead, and compares it with the server: new trains and stations, renamed trains, moved times, changed",
+          "stations, changed running days, trains no longer published, and trains it could not fetch. Nothing",
+          "changes; the result waits under `sync.pending` for someone to apply it, and replaces a check never applied.",
+          "",
+          "If the railway does not answer for more than half the trains, the job fails and nothing is kept.",
+          "One railway job at a time: 409 while a load, check or apply runs.",
+        ].join("\n"),
+        ...secured("railway:manage"),
+        responses: {
+          202: response("Queued — follow it at /jobs/{id}", obj({ message: str(), job: ref("Job") })),
+          403: errors[403],
+          409: response("Another railway job is running", ref("Error")),
+        },
+      },
+    },
+
+    "/railway-data/sync/{id}/apply": {
+      post: {
+        tags: ["Railway data"],
+        summary: "Apply a check",
+        description: [
+          "Queues a background job that compares the check again as things are now, then: adds new stations and",
+          "trains with their routes; renames renamed trains; takes moved times on the same stations, even on trains",
+          "with departures, keeping the distances saved; replaces changed stations only on trains with no departures",
+          "still to run (the others are named); and updates running days where they are the single undated schedule",
+          "loading gives, listing departures already generated on a day no longer run. Coaches, seat plans and fares",
+          "are not touched and nothing is deleted. The applied timetable becomes the one Load works from.",
+        ].join("\n"),
+        ...secured("railway:manage"),
+        parameters: [pathParam("id", "The check's id (sync.pending.id)")],
+        responses: {
+          202: response("Queued — follow it at /jobs/{id}", obj({ message: str(), job: ref("Job") })),
+          403: errors[403],
+          409: response("Replaced or already applied, another railway job is running, or demo data is present", ref("Error")),
         },
       },
     },

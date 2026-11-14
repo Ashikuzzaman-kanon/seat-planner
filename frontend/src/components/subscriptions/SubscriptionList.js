@@ -6,9 +6,11 @@ import { Tag } from "primereact/tag";
 import DeviceCounts from "./DeviceCounts";
 import MyDevices from "./MyDevices";
 import ReasonDialog from "./ReasonDialog";
+import PersonLink from "@/components/people/PersonLink";
 import { tip } from "@/components/ui/tip";
 import {
   cancelSubscription,
+  countsOf,
   deleteSubscription,
   describeDevices,
   longDate,
@@ -46,6 +48,7 @@ export default function SubscriptionList({
   staff,
   onEdit,
   onOpenRequests,
+  onOpenVersions,
   reload,
   notify,
 }) {
@@ -54,7 +57,9 @@ export default function SubscriptionList({
   const [counts, setCounts] = useState({});
 
   const subscribe = (subscription) => {
-    setCounts(startingCounts(platforms));
+    // Asking to continue one: the devices it had, to begin with.
+    const had = subscription.mine ? countsOf(subscription.mine.devices, platforms) : null;
+    setCounts(had && totalOf(had) > 0 ? had : startingCounts(platforms));
     setAsking({ kind: "subscribe", subscription });
   };
 
@@ -130,44 +135,63 @@ export default function SubscriptionList({
                     </code>
                   )}
                 </div>
-                {canManage && (
+                {(canManage || onOpenVersions) && (
                   <span className="sub-card__manage">
-                    <Button icon="pi pi-pencil" size="small" text rounded onClick={() => onEdit(subscription)} {...tip("Rename or re-describe")} />
-                    {subscription.isOpen ? (
+                    {onOpenVersions && (
                       <Button
-                        icon="pi pi-lock"
+                        icon="pi pi-tag"
                         size="small"
                         text
                         rounded
-                        onClick={() => setAsking({ kind: "close", subscription })}
-                        {...tip("Close to new requests")}
-                      />
-                    ) : (
-                      <Button
-                        icon="pi pi-lock-open"
-                        size="small"
-                        text
-                        rounded
-                        loading={busyId === subscription.id}
-                        onClick={() => reopen(subscription)}
-                        {...tip("Open to requests again")}
+                        onClick={() => onOpenVersions(subscription)}
+                        {...tip("Version rules")}
                       />
                     )}
-                    <Button
-                      icon="pi pi-trash"
-                      size="small"
-                      text
-                      rounded
-                      severity="danger"
-                      disabled={!untouched}
-                      onClick={() => setAsking({ kind: "delete", subscription })}
-                      {...tip(untouched ? "Delete" : "People have asked for this one — close it instead")}
-                    />
+                    {canManage && (
+                      <>
+                        <Button icon="pi pi-pencil" size="small" text rounded onClick={() => onEdit(subscription)} {...tip("Rename or re-describe")} />
+                        {subscription.isOpen ? (
+                          <Button
+                            icon="pi pi-lock"
+                            size="small"
+                            text
+                            rounded
+                            onClick={() => setAsking({ kind: "close", subscription })}
+                            {...tip("Close to new requests")}
+                          />
+                        ) : (
+                          <Button
+                            icon="pi pi-lock-open"
+                            size="small"
+                            text
+                            rounded
+                            loading={busyId === subscription.id}
+                            onClick={() => reopen(subscription)}
+                            {...tip("Open to requests again")}
+                          />
+                        )}
+                        <Button
+                          icon="pi pi-trash"
+                          size="small"
+                          text
+                          rounded
+                          severity="danger"
+                          disabled={!untouched}
+                          onClick={() => setAsking({ kind: "delete", subscription })}
+                          {...tip(untouched ? "Delete" : "People have asked for this one — close it instead")}
+                        />
+                      </>
+                    )}
                   </span>
                 )}
               </header>
 
-              {!subscription.isOpen && <Tag value="Closed to new requests" severity="secondary" className="sub-card__closed" />}
+              {(!subscription.isOpen || subscription.includesSeatPlans) && (
+                <div className="sub-card__tags">
+                  {!subscription.isOpen && <Tag value="Closed to new requests" severity="secondary" className="sub-card__closed" />}
+                  {subscription.includesSeatPlans && <Tag value="Includes seat plans" severity="info" icon="pi pi-th-large" />}
+                </div>
+              )}
 
               {subscription.description && <p className="sub-card__about">{subscription.description}</p>}
 
@@ -200,9 +224,20 @@ export default function SubscriptionList({
               )}
 
               <footer className="sub-card__actions">
+                {mine?.valid && subscription.appUrl && (
+                  <a
+                    className="p-button p-component p-button-sm sub-app-link"
+                    href={subscription.appUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <i className="pi pi-external-link" aria-hidden="true" />
+                    <span>Open the app</span>
+                  </a>
+                )}
                 {!live && subscription.isOpen && (
                   <Button
-                    label={mine ? "Subscribe again" : "Subscribe"}
+                    label={mine ? "Ask to continue" : "Subscribe"}
                     icon="pi pi-plus"
                     size="small"
                     onClick={() => subscribe(subscription)}
@@ -252,7 +287,17 @@ export default function SubscriptionList({
                     <Tag value={meta.label} severity={meta.severity} />
                     <small>
                       {h.status === "expired" && `Ran until ${longDate(h.lastDay)}`}
-                      {h.status === "cancelled" && h.startsAt && `Ended ${when(h.endedAt)}${h.endedBy ? ` by ${h.endedBy}` : ""}`}
+                      {h.status === "cancelled" && h.startsAt && (
+                        <>
+                          Ended {when(h.endedAt)}
+                          {h.endedBy && (
+                            <>
+                              {" by "}
+                              <PersonLink id={h.endedById} name={h.endedBy} />
+                            </>
+                          )}
+                        </>
+                      )}
                       {h.status === "cancelled" && !h.startsAt && "Withdrawn before it was reviewed"}
                       {h.status === "declined" && (h.decisionNote ? `“${h.decisionNote}”` : `Declined ${when(h.decidedAt)}`)}
                     </small>
@@ -266,8 +311,12 @@ export default function SubscriptionList({
 
       <ReasonDialog
         visible={asking?.kind === "subscribe"}
-        header={`Subscribe to ${asking?.subscription.name || ""}`}
-        message="On how many devices will you use it? Whoever reviews your request sees these numbers, and may change them."
+        header={`${asking?.subscription.mine ? "Ask to continue" : "Subscribe to"} ${asking?.subscription.name || ""}`}
+        message={
+          asking?.subscription.mine
+            ? "Your subscription carries on once it is approved. On how many devices will you use it? Whoever reviews your request sees these numbers, and may change them."
+            : "On how many devices will you use it? Whoever reviews your request sees these numbers, and may change them."
+        }
         confirmLabel="Send request"
         confirmIcon="pi pi-send"
         canConfirm={platforms.length > 0 && totalOf(counts) > 0}
@@ -285,7 +334,7 @@ export default function SubscriptionList({
         message={
           asking?.subscription.mine?.status === "pending"
             ? `Your request for ${asking?.subscription.name} will be closed. You can ask again whenever you like.`
-            : `${asking?.subscription.name} stops straight away — it would otherwise run until ${longDate(asking?.subscription.mine?.lastDay)}. To have it again you would need to ask and be approved.`
+            : `${asking?.subscription.name} stops straight away — it would otherwise run until ${longDate(asking?.subscription.mine?.lastDay)}. To have it again you would ask to continue it, and be approved.`
         }
         confirmLabel={asking?.subscription.mine?.status === "pending" ? "Withdraw request" : "Cancel subscription"}
         cancelLabel="Keep it"

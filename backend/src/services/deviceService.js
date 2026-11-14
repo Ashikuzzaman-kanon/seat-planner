@@ -5,6 +5,8 @@ const ApiError = require("../utils/ApiError");
 const { AUDIT_ACTIONS } = require("../constants/auditActions");
 const rules = require("../utils/subscriptionDevices");
 const audit = require("./auditService");
+const versions = require("./appVersionService");
+const appTokens = require("./appTokenService");
 
 const { REASON } = rules;
 
@@ -29,11 +31,31 @@ const { REASON } = rules;
  * device screen, and in the audit log when there is one — and none of them is
  * returned. Telling a caller "limit reached" or "blocked" is telling it what
  * to change next.
+ *
+ * ## What is written down
+ *
+ * Every check, not only the remarkable ones: `noteCheck` puts one entry in the
+ * audit log for each check that is answered, whether it came from a device on
+ * its first call or its thousandth, and whether the answer was yes or no. A
+ * device taking a place is a second entry of its own, because that is a
+ * change to the account and not only a question asked of it.
  */
 
 const person = (user) => ({ id: user.id, email: user.email });
 const account = (user) => ({ type: "user", id: user.id, label: user.email });
 const clean = (text) => (typeof text === "string" && text.trim() ? text.trim() : null);
+
+/**
+ * The device a check says it came from, as it goes on record: whatever was
+ * sent, cut to fit, or null where nothing was.
+ */
+const asRecorded = (sent = {}) => ({
+  platform: rules.asSent(sent.platform, 40).toLowerCase() || null,
+  deviceId: rules.asSent(sent.deviceId, 128) || null,
+  version: rules.asSent(sent.version, 40) || null,
+  // How the caller signed in: with the password, or the app's token.
+  ...(sent.via ? { via: sent.via } : {}),
+});
 
 /* ------------------------------------------------------------------ *
  * Platforms
@@ -163,13 +185,16 @@ const REASON_WORDS = Object.freeze({
   [REASON.BLOCKED]: "the device is blocked",
   [REASON.LIMIT_REACHED]: "every place on that platform is taken",
   [REASON.BEYOND_LIMIT]: "the device has a place, but beyond what the subscription allows now",
+  [REASON.APP_VERSION]: "every subscription the device may use turns away the version of the app",
+  [REASON.NO_SUBSCRIPTION]: "the account has no subscription running",
 });
 
 /**
- * Write down that a check was turned away, and why. Never throws: failing to
- * record a refusal must not turn into a different answer for the caller.
+ * Keep the row staff read on the account's device screen: that this device
+ * was turned away, why, and how many times. Never throws: failing to keep it
+ * must not turn into a different answer for the caller.
  */
-async function noteRefusal(user, sent, reason, detail = {}) {
+async function keepRefusal(user, sent, reason) {
   const platformValue = rules.asSent(sent.platform, 40).toLowerCase();
   const deviceId = rules.asSent(sent.deviceId, 128);
 
@@ -197,31 +222,33 @@ async function noteRefusal(user, sent, reason, detail = {}) {
   } catch (err) {
     console.error(`[devices] could not record a refusal for user ${user.id}: ${err.message}`);
   }
-
-  await audit.record({
-    action: AUDIT_ACTIONS.SUBSCRIPTION_DEVICE_REFUSE,
-    actor: person(user),
-    entity: account(user),
-    after: { reason, platform: platformValue || null, deviceId: deviceId || null, ...detail },
-    outcome: "failure",
-    message: `subscription check answered "not valid": ${REASON_WORDS[reason] || reason}`,
-  });
 }
 
 /**
  * Decide which of an account's running subscriptions the device in this check
- * may use. Returns the ids of those subscriptions — empty when it may use none.
+ * may use.
+ *
+ * Returns `{ allowed, versionRefused, reason, detail, added }`: `allowed` is
+ * the ids of those subscriptions, empty when it may use none — and then
+ * `reason` says why. `versionRefused` maps the id of each subscription the
+ * device has a place under but whose rules turn the app's version away, to
+ * why. `added` is true when the device took a place just now, and `detail`
+ * is what the numbers were, for the record.
+ *
+ * The version decides only which subscriptions are valid, never the place: a
+ * device keeps its place, or takes one, whatever version it checks in with.
  *
  * `memberships` are the account's valid UserSubscription rows. With none there
- * is nothing to use a device on, so nothing is recorded either way.
+ * is nothing to use a device on: that is its own reason, and not a device
+ * being turned away, so no refusal row is kept for it.
  */
 async function admit(user, sent, memberships, now = new Date()) {
-  const nothing = new Set();
-  if (!memberships.length) return nothing;
+  const verdict = (found = {}) => ({ allowed: new Set(), versionRefused: new Map(), reason: null, detail: {}, added: false, ...found });
+  if (!memberships.length) return verdict({ reason: REASON.NO_SUBSCRIPTION });
 
-  const refuse = async (reason, detail) => {
-    await noteRefusal(user, sent, reason, detail);
-    return nothing;
+  const refuse = async (reason, detail = {}) => {
+    await keepRefusal(user, sent, reason);
+    return verdict({ reason, detail });
   };
 
   const device = rules.cleanDeviceId(sent.deviceId);
@@ -249,7 +276,11 @@ async function admit(user, sent, memberships, now = new Date()) {
     if (known?.isBlocked) return { reason: REASON.BLOCKED };
 
     if (known) {
-      await known.update({ lastSeenAt: now, checks: known.checks + 1 }, { transaction });
+      // A check that does not say its version leaves the last one known.
+      await known.update(
+        { lastSeenAt: now, checks: known.checks + 1, ...(sent.version ? { appVersion: sent.version } : {}) },
+        { transaction }
+      );
       return { place: rules.placeOf(devices, device.id) };
     }
 
@@ -257,7 +288,7 @@ async function admit(user, sent, memberships, now = new Date()) {
     if (taken >= most) return { reason: REASON.LIMIT_REACHED, detail: { devicesOnPlatform: taken, mostAllowed: most } };
 
     const added = await UserDevice.create(
-      { userId: user.id, platformId: platform.id, deviceId: device.id, lastSeenAt: now },
+      { userId: user.id, platformId: platform.id, deviceId: device.id, lastSeenAt: now, appVersion: sent.version || null },
       { transaction }
     );
     return { place: taken + 1, added };
@@ -276,8 +307,53 @@ async function admit(user, sent, memberships, now = new Date()) {
   }
 
   const allowed = memberships.filter((m) => outcome.place <= rules.limitFor(m.deviceLimits, platform.id));
-  if (!allowed.length) return refuse(REASON.BEYOND_LIMIT, { place: outcome.place, mostAllowed: most });
-  return new Set(allowed.map((m) => m.subscriptionId));
+  const detail = { place: outcome.place, mostAllowed: most };
+  if (!allowed.length) return refuse(REASON.BEYOND_LIMIT, detail);
+
+  // Each subscription's own rules for the app's version on this platform.
+  const versionRefused = await versions.refusals(platform.id, allowed.map((m) => m.subscriptionId), sent.version || null);
+  const usable = allowed.filter((m) => !versionRefused.has(m.subscriptionId));
+  const added = Boolean(outcome.added);
+  if (!usable.length) {
+    await keepRefusal(user, sent, REASON.APP_VERSION);
+    return verdict({ versionRefused, reason: REASON.APP_VERSION, added, detail });
+  }
+  return verdict({ allowed: new Set(usable.map((m) => m.subscriptionId)), versionRefused, added, detail });
+}
+
+/**
+ * Put a check that was answered in the audit log — every one: from a device
+ * on its first call or one seen a thousand times, answered yes or no.
+ *
+ * `verdict` is what `admit` decided and `validCodes` the subscriptions that came
+ * back valid. With none, the entry carries the reason — which is the only
+ * place a caller's "not valid" is explained. `onVersion` is
+ * `{ "<code>": refusal }` for each subscription that turned the app's version
+ * away, whether or not others were valid.
+ */
+async function noteCheck(user, sent, verdict, validCodes, onVersion = {}) {
+  const valid = validCodes.length > 0;
+  const refusedVersion = Object.entries(onVersion);
+  const versionWords = refusedVersion.map(([code, why]) => `${code}: ${versions.WORDS[why] || why}`).join("; ");
+  await audit.record({
+    action: AUDIT_ACTIONS.SUBSCRIPTION_CHECK,
+    actor: person(user),
+    entity: account(user),
+    after: {
+      ...asRecorded(sent),
+      valid: validCodes,
+      ...(valid ? {} : { reason: verdict.reason }),
+      ...(refusedVersion.length ? { refusedOnVersion: onVersion } : {}),
+      ...(verdict.added ? { newDevice: true } : {}),
+      ...verdict.detail,
+    },
+    outcome: valid ? "success" : "failure",
+    message: valid
+      ? `subscription check answered "valid" for ${validCodes.join(", ")}${verdict.added ? " — from a new device, which took a place" : ""}` +
+        (refusedVersion.length ? `; the app's version was turned away by ${versionWords}` : "")
+      : `subscription check answered "not valid": ${REASON_WORDS[verdict.reason] || verdict.reason}` +
+        (refusedVersion.length ? ` — ${versionWords}` : ""),
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -363,6 +439,10 @@ async function updateDevice(id, { note, isBlocked }) {
   if (note !== undefined) device.note = clean(note);
   if (isBlocked !== undefined) device.isBlocked = Boolean(isBlocked);
   await device.save();
+  // A blocked device's app is signed out too.
+  if (!before.isBlocked && device.isBlocked) {
+    await appTokens.revokeForDevice(device.userId, device.deviceId, device.platform?.value);
+  }
 
   await audit.record({
     action: AUDIT_ACTIONS.SUBSCRIPTION_DEVICE_UPDATE,
@@ -386,6 +466,7 @@ async function removeDevice(id) {
   const device = await deviceOr404(id);
   const before = deviceOut(device, { staff: true });
   await device.destroy();
+  await appTokens.revokeForDevice(device.userId, device.deviceId, device.platform?.value);
 
   await audit.record({
     action: AUDIT_ACTIONS.SUBSCRIPTION_DEVICE_DELETE,
@@ -411,11 +492,15 @@ module.exports = {
   updatePlatform,
   removePlatform,
   limitsOut,
+  asRecorded,
   admit,
+  noteCheck,
   devicesOf,
   devicesOfUser,
   updateDevice,
   removeDevice,
   pruneRefusals,
   REFUSALS_KEPT,
+  REASON,
+  REASON_WORDS,
 };

@@ -32,6 +32,7 @@ export const PERMISSIONS = {
 
   USER_VIEW: "user:view",
   USER_MANAGE_ROLES: "user:manage_roles",
+  USER_RESTRICT: "user:restrict",
 
   ROLE_VIEW: "role:view",
   ROLE_CREATE: "role:create",
@@ -71,6 +72,11 @@ export const PERMISSIONS = {
 
   RAILWAY_MANAGE: "railway:manage",
 
+  ALLOCATION_VIEW: "allocation:view",
+  ALLOCATION_MANAGE: "allocation:manage",
+  ALLOCATION_REQUESTS: "allocation:requests",
+
   SUBSCRIPTION_MANAGE: "subscription:manage",
   SUBSCRIPTION_APPROVE: "subscription:approve",
+  SUBSCRIPTION_VERSIONS: "subscription:versions",
 };

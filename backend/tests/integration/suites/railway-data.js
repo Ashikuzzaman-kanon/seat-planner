@@ -72,7 +72,7 @@ const tomorrowInDhaka = () => new Date(Date.now() + 6 * 3600_000 + 86_400_000).t
   check("which succeeds", job?.status === "succeeded", job?.lastError || "did not finish");
   const r = job?.result || {};
   check("every train has its route", r.routes?.replaced + r.routes?.unchanged === 149, JSON.stringify(r.routes));
-  check("82 approved plans, one per train a source names", r.plans?.approved === 82, JSON.stringify(r.plans));
+  check("226 approved plans, one for each coach of every line-up", r.plans?.approved === 226, JSON.stringify(r.plans));
   check("8 drafts for sources that name no train", r.plans?.drafts === 8, JSON.stringify(r.plans));
   check("50 line-ups and running days", r.compositions?.set === 50 && r.schedules?.set === 50,
     JSON.stringify({ c: r.compositions, s: r.schedules }));
@@ -91,13 +91,21 @@ const tomorrowInDhaka = () => new Date(Date.now() + 6 * 3600_000 + 86_400_000).t
     JSON.stringify(ready.get("SILKCITY EXPRESS (753)")));
   check("still in all three of its classes",
     JSON.stringify(ready.get("SILKCITY EXPRESS (753)")?.seatsByClass) ===
-      JSON.stringify({ "AC Cabin": 96, Snigdha: 78, "Shovon Chair": 210 }),
+      JSON.stringify({ AC_B: 96, SNIGDHA: 78, S_CHAIR: 210 }),
     JSON.stringify(ready.get("SILKCITY EXPRESS (753)")?.seatsByClass));
   check("Madhumati's cabin-fitted coach is two sections", ready.get("MADHUMATI EXPRESS (755)")?.coaches.includes("KA-CABIN"));
   check("running days come from the timetable (Madhumati rests on Saturday)",
     JSON.stringify(ready.get("MADHUMATI EXPRESS (755)")?.runsOn) === "[0,1,2,3,4,5]",
     JSON.stringify(ready.get("MADHUMATI EXPRESS (755)")?.runsOn));
   check("a train without a plan is not made ready", !ready.has("KURIGRAM EXPRESS (797)"));
+  check("each coach of a line-up has its own plan, numbered with its letter",
+    JSON.stringify(ready.get("SILKCITY EXPRESS (753)")?.coaches) === JSON.stringify(["KA", "KHA", "GHA", "CHA", "SCHA"]),
+    JSON.stringify(ready.get("SILKCITY EXPRESS (753)")?.coaches));
+  const silk = (await call("GET", `/plans?trainNameId=${ready.get("SILKCITY EXPRESS (753)")?.id}`, { token: st })).body.plans;
+  check("so Silk City has five plans, KA to SCHA, in the railway's classes",
+    JSON.stringify(silk.filter((p) => p.trainName?.name === "SILKCITY EXPRESS (753)").map((p) => `${p.coachNo}:${p.coachClass?.name}`).sort()) ===
+      JSON.stringify(["CHA:S_CHAIR", "GHA:SNIGDHA", "KA:AC_B", "KHA:AC_B", "SCHA:S_CHAIR"]),
+    JSON.stringify(silk.map((p) => [p.trainName?.name, p.coachNo, p.coachClass?.name])));
 
   const drafts = (await call("GET", "/plans?status=draft", { token: st })).body.plans;
   const plates = drafts.find((p) => p.coachNo === "BERTH-PLATES-40");
@@ -111,7 +119,7 @@ const tomorrowInDhaka = () => new Date(Date.now() + 6 * 3600_000 + 86_400_000).t
   const second = await finished(again.body.job.id, st);
   check("succeeds", second?.status === "succeeded", second?.lastError);
   check("every route unchanged", second?.result.routes.unchanged === 149, JSON.stringify(second?.result.routes));
-  check("every plan kept", second?.result.plans.existing === 90 && second?.result.plans.approved === 0,
+  check("every plan kept", second?.result.plans.existing === 234 && second?.result.plans.approved === 0,
     JSON.stringify(second?.result.plans));
 
   console.log("\n== an overnight train ==");
@@ -140,10 +148,10 @@ const tomorrowInDhaka = () => new Date(Date.now() + 6 * 3600_000 + 86_400_000).t
   check("leaving at the published 10:15", card?.from.time?.startsWith("10:15"), JSON.stringify(card?.from));
   check("arriving at the published 19:00", card?.to.time?.startsWith("19:00"), JSON.stringify(card?.to));
   check("priced in all three classes",
-    ["AC Chair", "Non-AC Cabin", "Shovon Chair"].every((c) => card?.fares.some((f) => f.coachClass === c && f.fareMinor > 0)),
+    ["AC_CHAIR", "F_BERTH", "S_CHAIR"].every((c) => card?.fares.some((f) => f.coachClass === c && f.fareMinor > 0)),
     JSON.stringify(card?.fares));
-  const chair = card?.fares.find((f) => f.coachClass === "Shovon Chair");
-  check("Shovon Chair at the per-kilometre rate (405 km × 1.30)", chair?.fareMinor === 52650, `${chair?.fareMinor}`);
+  const chair = card?.fares.find((f) => f.coachClass === "S_CHAIR");
+  check("S_CHAIR at the per-kilometre rate (405 km × 1.30)", chair?.fareMinor === 52650, `${chair?.fareMinor}`);
 
   const journey = { tripId: card.tripId, fromStationId: dhaka.id, toStationId: dinajpur.id, count: 1 };
   const held = await call("POST", "/holds/auto", { token: ut, body: { ...journey, together: true } });

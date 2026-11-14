@@ -12,6 +12,7 @@ const listPlans = asyncHandler(async (req, res) => {
     search: req.query.search || "",
     mine: req.query.mine === "1" || req.query.mine === "true",
     templates: req.query.templates === "1" || req.query.templates === "true",
+    kind: req.query.kind === "templates" ? "templates" : "plans",
     trainNameId: req.query.trainNameId,
   });
   res.json({ plans });
@@ -34,6 +35,12 @@ const updatePlan = asyncHandler(async (req, res) => {
     data: req.body,
   });
   res.json({ message: "Plan updated", plan });
+});
+
+/** An editable copy of an approved plan: 201 when it was just opened, 200 when it already was. */
+const revise = asyncHandler(async (req, res) => {
+  const { plan, opened } = await seatPlanService.revise({ ...actor(req), id: req.params.id });
+  res.status(opened ? 201 : 200).json({ message: opened ? "Copy opened" : "Copy already open", plan });
 });
 
 const submitPlan = asyncHandler(async (req, res) => {
@@ -60,11 +67,39 @@ const deletePlan = asyncHandler(async (req, res) => {
   res.json({ message: "Plan deleted" });
 });
 
+/** One or several plans moved to templates: { results: [{ id, ok, label | reason }] }. */
+const moveToTemplates = asyncHandler(async (req, res) => {
+  res.json({ results: await seatPlanService.moveToTemplates({ ...actor(req), ids: req.body.ids }) });
+});
+
+const restore = asyncHandler(async (req, res) => {
+  res.json({ plan: await seatPlanService.restoreFromTemplates({ ...actor(req), id: req.params.id }) });
+});
+
+const changeDetails = asyncHandler(async (req, res) => {
+  res.json({ plan: await seatPlanService.changeDetails({ ...actor(req), id: req.params.id, data: req.body }) });
+});
+
+const replace = asyncHandler(async (req, res) => {
+  const { plan, templateId } = await seatPlanService.replaceWith({
+    ...actor(req),
+    id: req.params.id,
+    data: req.body,
+    planId: req.body.planId ? Number(req.body.planId) : null,
+  });
+  res.status(201).json({ plan, templateId });
+});
+
 module.exports = {
   listPlans,
+  moveToTemplates,
+  restore,
+  changeDetails,
+  replace,
   getPlan,
   createPlan,
   updatePlan,
+  revise,
   submitPlan,
   approvePlan,
   rejectPlan,

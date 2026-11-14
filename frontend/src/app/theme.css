@@ -151,6 +151,15 @@ h4 {
 a {
   color: var(--brand-600);
 }
+/* A link drawn as a solid button keeps the button's text colour. PrimeReact's
+   own rules sit in a layer, so the plain link colour above would beat them and
+   leave blue text on a blue button. */
+a.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-link),
+a.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-link):hover,
+a.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-link):visited {
+  color: var(--primary-color-text);
+  text-decoration: none;
+}
 
 /* Read by screen readers, not drawn. */
 .sr-only {

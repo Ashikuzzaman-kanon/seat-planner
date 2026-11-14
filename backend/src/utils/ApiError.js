@@ -26,6 +26,20 @@ class ApiError extends Error {
   static conflict(msg = "Conflict") {
     return new ApiError(409, msg);
   }
+  /**
+   * A tab of the app switched off for the caller (see services/featureService).
+   * A 403 with its own code, not a 503: the app reads 503 as "the server is
+   * waking up" and would keep retrying. `note` is the message the super admin
+   * left for the people it is off for.
+   */
+  static featureUnavailable(features, note) {
+    const error = new ApiError(403, note ? `This is temporarily unavailable: ${note}` : "This is temporarily unavailable.", {
+      features,
+      note: note || null,
+    });
+    error.code = "FEATURE_UNAVAILABLE";
+    return error;
+  }
   /** `retryAfterSeconds` becomes the Retry-After header (see the error handler). */
   static tooManyRequests(msg = "Too many requests", retryAfterSeconds) {
     const error = new ApiError(429, msg);

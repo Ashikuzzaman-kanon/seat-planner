@@ -11,6 +11,7 @@ import SubscriptionEditor from "@/components/subscriptions/SubscriptionEditor";
 import RequestsQueue from "@/components/subscriptions/RequestsQueue";
 import Subscribers from "@/components/subscriptions/Subscribers";
 import Platforms from "@/components/subscriptions/Platforms";
+import Versions from "@/components/subscriptions/Versions";
 import {
   fetchMyDevices,
   fetchMySubscriptions,
@@ -24,9 +25,10 @@ import "@/components/subscriptions/subscriptions.css";
  * Subscriptions.
  *
  * Everyone signed in sees what there is and where they stand with each. The
- * two reviewer tabs — who is waiting, and who is subscribed — and the
- * manager's tab for platforms appear only for someone who can act on them;
- * with neither permission there are no tabs at all, just the list.
+ * two reviewer tabs — who is waiting, and who is subscribed — the manager's
+ * tab for platforms, and the tab for which app versions may check appear only
+ * for someone who can act on them; with none of those permissions there are
+ * no tabs at all, just the list.
  *
  * `?tab=requests` opens on the queue, which is where the "someone asked"
  * notification points.
@@ -37,6 +39,7 @@ export default function SubscriptionsPage() {
 
   const canManage = hasPermission(PERMISSIONS.SUBSCRIPTION_MANAGE);
   const canReview = hasPermission(PERMISSIONS.SUBSCRIPTION_APPROVE);
+  const canVersions = hasPermission(PERMISSIONS.SUBSCRIPTION_VERSIONS);
   const staff = canManage || canReview;
 
   const [tab, setTab] = useState("subscriptions");
@@ -47,6 +50,8 @@ export default function SubscriptionsPage() {
   const [myDevices, setMyDevices] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
+  // The subscription the Versions tab shows; kept in the address as ?subscription=.
+  const [versionsOf, setVersionsOf] = useState(null);
 
   const notify = useCallback(
     (severity, summary, detail) =>
@@ -82,9 +87,16 @@ export default function SubscriptionsPage() {
   // Read the tab from the address once the permission is known — a link to the
   // queue must not strand someone who cannot see it on an empty page.
   useEffect(() => {
-    const wanted = new URLSearchParams(window.location.search).get("tab");
-    if ((canReview && ["requests", "subscribers"].includes(wanted)) || (canManage && wanted === "platforms")) setTab(wanted);
-  }, [canReview, canManage]);
+    const params = new URLSearchParams(window.location.search);
+    const wanted = params.get("tab");
+    if (params.get("subscription")) setVersionsOf(Number(params.get("subscription")));
+    if (
+      (canReview && ["requests", "subscribers"].includes(wanted)) ||
+      (canManage && wanted === "platforms") ||
+      (canVersions && wanted === "versions")
+    )
+      setTab(wanted);
+  }, [canReview, canManage, canVersions]);
 
   // Staff are sent the switched-off platforms too; only the others can be asked for.
   const askable = offered.platforms.filter((p) => p.isActive);
@@ -93,14 +105,22 @@ export default function SubscriptionsPage() {
     canReview && { key: "requests", label: "Requests", icon: "pi pi-inbox", count: pending },
     canReview && { key: "subscribers", label: "Subscribers", icon: "pi pi-users" },
     canManage && { key: "platforms", label: "Platforms", icon: "pi pi-desktop" },
+    canVersions && { key: "versions", label: "Versions", icon: "pi pi-tag" },
   ].filter(Boolean);
 
-  const show = (next) => {
+  const show = (next, { subscriptionId = null } = {}) => {
     setTab(next);
     const url = new URL(window.location.href);
     if (next === "subscriptions") url.searchParams.delete("tab");
     else url.searchParams.set("tab", next);
+    if (next === "versions" && subscriptionId) url.searchParams.set("subscription", subscriptionId);
+    if (next !== "versions") url.searchParams.delete("subscription");
     window.history.replaceState(null, "", url);
+  };
+
+  const showVersionsOf = (subscriptionId) => {
+    setVersionsOf(subscriptionId);
+    show("versions", { subscriptionId });
   };
 
   return (
@@ -119,7 +139,7 @@ export default function SubscriptionsPage() {
         {canManage && <Button label="New subscription" icon="pi pi-plus" onClick={() => setEditing({})} />}
       </div>
 
-      {staff && (
+      {tabs.length > 1 && (
         <div className="sub-tabs" role="tablist" aria-label="Subscriptions">
           {tabs.map((t) => (
             <button
@@ -158,6 +178,8 @@ export default function SubscriptionsPage() {
         />
       ) : tab === "platforms" && canManage ? (
         <Platforms platforms={offered.platforms} onChanged={load} notify={notify} />
+      ) : tab === "versions" && canVersions ? (
+        <Versions subscriptions={subscriptions} chosenId={versionsOf} onChoose={showVersionsOf} notify={notify} />
       ) : (
         <SubscriptionList
           subscriptions={subscriptions}
@@ -169,6 +191,7 @@ export default function SubscriptionsPage() {
           staff={staff}
           onEdit={setEditing}
           onOpenRequests={canReview ? () => show("requests") : undefined}
+          onOpenVersions={canVersions ? (subscription) => showVersionsOf(subscription.id) : undefined}
           reload={load}
           notify={notify}
         />
