@@ -2,7 +2,8 @@
 
 The learning-goal topics this project covers, topic by topic. Topics 1 to 35 came first and keep their
 numbers; 36 to 59 were added so that every sub-goal on the goal sheet has a topic.
-[The goal sheet, sub-goal by sub-goal](#the-goal-sheet-sub-goal-by-sub-goal) maps each line of the sheet to its topic.
+[The goal sheet, sub-goal by sub-goal](#the-goal-sheet-sub-goal-by-sub-goal) maps each sub-goal still open to its topic and
+to its study page in [goals/](goals/README.md), written to learn from before presenting.
 
 For each topic: what it is (**Topic**), where and how Seat Planner uses it (**In Seat Planner**), and
 where the code is (**Code**). Where a topic is shown by doing rather than by code there are steps
@@ -17,109 +18,88 @@ Code links open the file at the line where the feature lives — on GitHub, or i
 - 🟡 **Partly in the code** — show what is there; the rest is explained.
 - 🎬 **Live demo** — a technique rather than code: done in front of people, on this project.
 - 💬 **Explain** — not in this project. A short talk, with the nearest thing here to point at.
+- 🧰 **In everyday work** — shown by how the work is done; its study page summarises it, with numbers from this repository.
 - ⏳ **Planned** — Phase 9 (hardening); not built.
 
 ## The goal sheet, sub-goal by sub-goal
 
-Every sub-goal on the sheet, in the sheet's own order and wording, with the topic that covers it.
-Where two topics are named, the first is the one to present from.
+Every sub-goal still open on the sheet (as of 15 November 2026), in the sheet's own order and wording,
+with its study page and the topics that cover it. Where two topics are named, the first is the one to
+present from. Sub-goals at 100% are left out.
 
-| Goal | Sub-goals | ✅ | 🟡 | 🎬 | 💬 |
-|---|---|---|---|---|---|
-| [1. Application Deployment (Intermediate)](#goal-1--application-deployment-intermediate) | 18 | 7 | 5 | 0 | 6 |
-| [2. Debugging Techniques (Advanced)](#goal-2--debugging-techniques-advanced) | 7 | 1 | 0 | 4 | 2 |
-| [3. Logging](#goal-3--logging) | 1 | 0 | 1 | 0 | 0 |
-| [4. ORM (Intermediate)](#goal-4--orm-intermediate) | 12 | 11 | 1 | 0 | 0 |
-| [5. Operating System (Advanced)](#goal-5--operating-system-advanced) | 3 | 0 | 3 | 0 | 0 |
-| [6. Unit Testing (Advanced)](#goal-6--unit-testing-advanced) | 4 | 3 | 1 | 0 | 0 |
-| **Total** | **45** | **22** | **11** | **4** | **8** |
+| Goal | Sub-goals | ✅ | 🟡 | 🎬 | 💬 | 🧰 |
+|---|---|---|---|---|---|---|
+| [1. Application Deployment (Basic)](#goal-1--application-deployment-basic) | 3 | 1 | 2 | 0 | 0 | 0 |
+| [2. Application Deployment (Intermediate)](#goal-2--application-deployment-intermediate) | 12 | 4 | 2 | 0 | 6 | 0 |
+| [3. Multiply productivity using AI](#goal-3--multiply-productivity-using-ai) | 6 | 0 | 0 | 0 | 0 | 6 |
+| [4. Debugging Techniques (Advanced)](#goal-4--debugging-techniques-advanced) | 7 | 0 | 0 | 7 | 0 | 0 |
+| **Total** | **28** | **5** | **4** | **7** | **6** | **6** |
 
-### Goal 1 — Application Deployment (Intermediate)
+### Goal 1 — Application Deployment (Basic)
 
-| Sub-goal on the sheet | | Topic | In one line |
-|---|---|---|---|
-| Deployment Strategies | 🟡 | [36](#36--deployment-strategies) | Immutable deploys switched over when ready, with previews first; rolling and canary are explained. |
-| Deployment Tools and Technologies | ✅ | [37](#37--deployment-tools-and-technologies) | Docker, Compose, Caddy, Vercel, Render, Aiven, GitHub Actions and Gradle — each with its file. |
-| Cloud Deployment | ✅ | [29](#29--cloud-deployment) | Live on Vercel, Render and Aiven, behind one origin. |
-| On-Premises Deployment | ✅ | [38](#38--on-premises-deployment), [28](#28--docker-compose-environment-volumes-and-networking) | The whole stack on one machine of your own, with Docker Compose and Caddy. |
-| Continuous Integration and Continuous Deployment (CI/CD) | 🟡 | [31](#31--cicd) | CI on every pull request and an automated Android release; deploys are not gated on it. |
-| Containerization and Orchestration | 🟡 | [39](#39--containerization-and-orchestration), [27](#27--dockerfile-basics-and-dockerizing-nodejs), [28](#28--docker-compose-environment-volumes-and-networking) | Two images and five containers under Compose; Kubernetes is explained. |
-| Monitoring and Logging | 🟡 | [33](#33--monitoring) | A health endpoint and failed-job notices; no metrics or outside alerts. |
-| Security in Application Deployment | ✅ | [30](#30--security-in-deployment) | TLS to the database, a CORS allow-list, secrets in the environment. |
-| Rollback and Disaster Recovery | 🟡 | [32](#32--rollback-and-disaster-recovery) | Every migration can be undone; there are no backups yet. |
-| Best Practices for Application Deployment | ✅ | [40](#40--best-practices-for-application-deployment) | Configuration from the environment, one image for any domain, migrations before start. |
-| Jenkins - Basics | 💬 | [41](#41--jenkins---basics) | Not used — CI here is GitHub Actions. Explained against `ci.yml`. |
-| Jenkins - Freestyle Project | 💬 | [42](#42--jenkins---freestyle-project) | Explained; the frontend build job is the nearest thing. |
-| Jenkins - Pipeline Project | 💬 | [43](#43--jenkins---pipeline-project) | Explained; `ci.yml` translates into a Jenkinsfile stage by stage. |
-| Jenkins - Configuration | 💬 | [44](#44--jenkins---configuration) | Explained; the release workflow's secrets and pinned tools are the nearest thing. |
-| Docker - Optimizing Images | ✅ | [27](#27--dockerfile-basics-and-dockerizing-nodejs) | Production-only install and a two-stage build. |
-| Docker - Security | ✅ | [45](#45--docker---security) | Not root, no secrets in images, only the proxy published. |
-| Docker - Resource Management | 💬 | [46](#46--docker---resource-management) | No limits are set. Explained; the connection-pool cap is the nearest thing. |
-| Docker - Custom Registries | 💬 | [47](#47--docker---custom-registries) | Nothing is pushed to a registry. Explained. |
+Each is at 50%: the project already runs on Docker. The study page adds the commands, the networking rules and the debugging steps behind it, each tried on throw-away containers.
 
-### Goal 2 — Debugging Techniques (Advanced)
+| Sub-goal on the sheet | | Study page | Topic | In one line |
+|---|---|---|---|---|
+| Docker - Basic Commands | 🟡 | [Docker basics](goals/deployment-basic.md#basic-commands) | [27](#27--dockerfile-basics-and-dockerizing-nodejs), [28](#28--docker-compose-environment-volumes-and-networking) | Two Dockerfiles and a five-service Compose file; the everyday commands, tried on throw-away containers. |
+| Docker - Networking | ✅ | [Docker basics](goals/deployment-basic.md#networking) | [28](#28--docker-compose-environment-volumes-and-networking) | Services found by name, only the proxy published, MongoDB on the loopback address only. |
+| Docker - Debugging and Logs | 🟡 | [Docker basics](goals/deployment-basic.md#debugging-and-logs) | [28](#28--docker-compose-environment-volumes-and-networking), [33](#33--monitoring) | Logs to stdout, a graceful stop and a healthcheck; exit codes, `logs` and `inspect` tried by hand. |
 
-| Sub-goal on the sheet | | Topic | In one line |
-|---|---|---|---|
-| Conditional Breakpoints and Actions | 🎬 | [48](#48--conditional-breakpoints-and-actions) | A breakpoint that stops only for a hold of three seats or more, and a logpoint that never stops. |
-| Attach to Process | 🎬 | [49](#49--attach-to-process) | VS Code attached to the API while it runs; Chrome attached to the page inside the Android app. |
-| Debugging Child Processes | 🎬 | [50](#50--debugging-child-processes) | The test runner and the suites it starts, both under one debugger. |
-| Debugging Mixed Code Bases | 🎬 | [51](#51--debugging-mixed-code-bases) | Kotlin and the JavaScript page it hosts, followed across the boundary. |
-| Debugging in Multi-threaded Applications | 💬 | [52](#52--debugging-in-multi-threaded-applications) | Explained; the Android app's background thread and the race tests are the nearest things. |
-| Core dump analysis | 💬 | [53](#53--core-dump-analysis) | Explained; a Node diagnostic report can be shown in its place. |
-| Different env issue reproduce | ✅ | [54](#54--different-env-issue-reproduce) | Four real cases: a timezone, a blocked mail port, a sleeping server, a phone's camera. |
+### Goal 2 — Application Deployment (Intermediate)
 
-### Goal 3 — Logging
+Done on the sheet, so not listed: deployment strategies, tools and technologies, cloud, on-premises, CI/CD, containerization and orchestration. Their topics stay in the guide.
 
-| Sub-goal on the sheet | | Topic | In one line |
-|---|---|---|---|
-| Structured logging | 🟡 | [19](#19--logging-objects-and-structured-records), [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging) | The audit log is structured end to end; the application's console lines are still text, and structuring them is planned. |
+| Sub-goal on the sheet | | Study page | Topic | In one line |
+|---|---|---|---|---|
+| Monitoring and Logging | 🟡 | [Monitoring and logging](goals/deployment-monitoring-logging.md) | [33](#33--monitoring) | A health endpoint, the audit-analysis and jobs pages; no outside check or alerts yet. |
+| Security in Application Deployment | ✅ | [Security](goals/deployment-security.md) | [30](#30--security-in-deployment), [35](#35--authentication-and-authorization) | Secrets kept out of Git and images, HTTPS with HSTS, a CORS allow-list, permissions; the gaps are listed. |
+| Rollback and Disaster Recovery | 🟡 | [Rollback and DR](goals/deployment-rollback-dr.md) | [32](#32--rollback-and-disaster-recovery) | Earlier deploys kept, feature switches, durable jobs; no backups of our own yet. |
+| Best Practices for Application Deployment | ✅ | [Best practices](goals/deployment-best-practices.md) | [40](#40--best-practices-for-application-deployment) | Checked against the twelve factors, with the three gaps to close first. |
+| Jenkins - Basics | 💬 | [Jenkins](goals/jenkins.md#basics) | [41](#41--jenkins---basics) | Not used: CI here is GitHub Actions. Explained, with a Jenkins in Docker to try. |
+| Jenkins - Freestyle Project | 💬 | [Jenkins](goals/jenkins.md#freestyle-project) | [42](#42--jenkins---freestyle-project) | The backend tests as a freestyle job, field by field. |
+| Jenkins - Pipeline Project | 💬 | [Jenkins](goals/jenkins.md#pipeline-project) | [43](#43--jenkins---pipeline-project) | `ci.yml` translated into a Jenkinsfile, line by line. |
+| Jenkins - Configuration | 💬 | [Jenkins](goals/jenkins.md#configuration) | [44](#44--jenkins---configuration) | Manage Jenkins page by page, and a Configuration-as-Code sketch. |
+| Docker - Optimizing Images | ✅ | [Docker, advanced](goals/docker-advanced.md#optimizing-images) | [27](#27--dockerfile-basics-and-dockerizing-nodejs) | Production-only install, layer order, a two-stage web build; measured at 328 MB, 289 MB with one more line. |
+| Docker - Security | ✅ | [Docker, advanced](goals/docker-advanced.md#docker-security) | [45](#45--docker---security) | Not root, no secrets in images, only the proxy published; a Trivy scan read by where its findings come from. |
+| Docker - Resource Management | 💬 | [Docker, advanced](goals/docker-advanced.md#resource-management) | [46](#46--docker---resource-management) | No limits set yet; limits tried with `docker stats`, and the connection-pool cap. |
+| Docker - Custom Registries | 💬 | [Docker, advanced](goals/docker-advanced.md#custom-registries) | [47](#47--docker---custom-registries) | Nothing pushed yet; a local registry tried, and the CI step that would push. |
 
-The sheet's other nine Logging sub-goals are already done, in a Logging goal that is complete, so they are not listed here. Topics [19](#19--logging-objects-and-structured-records) to [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging) are this project's logging topics all the same.
+### Goal 3 — Multiply productivity using AI
 
-### Goal 4 — ORM (Intermediate)
+Likely judged on everyday work rather than a presentation. The study page summarises each sub-goal, with numbers from this repository's history.
 
-| Sub-goal on the sheet | | Topic | In one line |
-|---|---|---|---|
-| Complex querying capabilities in ORM (e.g., subqueries, grouping) | ✅ | [6](#6--complex-querying-subqueries-grouping-filtered-includes) | Subqueries, GROUP BY and filtered includes, through the ORM. |
-| Transactions, including commit and rollback operations | ✅ | [7](#7--transactions-commit-and-rollback), [1](#1--transactions-and-row-locking) | Managed transactions; work is queued only after the commit. |
-| Understand generated Query | ✅ | [8](#8--understanding-the-generated-sql) | Every statement the ORM sends is printed in development. |
-| Understand object tracking | ✅ | [13](#13--object-tracking-and-hooks) | Hooks record every row created while demo data is built. |
-| Lazy Loading & Eager Loading | ✅ | [12](#12--lazy-and-eager-loading) | Eager loading, in a place where a missing include once caused a bug. |
-| Data Seeding | ✅ | [9](#9--data-seeding) | Seeders, the demo-data button and the railway loader — all safe to run twice. |
-| Debug Migration | ✅ | [10](#10--migrations-and-debugging-a-migration) | A migration over live data, rehearsed against a copy of the old schema. |
-| Repository Pattern | 🟡 | [16](#16--repository-pattern) | A service layer owns all data access, without repository interfaces. |
-| Handle Complex Mapping/Constraints | ✅ | [11](#11--complex-mappings-and-constraints), [2](#2--constraints-and-referential-integrity) | Many-to-many, two links to one table, and constraints that carry business rules. |
-| Caching | ✅ | [15](#15--caching) | Settings, permissions and a mail token, each cached in a different way. |
-| Unit Test | ✅ | [55](#55--unit-test--testing-code-that-uses-the-orm) | Database code is tested against a real test database, snapshotted and restored. |
-| Deployment strategies | ✅ | [17](#17--schema-deployment-strategy) | Migrations run before the API starts, so code and schema arrive together. |
+| Sub-goal on the sheet | | Study page | Topic | In one line |
+|---|---|---|---|---|
+| Understand and use AI Skills | 🧰 | [AI productivity](goals/ai-productivity.md#ai-skills) | — | Skills for charts, page design and code review; house rules kept as memory instead. |
+| Understand and use AI agents | 🧰 | [AI productivity](goals/ai-productivity.md#ai-agents) | — | Features built and verified in an agent loop: unit, integration and browser tests, CI. |
+| Use git worktrees to be able to work parallelly in multiple tasks | 🧰 | [AI productivity](goals/ai-productivity.md#git-worktrees-for-parallel-work) | — | These study pages were written in a second worktree, beside work in progress. |
+| Have proper AI setup | 🧰 | [AI productivity](goals/ai-productivity.md#a-proper-ai-setup) | — | Memory with house rules, a command allow-list, and a project that runs and tests locally. |
+| Keep up to date with AI capabilities | 🧰 | [AI productivity](goals/ai-productivity.md#keeping-up-to-date) | — | A weekly routine; features adopted as they appeared. |
+| Increase productivity by 200% | 🧰 | [AI productivity](goals/ai-productivity.md#productivity-measuring-200) | — | 27 pull requests in a month, each with its tests; how to measure against a baseline. |
 
-### Goal 5 — Operating System (Advanced)
+### Goal 4 — Debugging Techniques (Advanced)
 
-| Sub-goal on the sheet | | Topic | In one line |
-|---|---|---|---|
-| Advanced Shell Scripting | 🟡 | [56](#56--advanced-shell-scripting) | The shell that drives the Android release; longer scripts are explained. |
-| Service and System Management | 🟡 | [57](#57--service-and-system-management) | Containers kept running by Compose and timers inside the API; systemd is explained. |
-| Security and Troubleshooting | 🟡 | [58](#58--security-and-troubleshooting) | Least privilege in the containers; a connection test that says what failed. |
+Marked done on the sheet; still to be shown live, last. The demo follows the runbook, in IntelliJ IDEA or PhpStorm, with ready-made run configurations and small scripts. Topics [48](#48--conditional-breakpoints-and-actions) to [54](#54--different-env-issue-reproduce) below were written earlier, for VS Code; they still explain each technique.
 
-### Goal 6 — Unit Testing (Advanced)
+| Sub-goal on the sheet | | Study page | Topic | In one line |
+|---|---|---|---|---|
+| Conditional Breakpoints and Actions | 🎬 | [Debugging runbook](goals/debugging-demo.md#1-conditional-breakpoints-and-actions) | [48](#48--conditional-breakpoints-and-actions) | A condition that stops on the first bad refund of 2,000, a logging breakpoint, an exception breakpoint. |
+| Attach to Process | 🎬 | [Debugging runbook](goals/debugging-demo.md#2-attach-to-process) | [49](#49--attach-to-process) | The running API's debugger switched on without a restart, then attached to. |
+| Debugging Child Processes | 🎬 | [Debugging runbook](goals/debugging-demo.md#3-debugging-child-processes) | [50](#50--debugging-child-processes) | Into the children of a small script, then into the test runner's suites. |
+| Debugging Mixed Code Bases | 🎬 | [Debugging runbook](goals/debugging-demo.md#4-debugging-mixed-code-bases) | [51](#51--debugging-mixed-code-bases) | One seat hold followed from the browser to the API and its row in MySQL. |
+| Debugging in Multi-threaded Applications | 🎬 | [Debugging runbook](goals/debugging-demo.md#5-debugging-in-multi-threaded-applications) | [52](#52--debugging-in-multi-threaded-applications) | Four worker threads losing sales to a race, seen in the debugger, fixed with `Atomics`. |
+| Core dump analysis | 🎬 | [Debugging runbook](goals/debugging-demo.md#6-core-dump-analysis) | [53](#53--core-dump-analysis) | A crash report and a leak's heap snapshot, read; why Docker Desktop writes no core file. |
+| Different env issue reproduce | 🎬 | [Debugging runbook](goals/debugging-demo.md#7-reproducing-an-issue-from-a-different-environment) | [54](#54--different-env-issue-reproduce) | A production-only date bug reproduced with `TZ=UTC`; a Linux-only path bug in a container. |
 
-| Sub-goal on the sheet | | Topic | In one line |
-|---|---|---|---|
-| Test-Driven Development (TDD) | ✅ | [24](#24--test-driven-style-on-pure-logic) | Rules written as small pure functions, with their tests. |
-| Code Coverage and Metrics | ✅ | [26](#26--code-coverage-and-ci) | Measured across both test runs, with floors the build enforces. |
-| Testing Asynchronous and Multi-Threaded Code | 🟡 | [25](#25--testing-asynchronous-code), [59](#59--testing-multi-threaded-code) | Timeouts and retries, and races fired together; threads themselves are explained. |
-| Continuous Integration and Test Automation | ✅ | [26](#26--code-coverage-and-ci), [31](#31--cicd) | Every test runs on every pull request, without anyone starting it. |
+**For the theory session** — every open sub-goal except the debugging demo, presented from its study page.
+The 6 with nothing in the project to show: Jenkins - Basics ([Jenkins](goals/jenkins.md#basics)), Jenkins - Freestyle Project ([Jenkins](goals/jenkins.md#freestyle-project)), Jenkins - Pipeline Project ([Jenkins](goals/jenkins.md#pipeline-project)), Jenkins - Configuration ([Jenkins](goals/jenkins.md#configuration)), Docker - Resource Management ([Docker, advanced](goals/docker-advanced.md#resource-management)), Docker - Custom Registries ([Docker, advanced](goals/docker-advanced.md#custom-registries)).
+Shown in part, the rest explained (4): Docker - Basic Commands ([Docker basics](goals/deployment-basic.md#basic-commands)), Docker - Debugging and Logs ([Docker basics](goals/deployment-basic.md#debugging-and-logs)); Monitoring and Logging ([Monitoring and logging](goals/deployment-monitoring-logging.md)), Rollback and Disaster Recovery ([Rollback and DR](goals/deployment-rollback-dr.md)).
 
-**For the theory session** — the 8 sub-goals that are explained and nothing else: Jenkins - Basics ([41](#41--jenkins---basics)), Jenkins - Freestyle Project ([42](#42--jenkins---freestyle-project)), Jenkins - Pipeline Project ([43](#43--jenkins---pipeline-project)), Jenkins - Configuration ([44](#44--jenkins---configuration)), Docker - Resource Management ([46](#46--docker---resource-management)), Docker - Custom Registries ([47](#47--docker---custom-registries)); Debugging in Multi-threaded Applications ([52](#52--debugging-in-multi-threaded-applications)), Core dump analysis ([53](#53--core-dump-analysis)).
+**To do live, last** — the 7 debugging techniques, in IntelliJ IDEA or PhpStorm: Conditional Breakpoints and Actions ([Debugging runbook](goals/debugging-demo.md#1-conditional-breakpoints-and-actions)), Attach to Process ([Debugging runbook](goals/debugging-demo.md#2-attach-to-process)), Debugging Child Processes ([Debugging runbook](goals/debugging-demo.md#3-debugging-child-processes)), Debugging Mixed Code Bases ([Debugging runbook](goals/debugging-demo.md#4-debugging-mixed-code-bases)), Debugging in Multi-threaded Applications ([Debugging runbook](goals/debugging-demo.md#5-debugging-in-multi-threaded-applications)), Core dump analysis ([Debugging runbook](goals/debugging-demo.md#6-core-dump-analysis)), Different env issue reproduce ([Debugging runbook](goals/debugging-demo.md#7-reproducing-an-issue-from-a-different-environment)).
 
-**To do live** — the 4 that are shown by doing them: Conditional Breakpoints and Actions ([48](#48--conditional-breakpoints-and-actions)), Attach to Process ([49](#49--attach-to-process)), Debugging Child Processes ([50](#50--debugging-child-processes)), Debugging Mixed Code Bases ([51](#51--debugging-mixed-code-bases)).
+**In everyday work** — the 6 AI sub-goals: Understand and use AI Skills ([AI productivity](goals/ai-productivity.md#ai-skills)), Understand and use AI agents ([AI productivity](goals/ai-productivity.md#ai-agents)), Use git worktrees to be able to work parallelly in multiple tasks ([AI productivity](goals/ai-productivity.md#git-worktrees-for-parallel-work)), Have proper AI setup ([AI productivity](goals/ai-productivity.md#a-proper-ai-setup)), Keep up to date with AI capabilities ([AI productivity](goals/ai-productivity.md#keeping-up-to-date)), Increase productivity by 200% ([AI productivity](goals/ai-productivity.md#productivity-measuring-200)).
 
-**Shown in part, the rest explained** — 11: Deployment Strategies ([36](#36--deployment-strategies)), Continuous Integration and Continuous Deployment (CI/CD) ([31](#31--cicd)), Containerization and Orchestration ([39](#39--containerization-and-orchestration)), Monitoring and Logging ([33](#33--monitoring)), Rollback and Disaster Recovery ([32](#32--rollback-and-disaster-recovery)); Structured logging ([19](#19--logging-objects-and-structured-records)); Repository Pattern ([16](#16--repository-pattern)); Advanced Shell Scripting ([56](#56--advanced-shell-scripting)), Service and System Management ([57](#57--service-and-system-management)), Security and Troubleshooting ([58](#58--security-and-troubleshooting)); Testing Asynchronous and Multi-Threaded Code ([25](#25--testing-asynchronous-code)).
-
-*Understand object tracking* is on the sheet twice under ORM; it is one line here.
-
-In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency without holding locks ([4](#4--concurrency-without-holding-locks)), Partitioning ([5](#5--partitioning)), Duplicate entries ([14](#14--duplicate-entries)), A document store beside the relational database ([18](#18--a-document-store-beside-the-relational-database)), Correlating entries to one request ([20](#20--correlating-entries-to-one-request)), Basic logging and log levels ([21](#21--basic-logging-and-log-levels)), Retention ([22](#22--retention)), Concurrency and isolation ([34](#34--concurrency-and-isolation)), Authentication and authorization ([35](#35--authentication-and-authorization)).
+Topics for goals already complete stay in this guide; 38 of them are no longer on the sheet.
 
 ## Database — SQL
 
@@ -129,7 +109,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** A purchase writes the booking, tickets, seat segments, wallet debit and payment in one transaction, re-reading the hold with `SELECT … FOR UPDATE` in case it expired meanwhile. Wallet rows are locked the same way, so five simultaneous purchases on one wallet cannot overspend it. Deciding a subscription request locks its row first too, so two reviewers cannot both act on it.
 
-**Code.** [booking transaction](../backend/src/services/bookingService.js#L214) · [hold locked FOR UPDATE](../backend/src/services/bookingService.js#L217) · [wallet row lock](../backend/src/services/walletService.js#L57) · [subscription decision lock](../backend/src/services/subscriptionService.js#L393)
+**Code.** [booking transaction](../backend/src/services/bookingService.js#L214) · [hold locked FOR UPDATE](../backend/src/services/bookingService.js#L217) · [wallet row lock](../backend/src/services/walletService.js#L57) · [subscription decision lock](../backend/src/services/subscriptionService.js#L455)
 
 ### 2. ✅ Constraints and referential integrity
 
@@ -195,7 +175,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** Command-line seeders build users, seat plans, the network and departures, idempotently. The in-app Demo Data button builds the same data through the normal services, and *Railway Data* loads the real railway's published timetable from a snapshot in the repository — adding what is missing, never changing what is there, so it too can run twice.
 
-**Code.** [importSeatPlans.js](../backend/src/seeders/importSeatPlans.js) · [seedNetwork.js](../backend/src/seeders/seedNetwork.js) · [seedDepartures.js](../backend/src/seeders/seedDepartures.js) · [demoService.populate](../backend/src/services/demoService.js#L814) · [railwayService.load](../backend/src/services/railwayService.js#L380) · [the timetable snapshot](../backend/src/data/railway/timetable.json)
+**Code.** [importSeatPlans.js](../backend/src/seeders/importSeatPlans.js) · [seedNetwork.js](../backend/src/seeders/seedNetwork.js) · [seedDepartures.js](../backend/src/seeders/seedDepartures.js) · [demoService.populate](../backend/src/services/demoService.js#L814) · [railwayService.load](../backend/src/services/railwayService.js#L402) · [the timetable snapshot](../backend/src/data/railway/timetable.json)
 
 ### 10. ✅ Migrations, and debugging a migration
 
@@ -227,7 +207,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** Global `afterCreate` / `afterBulkCreate` hooks note every row created while demo data is being built, in the same transaction as the row, so the demo can later be removed exactly.
 
-**Code.** [demoCapture.install](../backend/src/utils/demoCapture.js#L50) · [registered here](../backend/src/models/index.js#L105)
+**Code.** [demoCapture.install](../backend/src/utils/demoCapture.js#L50) · [registered here](../backend/src/models/index.js#L133)
 
 ### 14. ✅ Duplicate entries
 
@@ -235,7 +215,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** Seeding uses `findOrCreate` so it can run twice; a unique-constraint violation anywhere is answered with a clear 409 instead of a crash. A notification carries a key per event under a unique index, so a job that is retried cannot tell someone twice; a device turned away again and again is one row whose count goes up (`INSERT … ON DUPLICATE KEY UPDATE`), not a row per attempt.
 
-**Code.** [findOrCreate](../backend/src/services/demoService.js#L420) · [unique violation → 409](../backend/src/middleware/errorHandler.js#L13) · [a notification told once](../backend/src/services/inboxService.js#L56) · [one row per refusal, counted](../backend/src/services/deviceService.js#L183)
+**Code.** [findOrCreate](../backend/src/services/demoService.js#L420) · [unique violation → 409](../backend/src/middleware/errorHandler.js#L13) · [a notification told once](../backend/src/services/inboxService.js#L56) · [one row per refusal, counted](../backend/src/services/deviceService.js#L208)
 
 ### 15. ✅ Caching
 
@@ -303,7 +283,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** Partly: finished job records and old notifications are pruned after a configurable number of days, the record of subscription checks that were turned away is capped per account and dropped after ninety, and the unsold seats of trains long gone are cleared daily while everything with money or a journey behind it is kept. Log rotation is Phase 9.
 
-**Code.** [jobService.prune](../backend/src/services/jobService.js#L557) · [inboxService.prune](../backend/src/services/inboxService.js#L160) · [deviceService.pruneRefusals](../backend/src/services/deviceService.js#L400) · [seatRetentionService.clearDeparted](../backend/src/services/seatRetentionService.js#L68)
+**Code.** [jobService.prune](../backend/src/services/jobService.js#L557) · [inboxService.prune](../backend/src/services/inboxService.js#L160) · [deviceService.pruneRefusals](../backend/src/services/deviceService.js#L481) · [seatRetentionService.clearDeparted](../backend/src/services/seatRetentionService.js#L68)
 
 ### 23. ⏳ Asynchronous logging, frameworks, rotation, distributed logging
 
@@ -337,7 +317,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** 44 integration suites live in the repository beside the unit tests. They build a database of their own, snapshot it and restore it before every suite, and talk to the API over HTTP. Coverage is measured across the unit and integration runs together, and the build fails below 90% of lines and functions or 70% of branches. GitHub Actions runs all of it on every pull request and every push to `master`, against MySQL and MongoDB services, with a production build of the web app.
 
-**Code.** [ci.yml](../.github/workflows/ci.yml) · [integration runner](../backend/tests/integration/run.js) · [snapshot and restore](../backend/tests/integration/run.js#L138) · [coverage floors](../backend/package.json#L24) · [what is measured](../backend/.c8rc.json)
+**Code.** [ci.yml](../.github/workflows/ci.yml) · [integration runner](../backend/tests/integration/run.js) · [snapshot and restore](../backend/tests/integration/run.js#L149) · [coverage floors](../backend/package.json#L24) · [what is measured](../backend/.c8rc.json)
 
 ## Application deployment — Docker
 
@@ -373,7 +353,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** TLS to the database; a CORS allow-list that admits the project's own preview deployments by pattern, with one endpoint deliberately open to any origin because nothing of the browser's own goes with a call to it; secrets only in environment variables, and the Android app's signing key only in repository secrets; mail sent over HTTPS because the host blocks SMTP.
 
-**Code.** [database TLS](../backend/src/config/database.js#L9) · [CORS allow-list](../backend/src/utils/allowedOrigin.js#L66) · [the one open route](../backend/src/app.js#L34) · [email over HTTPS](../backend/src/services/emailService.js#L161)
+**Code.** [database TLS](../backend/src/config/database.js#L9) · [CORS allow-list](../backend/src/utils/allowedOrigin.js#L66) · [the one open route](../backend/src/app.js#L36) · [email over HTTPS](../backend/src/services/emailService.js#L161)
 
 ### 31. 🟡 CI/CD
 
@@ -397,7 +377,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** Partly: a health endpoint answers whether the API is up, and the web app calls it to wake a sleeping server and to know when it is back. Background work is watched from inside the app — a screen lists what is running and what failed, and a job that gives up notifies the staff who can send it round again. A script signs in on the live site after the API has slept and records what happened.
 
-**Code.** [health endpoint](../backend/src/routes/index.js#L28) · [a failed job tells staff](../backend/src/services/jobService.js#L127) · [Background Jobs page](../frontend/src/app/dashboard/jobs/page.js) · [prod-wake-check.js](../tools/prod-wake-check.js)
+**Code.** [health endpoint](../backend/src/routes/index.js#L31) · [a failed job tells staff](../backend/src/services/jobService.js#L127) · [Background Jobs page](../frontend/src/app/dashboard/jobs/page.js) · [prod-wake-check.js](../tools/prod-wake-check.js)
 
 **Explain.** There are no metrics, no uptime check and no alert outside the app — those are Phase 9, step 5. Say what is missing: the four golden signals (latency, traffic, errors, saturation), a metrics endpoint that something like Prometheus scrapes, an outside check of the health endpoint, and alerts that reach a person. The logging half of this sub-goal is the Logging topics.
 
@@ -409,7 +389,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** Seat holds claim segments atomically — the unique key on (seat, segment) makes the loser of a race fail cleanly — wallet rows are locked, background jobs use leases with heartbeats, and de-duplication keys stop two clicks queueing two mass refunds. A device takes a place on a subscription with the account's row locked, so of six new devices arriving together exactly one gets the last place; password checks for one email run one at a time, so a burst of guesses is counted in order.
 
-**Code.** [holdService.create](../backend/src/services/holdService.js#L62) · [seat-segment unique key](../backend/migrations/20260105000000-segment-inventory.js#L51) · [job de-duplication](../backend/src/services/jobService.js#L156) · [lease heartbeat](../backend/src/services/jobService.js#L245) · [a place taken under a lock](../backend/src/services/deviceService.js#L241) · [one password check at a time](../backend/src/services/authService.js#L188)
+**Code.** [holdService.create](../backend/src/services/holdService.js#L62) · [seat-segment unique key](../backend/migrations/20260105000000-segment-inventory.js#L51) · [job de-duplication](../backend/src/services/jobService.js#L156) · [lease heartbeat](../backend/src/services/jobService.js#L245) · [a place taken under a lock](../backend/src/services/deviceService.js#L268) · [one password check at a time](../backend/src/services/authService.js#L196)
 
 ### 35. ✅ Authentication and authorization
 
@@ -417,7 +397,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** Hashed passwords, short-lived JWTs with rotating refresh tokens, and permissions as data with an escalation guard. Sign-in pauses for an account after a run of wrong passwords. A caller outside the app can check a subscription with an email and password — through the same check as sign-in, pause included — and is given no session.
 
-**Code.** [tokenService.rotateRefreshToken](../backend/src/services/tokenService.js#L74) · [escalation guard](../backend/src/services/roleService.js#L24) · [the pause after wrong passwords](../backend/src/services/authService.js#L216) · [one check for sign-in and outside callers](../backend/src/services/authService.js#L274)
+**Code.** [tokenService.rotateRefreshToken](../backend/src/services/tokenService.js#L74) · [escalation guard](../backend/src/services/roleService.js#L24) · [the pause after wrong passwords](../backend/src/services/authService.js#L224) · [one check for sign-in and outside callers](../backend/src/services/authService.js#L286)
 
 ## Application deployment — the rest of the goal sheet
 
@@ -465,7 +445,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** Configuration comes from the environment, with an example file listing every variable. The web image is built with a relative API address, so one image runs behind any domain. Schema changes are versioned migrations applied by the container before it serves — never an automatic sync. The API waits for the database to be healthy. Containers run as a non-root user, and no secret is baked into an image. Changes are seen on a preview address first. The tests start the app through the same boot sequence production uses.
 
-**Code.** [config/env.js](../backend/src/config/env.js) · [.env.example](../backend/.env.example) · [a relative API address](../frontend/Dockerfile#L18) · [migrations, then start](../backend/Dockerfile#L39) · [never a sync](../backend/src/boot.js#L17) · [waits for the database](../docker-compose.yml#L43) · [one boot sequence](../backend/src/boot.js#L9)
+**Code.** [config/env.js](../backend/src/config/env.js) · [.env.example](../backend/.env.example) · [a relative API address](../frontend/Dockerfile#L18) · [migrations, then start](../backend/Dockerfile#L39) · [never a sync](../backend/src/boot.js#L18) · [waits for the database](../docker-compose.yml#L43) · [one boot sequence](../backend/src/boot.js#L10)
 
 **Explain.** Two it does not follow yet, and worth naming before someone asks: a deploy does not wait for the checks, and backups are not scheduled.
 
@@ -563,7 +543,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **Do.** The integration tests are a parent and its children: the runner keeps the API inside its own process and starts every suite as a separate Node process. In a VS Code *JavaScript Debug Terminal* run `npm run test:integration -- subscription-devices`; the terminal attaches to each child as it starts. A breakpoint in the suite stops in the child, one in `deviceService.admit` stops in the parent, and the call-stack panel shows both. Without that, the child would have to be started with `--inspect-brk` on a port of its own.
 
-**Code.** [each suite is a child process](../backend/tests/integration/run.js#L90) · [the API stays in the parent](../backend/tests/integration/run.js#L213) · [a suite](../backend/tests/integration/suites/subscription-devices.js) · [deviceService.admit](../backend/src/services/deviceService.js#L218)
+**Code.** [each suite is a child process](../backend/tests/integration/run.js#L101) · [the API stays in the parent](../backend/tests/integration/run.js#L226) · [a suite](../backend/tests/integration/suites/subscription-devices.js) · [deviceService.admit](../backend/src/services/deviceService.js#L245)
 
 ### 51. 🎬 Debugging Mixed Code Bases
 
@@ -599,7 +579,7 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **In Seat Planner.** Four real ones. A timestamp was written in the server's own timezone: invisible on servers set to UTC, six hours out on a developer's machine — fixed by using the database's UTC clock, and a check now fails on any machine where the two differ. Production's host blocks SMTP, so mail that worked locally never left; there it goes over HTTPS. A sleeping production API refuses requests that arrive through the web host's proxy: a browser check simulates that sleeping server locally, and a script records the real one. And a phone refuses its camera to a page that is not served over HTTPS, so a tool serves the local site over HTTPS on the network. Behind all four: the tests start the app through the same boot sequence as production, and Compose runs the production images locally.
 
-**Code.** [the database's UTC clock](../backend/src/services/deviceService.js#L182) · [the check for it](../backend/tests/integration/suites/subscription-devices.js#L144) · [mail over HTTPS](../backend/src/services/emailService.js#L161) · [a simulated sleeping server](../e2e/test-wake.js) · [the real one, recorded](../tools/prod-wake-check.js) · [HTTPS on the local network](../tools/lan-https.js) · [one boot sequence](../backend/src/boot.js#L9)
+**Code.** [the database's UTC clock](../backend/src/services/deviceService.js#L207) · [the check for it](../backend/tests/integration/suites/subscription-devices.js#L144) · [mail over HTTPS](../backend/src/services/emailService.js#L161) · [a simulated sleeping server](../e2e/test-wake.js) · [the real one, recorded](../tools/prod-wake-check.js) · [HTTPS on the local network](../tools/lan-https.js) · [one boot sequence](../backend/src/boot.js#L10)
 
 ## ORM — the rest of the goal sheet
 
@@ -607,9 +587,9 @@ In this guide but not on the sheet: Indexing ([3](#3--indexing)), Concurrency wi
 
 **Topic.** Testing code that talks to the database through the ORM.
 
-**In Seat Planner.** Database code is tested against a real MySQL database, not a stand-in: the runner builds one with the same migrations as production, snapshots it, and restores it before every suite, so each of the 44 suites starts from the same rows. The rules themselves are pulled out of the services into pure functions, so most of the 265 unit tests need no database at all.
+**In Seat Planner.** Database code is tested against a real MySQL database, not a stand-in: the runner builds one with the same migrations as production, snapshots it, and restores it before every suite, so each of the 57 suites starts from the same rows. The rules themselves are pulled out of the services into pure functions, so most of the 337 unit tests need no database at all.
 
-**Code.** [snapshot](../backend/tests/integration/run.js#L138) · [restore](../backend/tests/integration/run.js#L154) · [a rule kept pure](../backend/src/utils/subscriptionDevices.js#L122) · [the service that applies it](../backend/src/services/deviceService.js#L218)
+**Code.** [snapshot](../backend/tests/integration/run.js#L149) · [restore](../backend/tests/integration/run.js#L165) · [a rule kept pure](../backend/src/utils/subscriptionDevices.js#L135) · [the service that applies it](../backend/src/services/deviceService.js#L245)
 
 **Explain.** Say the alternatives and why they were not used: an in-memory SQLite behaves differently from MySQL (locks, JSON, upserts), and mocked models prove only that the mock was called.
 
@@ -665,7 +645,7 @@ explained, or planned, to being shown.
 | What could be built | Topics it would move |
 |---|---|
 | A `Jenkinsfile` that runs what `ci.yml` runs, with Jenkins in a container beside the stack | [41](#41--jenkins---basics), [43](#43--jenkins---pipeline-project), [44](#44--jenkins---configuration) |
-| A logging library such as pino: JSON lines, a level per environment and the request ID on every line. It would finish *Structured logging*, the one Logging sub-goal still open | [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging), [21](#21--basic-logging-and-log-levels) |
+| A logging library such as pino: JSON lines, a level per environment and the request ID on every line | [23](#23--asynchronous-logging-frameworks-rotation-distributed-logging), [21](#21--basic-logging-and-log-levels), [33](#33--monitoring) |
 | Memory and CPU limits on each service in the Compose file, shown with `docker stats` | [46](#46--docker---resource-management) |
 | A CI step that pushes the API image to a registry, and a Compose file that pulls it | [47](#47--docker---custom-registries), [31](#31--cicd) |
 | A database backup script, and a restore that has been tried | [32](#32--rollback-and-disaster-recovery), [56](#56--advanced-shell-scripting) |

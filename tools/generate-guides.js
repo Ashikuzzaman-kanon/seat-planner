@@ -359,9 +359,10 @@ const features = [
  * for the same reason.
  *
  * Topics 36 onward were added so that every sub-goal on the goal sheet has a
- * topic. SHEET, further down, is the goal sheet itself, mapped onto topics:
- * only the sub-goals still open on it. (Its Logging goal has one left; the
- * other nine were completed under an earlier Logging goal.)
+ * topic. SHEET, further down, is the goal sheet itself, mapped onto topics and
+ * onto the study pages in docs/goals/: only the sub-goals still open on it.
+ * Goals since completed (ORM, Logging, Operating System, Unit Testing) left the
+ * sheet; their topics stay in the guide.
  * ==================================================================== */
 
 const DONE = "✅";
@@ -369,6 +370,7 @@ const PART = "🟡";
 const PLAN = "⏳";
 const LIVE = "🎬";
 const TALK = "💬";
+const WORK = "🧰";
 
 /**
  * How many topics, from the first, must come out exactly as they were — and
@@ -767,93 +769,84 @@ const goals = [
 ];
 
 /* ======================================================================
- * The goal sheet: every sub-goal in its own order and wording, with the
- * topics that cover it, how it is covered, and one line saying so.
+ * The goal sheet: every sub-goal still open, in the sheet's own order and
+ * wording, with the topics that cover it, how it is covered, one line saying
+ * so, and its study page in docs/goals/ (a file, and a heading in it). As of
+ * 2026-11-15; every sub-goal at 100% is left out.
  * ==================================================================== */
 
 const SHEET = [
   {
-    goal: "Application Deployment (Intermediate)",
+    goal: "Application Deployment (Basic)",
+    note: "Each is at 50%: the project already runs on Docker. The study page adds the commands, the networking rules and the debugging steps behind it, each tried on throw-away containers.",
     items: [
-      ["Deployment Strategies", PART, ["Deployment Strategies"], "Immutable deploys switched over when ready, with previews first; rolling and canary are explained."],
-      ["Deployment Tools and Technologies", DONE, ["Deployment Tools and Technologies"], "Docker, Compose, Caddy, Vercel, Render, Aiven, GitHub Actions and Gradle — each with its file."],
-      ["Cloud Deployment", DONE, ["Cloud deployment"], "Live on Vercel, Render and Aiven, behind one origin."],
-      ["On-Premises Deployment", DONE, ["On-Premises Deployment", "Docker Compose, environment, volumes and networking"], "The whole stack on one machine of your own, with Docker Compose and Caddy."],
-      ["Continuous Integration and Continuous Deployment (CI/CD)", PART, ["CI/CD"], "CI on every pull request and an automated Android release; deploys are not gated on it."],
-      ["Containerization and Orchestration", PART, ["Containerization and Orchestration", "Dockerfile basics and dockerizing Node.js", "Docker Compose, environment, volumes and networking"], "Two images and five containers under Compose; Kubernetes is explained."],
-      ["Monitoring and Logging", PART, ["Monitoring"], "A health endpoint and failed-job notices; no metrics or outside alerts."],
-      ["Security in Application Deployment", DONE, ["Security in deployment"], "TLS to the database, a CORS allow-list, secrets in the environment."],
-      ["Rollback and Disaster Recovery", PART, ["Rollback and disaster recovery"], "Every migration can be undone; there are no backups yet."],
-      ["Best Practices for Application Deployment", DONE, ["Best Practices for Application Deployment"], "Configuration from the environment, one image for any domain, migrations before start."],
-      ["Jenkins - Basics", TALK, ["Jenkins - Basics"], "Not used — CI here is GitHub Actions. Explained against `ci.yml`."],
-      ["Jenkins - Freestyle Project", TALK, ["Jenkins - Freestyle Project"], "Explained; the frontend build job is the nearest thing."],
-      ["Jenkins - Pipeline Project", TALK, ["Jenkins - Pipeline Project"], "Explained; `ci.yml` translates into a Jenkinsfile stage by stage."],
-      ["Jenkins - Configuration", TALK, ["Jenkins - Configuration"], "Explained; the release workflow's secrets and pinned tools are the nearest thing."],
-      ["Docker - Optimizing Images", DONE, ["Dockerfile basics and dockerizing Node.js"], "Production-only install and a two-stage build."],
-      ["Docker - Security", DONE, ["Docker - Security"], "Not root, no secrets in images, only the proxy published."],
-      ["Docker - Resource Management", TALK, ["Docker - Resource Management"], "No limits are set. Explained; the connection-pool cap is the nearest thing."],
-      ["Docker - Custom Registries", TALK, ["Docker - Custom Registries"], "Nothing is pushed to a registry. Explained."],
+      ["Docker - Basic Commands", PART, ["Dockerfile basics and dockerizing Node.js", "Docker Compose, environment, volumes and networking"], "Two Dockerfiles and a five-service Compose file; the everyday commands, tried on throw-away containers.", "deployment-basic.md#basic-commands"],
+      ["Docker - Networking", DONE, ["Docker Compose, environment, volumes and networking"], "Services found by name, only the proxy published, MongoDB on the loopback address only.", "deployment-basic.md#networking"],
+      ["Docker - Debugging and Logs", PART, ["Docker Compose, environment, volumes and networking", "Monitoring"], "Logs to stdout, a graceful stop and a healthcheck; exit codes, `logs` and `inspect` tried by hand.", "deployment-basic.md#debugging-and-logs"],
+    ],
+  },
+  {
+    goal: "Application Deployment (Intermediate)",
+    note: "Done on the sheet, so not listed: deployment strategies, tools and technologies, cloud, on-premises, CI/CD, containerization and orchestration. Their topics stay in the guide.",
+    items: [
+      ["Monitoring and Logging", PART, ["Monitoring"], "A health endpoint, the audit-analysis and jobs pages; no outside check or alerts yet.", "deployment-monitoring-logging.md"],
+      ["Security in Application Deployment", DONE, ["Security in deployment", "Authentication and authorization"], "Secrets kept out of Git and images, HTTPS with HSTS, a CORS allow-list, permissions; the gaps are listed.", "deployment-security.md"],
+      ["Rollback and Disaster Recovery", PART, ["Rollback and disaster recovery"], "Earlier deploys kept, feature switches, durable jobs; no backups of our own yet.", "deployment-rollback-dr.md"],
+      ["Best Practices for Application Deployment", DONE, ["Best Practices for Application Deployment"], "Checked against the twelve factors, with the three gaps to close first.", "deployment-best-practices.md"],
+      ["Jenkins - Basics", TALK, ["Jenkins - Basics"], "Not used: CI here is GitHub Actions. Explained, with a Jenkins in Docker to try.", "jenkins.md#basics"],
+      ["Jenkins - Freestyle Project", TALK, ["Jenkins - Freestyle Project"], "The backend tests as a freestyle job, field by field.", "jenkins.md#freestyle-project"],
+      ["Jenkins - Pipeline Project", TALK, ["Jenkins - Pipeline Project"], "`ci.yml` translated into a Jenkinsfile, line by line.", "jenkins.md#pipeline-project"],
+      ["Jenkins - Configuration", TALK, ["Jenkins - Configuration"], "Manage Jenkins page by page, and a Configuration-as-Code sketch.", "jenkins.md#configuration"],
+      ["Docker - Optimizing Images", DONE, ["Dockerfile basics and dockerizing Node.js"], "Production-only install, layer order, a two-stage web build; measured at 328 MB, 289 MB with one more line.", "docker-advanced.md#optimizing-images"],
+      ["Docker - Security", DONE, ["Docker - Security"], "Not root, no secrets in images, only the proxy published; a Trivy scan read by where its findings come from.", "docker-advanced.md#docker-security"],
+      ["Docker - Resource Management", TALK, ["Docker - Resource Management"], "No limits set yet; limits tried with `docker stats`, and the connection-pool cap.", "docker-advanced.md#resource-management"],
+      ["Docker - Custom Registries", TALK, ["Docker - Custom Registries"], "Nothing pushed yet; a local registry tried, and the CI step that would push.", "docker-advanced.md#custom-registries"],
+    ],
+  },
+  {
+    goal: "Multiply productivity using AI",
+    note: "Likely judged on everyday work rather than a presentation. The study page summarises each sub-goal, with numbers from this repository's history.",
+    items: [
+      ["Understand and use AI Skills", WORK, [], "Skills for charts, page design and code review; house rules kept as memory instead.", "ai-productivity.md#ai-skills"],
+      ["Understand and use AI agents", WORK, [], "Features built and verified in an agent loop: unit, integration and browser tests, CI.", "ai-productivity.md#ai-agents"],
+      ["Use git worktrees to be able to work parallelly in multiple tasks", WORK, [], "These study pages were written in a second worktree, beside work in progress.", "ai-productivity.md#git-worktrees-for-parallel-work"],
+      ["Have proper AI setup", WORK, [], "Memory with house rules, a command allow-list, and a project that runs and tests locally.", "ai-productivity.md#a-proper-ai-setup"],
+      ["Keep up to date with AI capabilities", WORK, [], "A weekly routine; features adopted as they appeared.", "ai-productivity.md#keeping-up-to-date"],
+      ["Increase productivity by 200%", WORK, [], "27 pull requests in a month, each with its tests; how to measure against a baseline.", "ai-productivity.md#productivity-measuring-200"],
     ],
   },
   {
     goal: "Debugging Techniques (Advanced)",
+    note: "Marked done on the sheet; still to be shown live, last. The demo follows the runbook, in IntelliJ IDEA or PhpStorm, with ready-made run configurations and small scripts. Topics {{Conditional Breakpoints and Actions}} to {{Different env issue reproduce}} below were written earlier, for VS Code; they still explain each technique.",
     items: [
-      ["Conditional Breakpoints and Actions", LIVE, ["Conditional Breakpoints and Actions"], "A breakpoint that stops only for a hold of three seats or more, and a logpoint that never stops."],
-      ["Attach to Process", LIVE, ["Attach to Process"], "VS Code attached to the API while it runs; Chrome attached to the page inside the Android app."],
-      ["Debugging Child Processes", LIVE, ["Debugging Child Processes"], "The test runner and the suites it starts, both under one debugger."],
-      ["Debugging Mixed Code Bases", LIVE, ["Debugging Mixed Code Bases"], "Kotlin and the JavaScript page it hosts, followed across the boundary."],
-      ["Debugging in Multi-threaded Applications", TALK, ["Debugging in Multi-threaded Applications"], "Explained; the Android app's background thread and the race tests are the nearest things."],
-      ["Core dump analysis", TALK, ["Core dump analysis"], "Explained; a Node diagnostic report can be shown in its place."],
-      ["Different env issue reproduce", DONE, ["Different env issue reproduce"], "Four real cases: a timezone, a blocked mail port, a sleeping server, a phone's camera."],
-    ],
-  },
-  {
-    goal: "Logging",
-    note: "The sheet's other nine Logging sub-goals are already done, in a Logging goal that is complete, so they are not listed here. Topics {{Logging objects and structured records}} to {{Asynchronous logging, frameworks, rotation, distributed logging}} are this project's logging topics all the same.",
-    items: [
-      ["Structured logging", PART, ["Logging objects and structured records", "Asynchronous logging, frameworks, rotation, distributed logging"], "The audit log is structured end to end; the application's console lines are still text, and structuring them is planned."],
-    ],
-  },
-  {
-    goal: "ORM (Intermediate)",
-    items: [
-      ["Complex querying capabilities in ORM (e.g., subqueries, grouping)", DONE, ["Complex querying: subqueries, grouping, filtered includes"], "Subqueries, GROUP BY and filtered includes, through the ORM."],
-      ["Transactions, including commit and rollback operations", DONE, ["Transactions: commit and rollback", "Transactions and row locking"], "Managed transactions; work is queued only after the commit."],
-      ["Understand generated Query", DONE, ["Understanding the generated SQL"], "Every statement the ORM sends is printed in development."],
-      ["Understand object tracking", DONE, ["Object tracking and hooks"], "Hooks record every row created while demo data is built."],
-      ["Lazy Loading & Eager Loading", DONE, ["Lazy and eager loading"], "Eager loading, in a place where a missing include once caused a bug."],
-      ["Data Seeding", DONE, ["Data seeding"], "Seeders, the demo-data button and the railway loader — all safe to run twice."],
-      ["Debug Migration", DONE, ["Migrations, and debugging a migration"], "A migration over live data, rehearsed against a copy of the old schema."],
-      ["Repository Pattern", PART, ["Repository pattern"], "A service layer owns all data access, without repository interfaces."],
-      ["Handle Complex Mapping/Constraints", DONE, ["Complex mappings and constraints", "Constraints and referential integrity"], "Many-to-many, two links to one table, and constraints that carry business rules."],
-      ["Caching", DONE, ["Caching"], "Settings, permissions and a mail token, each cached in a different way."],
-      ["Unit Test", DONE, ["Unit Test — testing code that uses the ORM"], "Database code is tested against a real test database, snapshotted and restored."],
-      ["Deployment strategies", DONE, ["Schema deployment strategy"], "Migrations run before the API starts, so code and schema arrive together."],
-    ],
-  },
-  {
-    goal: "Operating System (Advanced)",
-    items: [
-      ["Advanced Shell Scripting", PART, ["Advanced Shell Scripting"], "The shell that drives the Android release; longer scripts are explained."],
-      ["Service and System Management", PART, ["Service and System Management"], "Containers kept running by Compose and timers inside the API; systemd is explained."],
-      ["Security and Troubleshooting", PART, ["Security and Troubleshooting"], "Least privilege in the containers; a connection test that says what failed."],
-    ],
-  },
-  {
-    goal: "Unit Testing (Advanced)",
-    items: [
-      ["Test-Driven Development (TDD)", DONE, ["Test-driven style on pure logic"], "Rules written as small pure functions, with their tests."],
-      ["Code Coverage and Metrics", DONE, ["Code coverage and CI"], "Measured across both test runs, with floors the build enforces."],
-      ["Testing Asynchronous and Multi-Threaded Code", PART, ["Testing asynchronous code", "Testing Multi-Threaded Code"], "Timeouts and retries, and races fired together; threads themselves are explained."],
-      ["Continuous Integration and Test Automation", DONE, ["Code coverage and CI", "CI/CD"], "Every test runs on every pull request, without anyone starting it."],
+      ["Conditional Breakpoints and Actions", LIVE, ["Conditional Breakpoints and Actions"], "A condition that stops on the first bad refund of 2,000, a logging breakpoint, an exception breakpoint.", "debugging-demo.md#1-conditional-breakpoints-and-actions"],
+      ["Attach to Process", LIVE, ["Attach to Process"], "The running API's debugger switched on without a restart, then attached to.", "debugging-demo.md#2-attach-to-process"],
+      ["Debugging Child Processes", LIVE, ["Debugging Child Processes"], "Into the children of a small script, then into the test runner's suites.", "debugging-demo.md#3-debugging-child-processes"],
+      ["Debugging Mixed Code Bases", LIVE, ["Debugging Mixed Code Bases"], "One seat hold followed from the browser to the API and its row in MySQL.", "debugging-demo.md#4-debugging-mixed-code-bases"],
+      ["Debugging in Multi-threaded Applications", LIVE, ["Debugging in Multi-threaded Applications"], "Four worker threads losing sales to a race, seen in the debugger, fixed with `Atomics`.", "debugging-demo.md#5-debugging-in-multi-threaded-applications"],
+      ["Core dump analysis", LIVE, ["Core dump analysis"], "A crash report and a leak's heap snapshot, read; why Docker Desktop writes no core file.", "debugging-demo.md#6-core-dump-analysis"],
+      ["Different env issue reproduce", LIVE, ["Different env issue reproduce"], "A production-only date bug reproduced with `TZ=UTC`; a Linux-only path bug in a container.", "debugging-demo.md#7-reproducing-an-issue-from-a-different-environment"],
     ],
   },
 ];
 
+/** The study pages' names, as the sheet shows them. */
+const STUDY_PAGES = {
+  "deployment-basic.md": "Docker basics",
+  "docker-advanced.md": "Docker, advanced",
+  "deployment-security.md": "Security",
+  "deployment-monitoring-logging.md": "Monitoring and logging",
+  "deployment-rollback-dr.md": "Rollback and DR",
+  "deployment-best-practices.md": "Best practices",
+  "jenkins.md": "Jenkins",
+  "ai-productivity.md": "AI productivity",
+  "debugging-demo.md": "Debugging runbook",
+};
+
 /** What would turn a talk into something to show, and which topics it would move. */
 const COULD_BUILD = [
   ["A `Jenkinsfile` that runs what `ci.yml` runs, with Jenkins in a container beside the stack", ["Jenkins - Basics", "Jenkins - Pipeline Project", "Jenkins - Configuration"]],
-  ["A logging library such as pino: JSON lines, a level per environment and the request ID on every line. It would finish *Structured logging*, the one Logging sub-goal still open", ["Asynchronous logging, frameworks, rotation, distributed logging", "Basic logging and log levels"]],
+  ["A logging library such as pino: JSON lines, a level per environment and the request ID on every line", ["Asynchronous logging, frameworks, rotation, distributed logging", "Basic logging and log levels", "Monitoring"]],
   ["Memory and CPU limits on each service in the Compose file, shown with `docker stats`", ["Docker - Resource Management"]],
   ["A CI step that pushes the API image to a registry, and a Compose file that pulls it", ["Docker - Custom Registries", "CI/CD"]],
   ["A database backup script, and a restore that has been tried", ["Rollback and disaster recovery", "Advanced Shell Scripting"]],
@@ -1000,7 +993,7 @@ ${body}`;
 }
 
 function goalsDoc() {
-  const SHEET_MARKS = [DONE, PART, LIVE, TALK];
+  const SHEET_MARKS = [DONE, PART, LIVE, TALK, WORK];
   const rows = SHEET.flatMap((g) => g.items);
   const tally = (items) => SHEET_MARKS.map((m) => items.filter(([, mark]) => mark === m).length);
   const ref = (title, from) => {
@@ -1008,6 +1001,11 @@ function goalsDoc() {
     return `[${t.n}](#${t.anchor})`;
   };
   const refs = (titles, from) => titles.map((title) => ref(title, from)).join(", ");
+  const study = (page) => {
+    const [file] = page.split("#");
+    if (!STUDY_PAGES[file]) throw new Error(`no name for the study page ${file}`);
+    return `[${STUDY_PAGES[file]}](goals/${page})`;
+  };
   const goalAnchor = (g, i) => slug(`Goal ${i + 1} — ${g.goal}`);
 
   const summary = SHEET.map((g, i) => `| [${i + 1}. ${g.goal}](#${goalAnchor(g, i)}) | ${g.items.length} | ${tally(g.items).join(" | ")} |`).join("\n");
@@ -1016,11 +1014,12 @@ function goalsDoc() {
     [
       `### Goal ${i + 1} — ${g.goal}`,
       "",
-      "| Sub-goal on the sheet | | Topic | In one line |",
-      "|---|---|---|---|",
-      ...g.items.map(([name, mark, titles, brief]) => `| ${name} | ${mark} | ${refs(titles, `sheet "${name}"`)} | ${brief} |`),
-      "",
       ...(g.note ? [fill(g.note, `the note on "${g.goal}"`), ""] : []),
+      "| Sub-goal on the sheet | | Study page | Topic | In one line |",
+      "|---|---|---|---|---|",
+      ...g.items.map(([name, mark, titles, brief, page]) =>
+        `| ${name} | ${mark} | ${study(page)} | ${titles.length ? refs(titles, `sheet "${name}"`) : "—"} | ${brief} |`),
+      "",
     ].join("\n")
   ).join("\n");
 
@@ -1028,7 +1027,7 @@ function goalsDoc() {
   const named = (mark) =>
     SHEET.map((g) => g.items.filter(([, m]) => m === mark))
       .filter((items) => items.length)
-      .map((items) => items.map(([name, , titles]) => `${name} (${ref(titles[0], name)})`).join(", "))
+      .map((items) => items.map(([name, , , , page]) => `${name} (${study(page)})`).join(", "))
       .join("; ");
 
   const onSheet = new Set(rows.flatMap(([, , titles]) => titles));
@@ -1041,13 +1040,15 @@ function goalsDoc() {
 
   const builds = COULD_BUILD.map(([what, titles]) => `| ${what} | ${refs(titles, "COULD_BUILD")} |`).join("\n");
 
-  const [inCode, partly, live, talk] = tally(rows);
+  const totals = tally(rows);
+  const [, partly, live, talk, work] = totals;
   const added = [...topics.values()].filter((t) => t.n > 35);
   return `# Seat Planner — learning goals
 
 The learning-goal topics this project covers, topic by topic. Topics 1 to 35 came first and keep their
 numbers; ${added[0].n} to ${added[added.length - 1].n} were added so that every sub-goal on the goal sheet has a topic.
-[The goal sheet, sub-goal by sub-goal](#the-goal-sheet-sub-goal-by-sub-goal) maps each line of the sheet to its topic.
+[The goal sheet, sub-goal by sub-goal](#the-goal-sheet-sub-goal-by-sub-goal) maps each sub-goal still open to its topic and
+to its study page in [goals/](goals/README.md), written to learn from before presenting.
 
 For each topic: what it is (**Topic**), where and how Seat Planner uses it (**In Seat Planner**), and
 where the code is (**Code**). Where a topic is shown by doing rather than by code there are steps
@@ -1062,28 +1063,30 @@ ${BRANCH_NOTE}
 - ${PART} **Partly in the code** — show what is there; the rest is explained.
 - ${LIVE} **Live demo** — a technique rather than code: done in front of people, on this project.
 - ${TALK} **Explain** — not in this project. A short talk, with the nearest thing here to point at.
+- ${WORK} **In everyday work** — shown by how the work is done; its study page summarises it, with numbers from this repository.
 - ${PLAN} **Planned** — Phase 9 (hardening); not built.
 
 ## The goal sheet, sub-goal by sub-goal
 
-Every sub-goal on the sheet, in the sheet's own order and wording, with the topic that covers it.
-Where two topics are named, the first is the one to present from.
+Every sub-goal still open on the sheet (as of 15 November 2026), in the sheet's own order and wording,
+with its study page and the topics that cover it. Where two topics are named, the first is the one to
+present from. Sub-goals at 100% are left out.
 
 | Goal | Sub-goals | ${SHEET_MARKS.join(" | ")} |
-|---|---|---|---|---|---|
+|---|---|${SHEET_MARKS.map(() => "---").join("|")}|
 ${summary}
-| **Total** | **${rows.length}** | **${inCode}** | **${partly}** | **${live}** | **${talk}** |
+| **Total** | **${rows.length}** | ${totals.map((t) => `**${t}**`).join(" | ")} |
 
 ${sheet}
-**For the theory session** — the ${talk} sub-goals that are explained and nothing else: ${named(TALK)}.
+**For the theory session** — every open sub-goal except the debugging demo, presented from its study page.
+The ${talk} with nothing in the project to show: ${named(TALK)}.
+Shown in part, the rest explained (${partly}): ${named(PART)}.
 
-**To do live** — the ${live} that are shown by doing them: ${named(LIVE)}.
+**To do live, last** — the ${live} debugging techniques, in IntelliJ IDEA or PhpStorm: ${named(LIVE)}.
 
-**Shown in part, the rest explained** — ${partly}: ${named(PART)}.
+**In everyday work** — the ${work} AI sub-goals: ${named(WORK)}.
 
-*Understand object tracking* is on the sheet twice under ORM; it is one line here.
-
-In this guide but not on the sheet: ${notOnSheet.map((t) => `${t.title} ([${t.n}](#${t.anchor}))`).join(", ")}.
+Topics for goals already complete stay in this guide; ${notOnSheet.length} of them are no longer on the sheet.
 
 ${body}
 ## Turning a talk into something to show
@@ -1127,6 +1130,26 @@ const g = goalsDoc();
   }
   for (const [, anchor] of f.matchAll(/\]\(LEARNING-GOALS\.md#([^)]+)\)/g)) {
     if (!anchors.has(anchor)) throw new Error(`FEATURES.md links to LEARNING-GOALS.md#${anchor}, which is not a heading`);
+  }
+}
+
+// Every study-page link must land on a page in docs/goals/, and on a heading there
+// (a repeated heading gets -1, -2 ... as on GitHub).
+{
+  const headingsOf = (file) => {
+    const seen = new Map();
+    return new Set([...fs.readFileSync(file, "utf8").matchAll(/^#{1,6} (.+)$/gm)].map((m) => {
+      const base = slug(m[1].trim());
+      const count = seen.get(base) || 0;
+      seen.set(base, count + 1);
+      return count ? `${base}-${count}` : base;
+    }));
+  };
+  for (const [, page] of g.matchAll(/\]\(goals\/([^)]+)\)/g)) {
+    const [file, anchor] = page.split("#");
+    const full = path.join(OUT, "goals", file);
+    if (!fs.existsSync(full)) throw new Error(`LEARNING-GOALS.md links to goals/${file}, which is not there`);
+    if (anchor && !headingsOf(full).has(anchor)) throw new Error(`LEARNING-GOALS.md links to goals/${page}, which is not a heading there`);
   }
 }
 

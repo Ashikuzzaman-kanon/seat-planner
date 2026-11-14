@@ -1,0 +1,6 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="6 Memory leak (heap snapshot)" type="NodeJSConfigurationType" folderName="Debugging demo" node-parameters="--max-old-space-size=48 --heapsnapshot-near-heap-limit=1 --report-on-fatalerror --diagnostic-dir=demo/debugging/out --report-directory=demo/debugging/out" path-to-js-file="demo/debugging/crash.js" application-parameters="leak" working-dir="$PROJECT_DIR$">
+    <envs />
+    <method v="2" />
+  </configuration>
+</component>

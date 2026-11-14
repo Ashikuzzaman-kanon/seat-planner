@@ -11,7 +11,8 @@ defined as data.
 > request after a quiet spell can take ~50 seconds.
 
 **Guides:** [Features](docs/FEATURES.md) — every feature with a link to its code ·
-[Learning goals](docs/LEARNING-GOALS.md) — each learning-goal topic and where the project exercises it
+[Learning goals](docs/LEARNING-GOALS.md) — each learning-goal topic and where the project exercises it ·
+[Goal study pages](docs/goals/README.md) — the open goals, to learn and present from, and the debugging demo's runbook
 
 ---
 

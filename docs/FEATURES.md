@@ -168,7 +168,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **In Seat Planner.** Registration sends a 6-digit code; password reset signs out every other session. A name, National ID and date of birth are asked for once, before the first booking, and pre-fill every checkout after. After five wrong passwords in a row the account takes no password at all for fifteen minutes (both numbers are settings), so a password cannot be guessed at speed; resetting it ends the pause, and anyone already signed in stays signed in. Every sign-in, failure and reset is written to the audit log — never a password or a code.
 
-**Code.** [authService.register](../backend/src/services/authService.js#L78) · [authService.login](../backend/src/services/authService.js#L324) · [authService.noteWrongPassword](../backend/src/services/authService.js#L216) · [authService.resetPassword](../backend/src/services/authService.js#L401) · [authService.updateProfile](../backend/src/services/authService.js#L469) · [Register page](../frontend/src/app/register/page.js) · [Profile page](../frontend/src/app/dashboard/profile/page.js)
+**Code.** [authService.register](../backend/src/services/authService.js#L81) · [authService.login](../backend/src/services/authService.js#L342) · [authService.noteWrongPassword](../backend/src/services/authService.js#L224) · [authService.resetPassword](../backend/src/services/authService.js#L422) · [authService.updateProfile](../backend/src/services/authService.js#L490) · [Register page](../frontend/src/app/register/page.js) · [Profile page](../frontend/src/app/dashboard/profile/page.js)
 
 **Goal topics covered.** ✅ [Authentication and authorization](LEARNING-GOALS.md#35--authentication-and-authorization) · ✅ [Logging objects and structured records](LEARNING-GOALS.md#19--logging-objects-and-structured-records) · ✅ [Duplicate entries](LEARNING-GOALS.md#14--duplicate-entries)
 
@@ -190,7 +190,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **In Seat Planner.** Anyone signed in can ask for a subscription, saying on how many devices of each platform they will use it. It waits for a reviewer, then runs through the end of its last day in Dhaka. Whether it is valid is read from the clock every time it is looked at, never only from a status that a job sets; an hourly job marks the ended ones and warns the subscriber a few days before. The subscriber can withdraw a request or cancel at any time, sees their devices and how many places are used (to look at, not to change), and can ask again afterwards. A unique key allows one live request per person per subscription, so two clicks cannot make two.
 
-**Code.** [subscriptionService.request](../backend/src/services/subscriptionService.js#L328) · [subscriptionService.cancel](../backend/src/services/subscriptionService.js#L511) · [UserSubscription.isValid](../backend/src/models/UserSubscription.js#L36) · [subscriptionPeriod.resolvePeriod](../backend/src/utils/subscriptionPeriod.js#L42) · [subscription.sweep job](../backend/src/jobs/index.js#L143) · [one live request each](../backend/migrations/20260122000000-subscriptions.js#L75) · [SubscriptionList.js](../frontend/src/components/subscriptions/SubscriptionList.js) · [period tests](../backend/tests/unit/subscriptionPeriod.test.js)
+**Code.** [subscriptionService.request](../backend/src/services/subscriptionService.js#L376) · [subscriptionService.cancel](../backend/src/services/subscriptionService.js#L575) · [UserSubscription.isValid](../backend/src/models/UserSubscription.js#L36) · [subscriptionPeriod.resolvePeriod](../backend/src/utils/subscriptionPeriod.js#L42) · [subscription.sweep job](../backend/src/jobs/index.js#L143) · [one live request each](../backend/migrations/20260122000000-subscriptions.js#L75) · [SubscriptionList.js](../frontend/src/components/subscriptions/SubscriptionList.js) · [period tests](../backend/tests/unit/subscriptionPeriod.test.js)
 
 **Goal topics covered.** ✅ [Duplicate entries](LEARNING-GOALS.md#14--duplicate-entries) · ✅ [Constraints and referential integrity](LEARNING-GOALS.md#2--constraints-and-referential-integrity) · ✅ [Test-driven style on pure logic](LEARNING-GOALS.md#24--test-driven-style-on-pure-logic)
 
@@ -262,7 +262,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **In Seat Planner.** A grid editor for coach layouts with per-seat attributes (window, charging port, fan). A draft can be saved with nothing filled in — train, coach type, class and coach number are asked for only when it is submitted. Plans are submitted and approved or rejected; only approved plans can put seats into service.
 
-**Code.** [PlanEditor.js](../frontend/src/components/plans/PlanEditor.js) · [SeatGrid.js](../frontend/src/components/plans/SeatGrid.js) · [normalizeLayout](../backend/src/utils/normalizeLayout.js#L76) · [seatPlanService.missingForSubmit](../backend/src/services/seatPlanService.js#L65) · [seatPlanService.approvePlan](../backend/src/services/seatPlanService.js#L221)
+**Code.** [PlanEditor.js](../frontend/src/components/plans/PlanEditor.js) · [SeatGrid.js](../frontend/src/components/plans/SeatGrid.js) · [normalizeLayout](../backend/src/utils/normalizeLayout.js#L90) · [seatPlanService.missingForSubmit](../backend/src/services/seatPlanService.js#L70) · [seatPlanService.approvePlan](../backend/src/services/seatPlanService.js#L363)
 
 **Goal topics covered.** ✅ [Data seeding](LEARNING-GOALS.md#9--data-seeding)
 
@@ -284,7 +284,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **In Seat Planner.** Cancelling a departure or a single coach refunds every ticket in full through a background job, one email per passenger. Coaches can be added from approved plans, removed only if no ticket has ever used them, cancelled and reinstated; reinstating is refused while refunds are still being issued.
 
-**Code.** [tripService.cancel](../backend/src/services/tripService.js#L486) · [coachService.cancel](../backend/src/services/coachService.js#L297) · [coachService.add](../backend/src/services/coachService.js#L138) · [TripCoachesDialog.js](../frontend/src/components/departures/TripCoachesDialog.js) · [RefundJobBanner.js](../frontend/src/components/departures/RefundJobBanner.js)
+**Code.** [tripService.cancel](../backend/src/services/tripService.js#L486) · [coachService.cancel](../backend/src/services/coachService.js#L298) · [coachService.add](../backend/src/services/coachService.js#L138) · [TripCoachesDialog.js](../frontend/src/components/departures/TripCoachesDialog.js) · [RefundJobBanner.js](../frontend/src/components/departures/RefundJobBanner.js)
 
 **Goal topics covered.** ✅ [Transactions: commit and rollback](LEARNING-GOALS.md#7--transactions-commit-and-rollback) · ✅ [Concurrency without holding locks](LEARNING-GOALS.md#4--concurrency-without-holding-locks) · ✅ [Concurrency and isolation](LEARNING-GOALS.md#34--concurrency-and-isolation)
 
@@ -326,9 +326,9 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **Topic.** Deciding who may do what, without hard-coding roles into the program.
 
-**In Seat Planner.** A catalogue of 52 permissions is synced to the database on every start. Roles are ordinary rows built from them, a user can hold several, and an escalation guard stops anyone granting a permission they do not hold. The super admin implicitly holds everything. Menus hide what a person cannot use; the API is the real guard. Someone whose roles change is told, by email and in the app, what changed, who changed it and what the account can do now.
+**In Seat Planner.** A catalogue of 57 permissions is synced to the database on every start. Roles are ordinary rows built from them, a user can hold several, and an escalation guard stops anyone granting a permission they do not hold. The super admin implicitly holds everything. Menus hide what a person cannot use; the API is the real guard. Someone whose roles change is told, by email and in the app, what changed, who changed it and what the account can do now.
 
-**Code.** [permission catalogue](../backend/src/constants/permissions.js#L106) · [roleService.assertCanGrantPermissions](../backend/src/services/roleService.js#L24) · [permissionService.getAccess](../backend/src/services/permissionService.js#L95) · [requirePermission](../backend/src/middleware/authorize.js#L17) · [notificationService.rolesChanged](../backend/src/services/notificationService.js#L550) · [Roles page](../frontend/src/app/dashboard/roles/page.js)
+**Code.** [permission catalogue](../backend/src/constants/permissions.js#L113) · [roleService.assertCanGrantPermissions](../backend/src/services/roleService.js#L24) · [permissionService.getAccess](../backend/src/services/permissionService.js#L95) · [requirePermission](../backend/src/middleware/authorize.js#L17) · [notificationService.rolesChanged](../backend/src/services/notificationService.js#L551) · [Roles page](../frontend/src/app/dashboard/roles/page.js)
 
 **Goal topics covered.** ✅ [Authentication and authorization](LEARNING-GOALS.md#35--authentication-and-authorization) · ✅ [Caching](LEARNING-GOALS.md#15--caching) · ✅ [Complex mappings and constraints](LEARNING-GOALS.md#11--complex-mappings-and-constraints) · ✅ [Migrations, and debugging a migration](LEARNING-GOALS.md#10--migrations-and-debugging-a-migration)
 
@@ -336,7 +336,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **Topic.** Every rule that might need tuning — timeouts, deductions, thresholds — changeable without a new release.
 
-**In Seat Planner.** 39 typed settings with limits and descriptions, held in memory and changed at runtime from a settings screen.
+**In Seat Planner.** 47 typed settings with limits and descriptions, held in memory and changed at runtime from a settings screen.
 
 **Code.** [settingDefinitions.js](../backend/src/constants/settingDefinitions.js) · [settingService.get](../backend/src/services/settingService.js#L43) · [settingService.set](../backend/src/services/settingService.js#L88) · [Settings page](../frontend/src/app/dashboard/settings/page.js)
 
@@ -370,7 +370,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **In Seat Planner.** *Railway Data* loads Bangladesh Railway's timetable — 149 trains, their stations and routes — from a snapshot kept in the repository, with the seat plans transcribed from coach diagrams. Loading adds what is missing and never changes what is there, so it can be run again. The 50 trains whose plans are known get coaches, running days and per-kilometre fares, ready for departures; diagrams that name no train become draft plans. Distances are estimated from running times, since the timetable publishes none. It runs as a background job, never generates departures itself, and refuses while demo data exists, because the demo's stations share names with the real ones.
 
-**Code.** [railwayService.load](../backend/src/services/railwayService.js#L380) · [timetable.timeline](../backend/src/utils/timetable.js#L113) · [timetable.estimateDistances](../backend/src/utils/timetable.js#L220) · [timetable.json](../backend/src/data/railway/timetable.json) · [seatPlans.js](../backend/src/data/railway/seatPlans.js) · [Railway Data page](../frontend/src/app/dashboard/railway-data/page.js) · [timetable tests](../backend/tests/unit/timetable.test.js)
+**Code.** [railwayService.load](../backend/src/services/railwayService.js#L402) · [timetable.timeline](../backend/src/utils/timetable.js#L113) · [timetable.estimateDistances](../backend/src/utils/timetable.js#L220) · [timetable.json](../backend/src/data/railway/timetable.json) · [seatPlans.js](../backend/src/data/railway/seatPlans.js) · [Railway Data page](../frontend/src/app/dashboard/railway-data/page.js) · [timetable tests](../backend/tests/unit/timetable.test.js)
 
 **Goal topics covered.** ✅ [Data seeding](LEARNING-GOALS.md#9--data-seeding) · ✅ [Duplicate entries](LEARNING-GOALS.md#14--duplicate-entries) · ✅ [Test-driven style on pure logic](LEARNING-GOALS.md#24--test-driven-style-on-pure-logic)
 
@@ -382,7 +382,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **In Seat Planner.** Two permissions. One creates subscriptions and the platforms they are used on (Windows and Android to begin with; more are rows, not code). The other works the queue: approving sets the period — days from today, or a last day — and starts on the device counts that were asked for, which the reviewer may change then or later while it runs. Every decision locks the row first, so two reviewers cannot both act on one request. From *Subscribers* a reviewer opens an account's devices: what has signed in, a note of their own on each, block or remove, and every check that was turned away, with the reason the caller was never given.
 
-**Code.** [subscriptionService.approve](../backend/src/services/subscriptionService.js#L419) · [decision under a row lock](../backend/src/services/subscriptionService.js#L393) · [subscriptionService.amend](../backend/src/services/subscriptionService.js#L575) · [deviceService.devicesOf](../backend/src/services/deviceService.js#L307) · [deviceService.createPlatform](../backend/src/services/deviceService.js#L63) · [RequestsQueue.js](../frontend/src/components/subscriptions/RequestsQueue.js) · [DevicesDialog.js](../frontend/src/components/subscriptions/DevicesDialog.js) · [Platforms.js](../frontend/src/components/subscriptions/Platforms.js)
+**Code.** [subscriptionService.approve](../backend/src/services/subscriptionService.js#L481) · [decision under a row lock](../backend/src/services/subscriptionService.js#L455) · [subscriptionService.amend](../backend/src/services/subscriptionService.js#L639) · [deviceService.devicesOf](../backend/src/services/deviceService.js#L383) · [deviceService.createPlatform](../backend/src/services/deviceService.js#L85) · [RequestsQueue.js](../frontend/src/components/subscriptions/RequestsQueue.js) · [DevicesDialog.js](../frontend/src/components/subscriptions/DevicesDialog.js) · [Platforms.js](../frontend/src/components/subscriptions/Platforms.js)
 
 **Goal topics covered.** ✅ [Transactions and row locking](LEARNING-GOALS.md#1--transactions-and-row-locking) · ✅ [Authentication and authorization](LEARNING-GOALS.md#35--authentication-and-authorization) · ✅ [Concurrency and isolation](LEARNING-GOALS.md#34--concurrency-and-isolation)
 
@@ -396,7 +396,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **In Seat Planner.** A short-lived JWT access token plus a refresh token that is rotated on every use and stored only as a hash. The browser refreshes automatically, sharing one refresh between simultaneous requests. A password reset signs out every session.
 
-**Code.** [tokenService.issueRefreshToken](../backend/src/services/tokenService.js#L46) · [tokenService.rotateRefreshToken](../backend/src/services/tokenService.js#L74) · [auth middleware](../backend/src/middleware/auth.js) · [api.js (refresh)](../frontend/src/lib/api.js#L109)
+**Code.** [tokenService.issueRefreshToken](../backend/src/services/tokenService.js#L46) · [tokenService.rotateRefreshToken](../backend/src/services/tokenService.js#L74) · [auth middleware](../backend/src/middleware/auth.js) · [api.js (refresh)](../frontend/src/lib/api.js#L116)
 
 **Goal topics covered.** ✅ [Authentication and authorization](LEARNING-GOALS.md#35--authentication-and-authorization)
 
@@ -414,9 +414,9 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **Topic.** A machine-readable description of every endpoint, its permissions and its responses.
 
-**In Seat Planner.** An OpenAPI 3 spec of 136 paths, served at `/api/v1/openapi.json`.
+**In Seat Planner.** An OpenAPI 3 spec of 181 paths, served at `/api/v1/openapi.json`.
 
-**Code.** [openapi.js](../backend/src/docs/openapi.js) · [served here](../backend/src/routes/index.js#L37)
+**Code.** [openapi.js](../backend/src/docs/openapi.js) · [served here](../backend/src/routes/index.js#L40)
 
 **Goal topics covered.** none of the listed topics — this one is about the product rather than a learning goal
 
@@ -446,7 +446,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **In Seat Planner.** One endpoint takes an email, a password, a device id and a platform, and answers with the account's name and a yes or no for every subscription: no dates, no tokens. It alone answers any origin; the rest of the API keeps its allow-list. The password is checked by the same function as sign-in and shares its pause, so there is no second, softer door to guess at. A subscription allows so many devices per platform: the first time a device checks in and a place is free it takes one, in the order devices arrived, with the account row locked so that two new devices cannot both take the last place. A device that is not let in — limit reached, blocked, unknown platform, missing id — is told only `valid: false`; the reason is kept for staff and never returned.
 
-**Code.** [subscriptionController.check](../backend/src/controllers/subscriptionController.js#L25) · [one route open to any origin](../backend/src/app.js#L34) · [authService.checkCredentials](../backend/src/services/authService.js#L274) · [deviceService.admit](../backend/src/services/deviceService.js#L218) · [subscriptionDevices.placeOf](../backend/src/utils/subscriptionDevices.js#L122) · [device-limit tests](../backend/tests/unit/subscriptionDevices.test.js) · [device suite](../backend/tests/integration/suites/subscription-devices.js) · [README: Subscriptions and the check API](../README.md)
+**Code.** [subscriptionController.check](../backend/src/controllers/subscriptionController.js#L76) · [one route open to any origin](../backend/src/app.js#L36) · [authService.checkCredentials](../backend/src/services/authService.js#L286) · [deviceService.admit](../backend/src/services/deviceService.js#L245) · [subscriptionDevices.placeOf](../backend/src/utils/subscriptionDevices.js#L135) · [device-limit tests](../backend/tests/unit/subscriptionDevices.test.js) · [device suite](../backend/tests/integration/suites/subscription-devices.js) · [README: Subscriptions and the check API](../README.md)
 
 **Goal topics covered.** ✅ [Authentication and authorization](LEARNING-GOALS.md#35--authentication-and-authorization) · ✅ [Security in deployment](LEARNING-GOALS.md#30--security-in-deployment) · ✅ [Concurrency and isolation](LEARNING-GOALS.md#34--concurrency-and-isolation) · ✅ [Transactions and row locking](LEARNING-GOALS.md#1--transactions-and-row-locking) · ✅ [Test-driven style on pure logic](LEARNING-GOALS.md#24--test-driven-style-on-pure-logic)
 
@@ -470,7 +470,7 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **In Seat Planner.** A request that reaches the sleeping API through the web host's proxy is refused rather than waking it, so the browser wakes it itself with one direct request and shows that the server is starting. Every request refused meanwhile waits for that same wake-up and is then sent once more — only requests that provably never reached the API, so nothing can be bought twice. Reloading while it wakes no longer signs anyone out, and errors that come from the hosting platform are explained in words rather than as a status code.
 
-**Code.** [api.js (wakeServer)](../frontend/src/lib/api.js#L79) · [api.js (errors in words)](../frontend/src/lib/api.js#L133) · [ServerWaking.js](../frontend/src/components/common/ServerWaking.js) · [the wake address](../frontend/next.config.mjs#L19) · [AuthContext.js](../frontend/src/contexts/AuthContext.js) · [wake check](../e2e/test-wake.js)
+**Code.** [api.js (wakeServer)](../frontend/src/lib/api.js#L86) · [api.js (errors in words)](../frontend/src/lib/api.js#L140) · [ServerWaking.js](../frontend/src/components/common/ServerWaking.js) · [the wake address](../frontend/next.config.mjs#L19) · [AuthContext.js](../frontend/src/contexts/AuthContext.js) · [wake check](../e2e/test-wake.js)
 
 **Goal topics covered.** ✅ [Cloud deployment](LEARNING-GOALS.md#29--cloud-deployment)
 
@@ -478,8 +478,8 @@ rather than changing it, and lists under *Worth knowing* which permissions it la
 
 **Topic.** Knowing that a change did not break something else, before it is merged.
 
-**In Seat Planner.** 265 unit tests cover the pure logic, and 44 integration suites exercise the API over HTTP. The suites build a database of their own — its name must end in `_test` — snapshot it, and restore it before every suite, so each starts from the same data whatever ran before. Coverage is measured across both runs, and the build fails below 90% of lines and functions or 70% of branches. GitHub Actions runs all of it against MySQL and MongoDB on every pull request and every push to `master`, with a production build of the web app. Browser checks drive the running site at laptop and phone widths.
+**In Seat Planner.** 337 unit tests cover the pure logic, and 57 integration suites exercise the API over HTTP. The suites build a database of their own — its name must end in `_test` — snapshot it, and restore it before every suite, so each starts from the same data whatever ran before. Coverage is measured across both runs, and the build fails below 90% of lines and functions or 70% of branches. GitHub Actions runs all of it against MySQL and MongoDB on every pull request and every push to `master`, with a production build of the web app. Browser checks drive the running site at laptop and phone widths.
 
-**Code.** [ci.yml](../.github/workflows/ci.yml) · [integration runner](../backend/tests/integration/run.js) · [snapshot and restore](../backend/tests/integration/run.js#L138) · [coverage floors](../backend/package.json#L24) · [unit tests](../backend/tests/unit) · [integration suites](../backend/tests/integration/suites) · [browser checks](../e2e/README.md)
+**Code.** [ci.yml](../.github/workflows/ci.yml) · [integration runner](../backend/tests/integration/run.js) · [snapshot and restore](../backend/tests/integration/run.js#L149) · [coverage floors](../backend/package.json#L24) · [unit tests](../backend/tests/unit) · [integration suites](../backend/tests/integration/suites) · [browser checks](../e2e/README.md)
 
 **Goal topics covered.** ✅ [Code coverage and CI](LEARNING-GOALS.md#26--code-coverage-and-ci) · ✅ [Test-driven style on pure logic](LEARNING-GOALS.md#24--test-driven-style-on-pure-logic) · ✅ [Testing asynchronous code](LEARNING-GOALS.md#25--testing-asynchronous-code) · 🟡 [CI/CD](LEARNING-GOALS.md#31--cicd)
