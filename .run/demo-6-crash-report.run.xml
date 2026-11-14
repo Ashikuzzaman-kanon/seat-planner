@@ -1,0 +1,6 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="6 Crash report" type="NodeJSConfigurationType" folderName="Debugging demo" node-parameters="--report-uncaught-exception --diagnostic-dir=demo/debugging/out --report-directory=demo/debugging/out" path-to-js-file="demo/debugging/crash.js" application-parameters="report" working-dir="$PROJECT_DIR$">
+    <envs />
+    <method v="2" />
+  </configuration>
+</component>

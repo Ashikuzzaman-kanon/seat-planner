@@ -8,6 +8,7 @@ const { PERMISSIONS } = require("../constants/permissions");
 const { loginRules } = require("../validators/authValidators");
 const { SUBSCRIPTION_STATUS } = require("../models/UserSubscription");
 const { MAX_DAYS, isCalendarDate } = require("../utils/subscriptionPeriod");
+const { bearerOf } = require("../services/appTokenService");
 
 /**
  * Subscriptions.
@@ -18,21 +19,56 @@ const { MAX_DAYS, isCalendarDate } = require("../utils/subscriptionPeriod");
  *   - `subscription:manage` creates, renames, closes and deletes subscriptions,
  *     and the platforms they can be used on;
  *   - `subscription:approve` works the requests and the subscriber list, sets
- *     how many devices each subscription allows, and looks after devices.
+ *     how many devices each subscription allows, and looks after devices;
+ *   - `subscription:versions` decides, for each subscription, which versions
+ *     of the apps it accepts.
  *
  * And one with no session at all: POST /check takes an email and password,
- * and the device the call came from, and says which subscriptions that
- * account holds on it.
+ * the device the call came from and the version of the app making it, and
+ * says which subscriptions that account holds on it.
  */
 const router = express.Router();
 
-// Before `authenticate`: its callers are outside the app and have no token.
-router.post("/check", loginRules, validate, c.check);
+/**
+ * The email and password are required — unless the call carries the app's
+ * sign-in token (`Authorization: Bearer`) from an earlier check instead.
+ */
+async function signInRules(req, _res, next) {
+  if (bearerOf(req)) return next();
+  try {
+    for (const rule of loginRules) await rule.run(req);
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Before `authenticate`: their callers are outside the app, with no session of the site's.
+router.post("/check", signInRules, validate, c.check);
+
+const SAY = Object.freeze({
+  train: "Name the train, or give its number",
+  class: "class is a class code, such as S_CHAIR",
+  coach: "coach is a coach letter, such as KA",
+});
+router.post(
+  "/seat-plans",
+  signInRules,
+  [
+    // One message per field, however it is wrong: missing, not text, or too long.
+    body("train").isString().withMessage(SAY.train).bail().trim().isLength({ min: 1, max: 100 }).withMessage(SAY.train),
+    body("class").optional({ values: "null" }).isString().withMessage(SAY.class).bail().isLength({ max: 40 }).withMessage(SAY.class),
+    body("coach").optional({ values: "null" }).isString().withMessage(SAY.coach).bail().isLength({ max: 40 }).withMessage(SAY.coach),
+  ],
+  validate,
+  c.seatPlans
+);
 
 router.use(authenticate);
 
 const manage = requirePermission(PERMISSIONS.SUBSCRIPTION_MANAGE);
 const approve = requirePermission(PERMISSIONS.SUBSCRIPTION_APPROVE);
+const versionsPermission = requirePermission(PERMISSIONS.SUBSCRIPTION_VERSIONS);
 
 const id = [param("id").isInt({ min: 1 }).withMessage("Invalid id")];
 const text = (field, max) =>
@@ -74,6 +110,7 @@ router.post(
   [
     body("name").isString().trim().isLength({ min: 1, max: 100 }).withMessage("A name of up to 100 characters is required"),
     text("description", 500),
+    body("includesSeatPlans").optional().isBoolean().withMessage("includesSeatPlans must be true or false").toBoolean(),
     body("code")
       .optional({ values: "falsy" })
       .isLength({ max: 40 })
@@ -115,6 +152,70 @@ router.patch(
   c.updatePlatform
 );
 router.delete("/platforms/:id", manage, id, validate, c.removePlatform);
+
+/* ---------------- App versions, per subscription and platform ---------------- */
+
+const platformId = param("platformId").isInt({ min: 1 }).withMessage("Invalid platform id");
+
+router.get("/:id/versions", versionsPermission, id, validate, c.versionPolicies);
+router.patch(
+  "/:id/versions/:platformId",
+  versionsPermission,
+  [
+    ...id,
+    platformId,
+    body("versionRequired").optional().isBoolean().withMessage("versionRequired must be true or false").toBoolean(),
+    body("minVersion").optional({ values: "null" }).isString().isLength({ max: 40 }).withMessage("minVersion must be a version, such as 1.4.2"),
+    body().custom((value) => {
+      if (value?.versionRequired === undefined && value?.minVersion === undefined) throw new Error("Give versionRequired or minVersion");
+      return true;
+    }),
+  ],
+  validate,
+  c.setVersionPolicy
+);
+router.post(
+  "/:id/versions/:platformId/blocked",
+  versionsPermission,
+  [
+    ...id,
+    platformId,
+    body("version").isString().isLength({ min: 1, max: 40 }).withMessage("A version such as 1.4.2 is required"),
+    text("note", 200),
+  ],
+  validate,
+  c.blockVersion
+);
+// Where the app is got from — the button its subscribers see. Empty clears it.
+router.patch(
+  "/:id/app-link",
+  versionsPermission,
+  [...id, body("appUrl").optional({ values: "null" }).isString().isLength({ max: 500 }).withMessage("appUrl is an https:// address of up to 500 characters")],
+  validate,
+  c.setAppLink
+);
+// Tell the subscribers on a platform about a version: a new one out, or an old one going away.
+router.post(
+  "/:id/versions/:platformId/notices",
+  versionsPermission,
+  [
+    ...id,
+    platformId,
+    body("kind").isIn(["released", "retiring"]).withMessage("kind is released or retiring"),
+    body("version").isString().withMessage("A version such as 1.4.2 is required").bail().isLength({ min: 1, max: 40 }).withMessage("A version such as 1.4.2 is required"),
+    body("message").isString().withMessage("Write the message subscribers will read").bail().trim().isLength({ min: 1, max: 1000 }).withMessage("The message is 1 to 1000 characters"),
+    body("email").optional().isBoolean().withMessage("email is true or false").toBoolean(),
+  ],
+  validate,
+  c.sendNotice
+);
+router.delete(
+  "/:id/versions/:platformId/blocked/:blockedId",
+  versionsPermission,
+  [...id, platformId, param("blockedId").isInt({ min: 1 }).withMessage("Invalid id")],
+  validate,
+  c.unblockVersion
+);
 
 /* ---------------- Devices ---------------- */
 
@@ -176,6 +277,14 @@ router.patch(
   validate,
   c.amend
 );
+// One that ended — cancelled, run out or declined — continued: the same record, a new period.
+router.post(
+  "/members/:id/resume",
+  approve,
+  [...id, days, lastDay, given("days", "lastDay"), deviceCounts],
+  validate,
+  c.resume
+);
 // The subscriber ends their own; a reviewer ends anyone's. The service tells them apart.
 router.post("/members/:id/cancel", [...id, text("reason", 500)], validate, c.cancel);
 
@@ -189,9 +298,10 @@ router.patch(
     body("name").optional().isString().trim().isLength({ min: 1, max: 100 }).withMessage("A name of up to 100 characters"),
     text("description", 500),
     body("isOpen").optional().isBoolean().withMessage("isOpen must be true or false").toBoolean(),
+    body("includesSeatPlans").optional().isBoolean().withMessage("includesSeatPlans must be true or false").toBoolean(),
     // Not `given`: a description may be sent empty, to clear it.
     body().custom((value) => {
-      if (!["name", "description", "isOpen"].some((key) => value?.[key] !== undefined)) {
+      if (!["name", "description", "isOpen", "includesSeatPlans"].some((key) => value?.[key] !== undefined)) {
         throw new Error("Nothing to change");
       }
       return true;

@@ -87,6 +87,18 @@ const env = {
     email: process.env.SUPER_ADMIN_EMAIL || "",
     password: process.env.SUPER_ADMIN_PASSWORD || "",
   },
+
+  // The public Seat Allocation page (/seat-allocation).
+  publicPage: {
+    // Shared with the web app's server, which passes each visitor's real
+    // address on with it. Set, the public API answers only requests that
+    // carry it, so nobody can call it directly and claim another address.
+    edgeSecret: process.env.PUBLIC_EDGE_SECRET || "",
+    // Cloudflare Turnstile, the bot check. Both keys, or no bot check.
+    turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || "",
+    turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || "",
+    turnstileVerifyUrl: process.env.TURNSTILE_VERIFY_URL || "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+  },
 };
 
 env.isProduction = env.nodeEnv === "production";

@@ -135,7 +135,7 @@ async function call(method, path, { token, body } = {}) {
   check("a backwards journey is refused", backwards.status === 400, `got ${backwards.status}`);
 
   const classes = (await call("GET", "/reference/coach-classes", { token: t })).body.items;
-  const acChair = classes.find((c) => c.name === "AC Chair");
+  const acChair = classes.find((c) => c.name === "AC_CHAIR");
   const byClass = await call("GET",
     `/trips/${trip.id}/availability?fromStationId=${A}&toStationId=${B}&coachClassId=${acChair.id}`, { token: t });
   check("narrowing to AC Chair gives 80", byClass.body.availableCount === 80, `got ${byClass.body.availableCount}`);

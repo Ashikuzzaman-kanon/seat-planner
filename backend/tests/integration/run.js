@@ -65,6 +65,17 @@ const testEnv = {
   GMAIL_CLIENT_SECRET: "",
   GMAIL_REFRESH_TOKEN: "",
   EMAIL_OUTBOX: path.join(WORK, "outbox.jsonl"),
+  // No test asks the real railway: the railway-sync suite runs a stand-in here.
+  RAILWAY_SOURCE_URL: "http://127.0.0.1:47329/train-routes",
+  RAILWAY_RETRY_MS: "20",
+  RAILWAY_PAUSE_MS: "0",
+  // The public Seat Allocation page: only through the web app (which the
+  // suite plays, with this secret), and a bot check whose answers a stand-in
+  // gives (allocation-public suite).
+  PUBLIC_EDGE_SECRET: "test-edge-secret",
+  TURNSTILE_SITE_KEY: "test-site-key",
+  TURNSTILE_SECRET_KEY: "test-secret-key",
+  TURNSTILE_VERIFY_URL: "http://127.0.0.1:47331/siteverify",
 };
 
 if (!/_test$/.test(testEnv.DB_NAME)) {
@@ -174,6 +185,8 @@ async function restore() {
   await conn.end();
 
   await require(path.join(BACKEND, "src/services/settingService")).loadSettings();
+  await require(path.join(BACKEND, "src/services/featureService")).loadSwitches();
+  require(path.join(BACKEND, "src/services/allocationService")).invalidate();
   require(path.join(BACKEND, "src/services/permissionService")).invalidateAll();
   await jobService.startWorker();
 }
@@ -275,7 +288,11 @@ const signal = (out) =>
       const failures = lines.filter((l) => /\bFAIL\b|Error|crashed/.test(l));
       // Long details (a whole JSON response) are cut: the line says what failed.
       const cut = (l) => (l.length > 240 ? `${l.slice(0, 240)}…` : l);
-      console.log((failures.length ? failures : lines).slice(-15).map((l) => `        ${cut(l)}`).join("\n"));
+      // A suite that crashed never printed its count: show how it ended, not
+      // only the lines that happen to say "Error".
+      const crashed = !/passed, \d+ failed/.test(tail);
+      const shown = crashed ? lines.slice(-25) : (failures.length ? failures : lines).slice(-15);
+      console.log(shown.map((l) => `        ${cut(l)}`).join("\n"));
     }
   }
 

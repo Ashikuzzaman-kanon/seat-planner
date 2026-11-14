@@ -1,5 +1,7 @@
 const asyncHandler = require("../utils/asyncHandler");
 const authService = require("../services/authService");
+const features = require("../services/featureService");
+const publicAllocation = require("../services/publicAllocationService");
 
 /** Context recorded against an issued refresh token, to make sessions identifiable. */
 function requestContext(req) {
@@ -44,6 +46,8 @@ const me = asyncHandler(async (req, res) => {
     user: req.user.toPublicJSON(),
     roles: req.access.roles,
     permissions: req.access.permissions,
+    unavailableFeatures: features.unavailableFor(req.user, req.access),
+    publicFeatures: publicAllocation.publicFeatures(),
   });
 });
 

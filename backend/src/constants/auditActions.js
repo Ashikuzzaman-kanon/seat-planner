@@ -112,6 +112,19 @@ const AUDIT_ACTIONS = Object.freeze({
 
   // The real railway timetable and seat plans, loaded by the super admin.
   RAILWAY_LOAD: "railway.load",
+  // Checking the server against what the railway publishes now, and applying it.
+  RAILWAY_SYNC_CHECK: "railway.sync_check",
+  RAILWAY_SYNC_APPLY: "railway.sync_apply",
+
+  // Feature switches (Settings → Features)
+  FEATURE_SWITCH: "feature.switch",
+
+  // Seat allocation: the railway's own, uploaded and edited (kept apart from booking data)
+  ALLOCATION_IMPORT: "allocation.import",
+  ALLOCATION_EDIT: "allocation.edit",
+  ALLOCATION_CLEAR: "allocation.clear",
+  // Each request to the public page, signed in or not
+  ALLOCATION_PUBLIC_VIEW: "allocation.public_view",
 
   // The daily sweep deleting long-departed trains' unsold seats.
   SEATS_CLEARED: "trip.seats_cleared",
@@ -125,19 +138,45 @@ const AUDIT_ACTIONS = Object.freeze({
   SUBSCRIPTION_DECLINE: "subscription.decline",
   SUBSCRIPTION_CANCEL: "subscription.cancel",
   SUBSCRIPTION_EXTEND: "subscription.extend",
+  SUBSCRIPTION_RESUME: "subscription.resume",
   SUBSCRIPTION_EXPIRE: "subscription.expire",
 
+  // Every check from outside the app that got as far as an answer: who, from
+  // which device, what came back valid — and when nothing did, the reason the
+  // caller was never given. (A check refused at the password is auth.login_failed.)
+  SUBSCRIPTION_CHECK: "subscription.check",
+
   // How many devices a subscription allows, the platforms there are, and the
-  // devices seen on each account. A refusal's reason is recorded here and
-  // never returned to the caller.
+  // devices seen on each account.
   SUBSCRIPTION_LIMITS: "subscription.limits",
   SUBSCRIPTION_PLATFORM_CREATE: "subscription.platform_create",
   SUBSCRIPTION_PLATFORM_UPDATE: "subscription.platform_update",
   SUBSCRIPTION_PLATFORM_DELETE: "subscription.platform_delete",
   SUBSCRIPTION_DEVICE_ADD: "subscription.device_add",
-  SUBSCRIPTION_DEVICE_REFUSE: "subscription.device_refuse",
   SUBSCRIPTION_DEVICE_UPDATE: "subscription.device_update",
   SUBSCRIPTION_DEVICE_DELETE: "subscription.device_delete",
+
+  // Which versions of the apps may make a subscription check, per platform.
+  SUBSCRIPTION_VERSION_POLICY: "subscription.version_policy",
+  SUBSCRIPTION_VERSION_BLOCK: "subscription.version_block",
+  SUBSCRIPTION_VERSION_UNBLOCK: "subscription.version_unblock",
+
+  // An app outside, signed in as a subscriber, asking for seat plans.
+  SUBSCRIPTION_SEAT_PLANS: "subscription.seat_plans",
+
+  // Seat plans: templates, and what saving one that clashes with another can do.
+  PLAN_TEMPLATE: "plan.template",
+  PLAN_RESTORE: "plan.restore",
+  PLAN_DETAILS: "plan.details",
+  PLAN_REPLACE: "plan.replace",
+
+  // A subscription's app: where it is got from, and notices about its versions.
+  SUBSCRIPTION_APP_LINK: "subscription.app_link",
+  SUBSCRIPTION_APP_NOTICE: "subscription.app_notice",
+
+  // An account stopped from signing in at all, and that lifted again.
+  ACCOUNT_RESTRICT: "account.restrict",
+  ACCOUNT_UNRESTRICT: "account.unrestrict",
 
   // Sign-in paused on an account after too many wrong passwords in a row.
   AUTH_LOCKED: "auth.locked",

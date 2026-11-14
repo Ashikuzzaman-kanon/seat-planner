@@ -26,6 +26,16 @@ class SeatPlan extends Model {
       as: "approvedBy",
       foreignKey: { name: "approvedById", allowNull: true },
     });
+    // An approved plan is changed through an editable copy of it: the plan
+    // keeps being used until the copy is approved (seatPlanService `revise`).
+    SeatPlan.belongsTo(models.SeatPlan, {
+      as: "revisionOf",
+      foreignKey: { name: "revisionOfId", allowNull: true },
+    });
+    SeatPlan.hasOne(models.SeatPlan, {
+      as: "revision",
+      foreignKey: { name: "revisionOfId", allowNull: true },
+    });
   }
 
   /**
@@ -39,6 +49,7 @@ class SeatPlan extends Model {
       id: this.id,
       coachNo: this.coachNo,
       status: this.status,
+      isTemplate: this.isTemplate,
       rejectionReason: this.rejectionReason,
       trainNameId: this.trainNameId,
       coachTypeId: this.coachTypeId,
@@ -50,6 +61,9 @@ class SeatPlan extends Model {
       createdBy: usr(this.createdBy),
       approvedBy: usr(this.approvedBy),
       approvedAt: this.approvedAt,
+      revisionOfId: this.revisionOfId,
+      // On an approved plan: its editable copy, while there is one.
+      revision: this.revision ? { id: this.revision.id, status: this.revision.status, rejectionReason: this.revision.rejectionReason } : null,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
@@ -71,6 +85,13 @@ SeatPlan.init(
       type: DataTypes.ENUM(...ALL_PLAN_STATUSES),
       allowNull: false,
       defaultValue: PLAN_STATUS.DRAFT,
+    },
+    // A layout kept to start plans from: never used by trains or
+    // departures, never in conflict with a plan (migration 20260204000000).
+    isTemplate: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
     },
     rejectionReason: {
       type: DataTypes.TEXT,

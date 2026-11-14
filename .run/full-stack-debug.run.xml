@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Full stack (debug)" type="CompoundRunConfigurationType" folderName="Seat Planner">
+    <toRun name="API (debug)" type="NodeJSConfigurationType" />
+    <toRun name="Web app (dev server)" type="js.build_tools.npm" />
+    <toRun name="Web app (browser)" type="JavascriptDebugType" />
+    <method v="2" />
+  </configuration>
+</component>

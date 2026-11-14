@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { InputText } from "primereact/inputtext";
@@ -10,6 +10,14 @@ import { Toast } from "primereact/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import AuthBrand from "@/components/layout/AuthBrand";
 import AuthField from "@/components/layout/AuthField";
+import { publicStatus } from "@/lib/publicAllocation";
+
+/** Back where the visitor came from after signing in — only to a page of this site. */
+function nextPage() {
+  if (typeof window === "undefined") return "/dashboard";
+  const next = new URLSearchParams(window.location.search).get("next") || "";
+  return /^\/(?!\/)[\w\-/?=&.%]*$/.test(next) ? next : "/dashboard";
+}
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -18,13 +26,21 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  // Whether Seat Allocation is open to everyone: then it gets a button here.
+  const [publicOpen, setPublicOpen] = useState(false);
+
+  useEffect(() => {
+    publicStatus()
+      .then((s) => setPublicOpen(Boolean(s.enabled)))
+      .catch(() => setPublicOpen(false));
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       await login(email, password);
-      router.replace("/dashboard");
+      router.replace(nextPage());
     } catch (err) {
       toast.current?.show({
         severity: "error",
@@ -92,6 +108,21 @@ export default function LoginPage() {
           className="w-full auth-submit"
           loading={loading}
         />
+
+        {publicOpen && (
+          <>
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+            <Link href="/seat-allocation" className="auth-public">
+              <i className="pi pi-search" aria-hidden="true" />
+              <span>
+                <strong>Check seat allocation</strong>
+                <small>Free · no account needed</small>
+              </span>
+            </Link>
+          </>
+        )}
 
         <div className="auth-divider">
           <span>New here?</span>

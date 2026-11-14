@@ -73,12 +73,17 @@ const DEMO_ROLES = [
       P.ACCOUNT_HOLD,
       P.USER_VIEW,
       P.USER_MANAGE_ROLES,
+      // Restricting an account is bounded the same way: never one that can do
+      // more than admin can.
+      P.USER_RESTRICT,
       P.ROLE_VIEW,
       P.ROLE_CREATE,
       P.ROLE_UPDATE,
       P.SETTING_VIEW,
       P.AUDIT_VIEW,
       P.JOB_VIEW,
+      // Who looks at the seat allocation, and for what.
+      P.ALLOCATION_REQUESTS,
     ],
   },
   {

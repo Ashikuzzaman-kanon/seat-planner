@@ -28,6 +28,7 @@ class UserDevice extends Model {
       firstSeenAt: this.createdAt,
       lastSeenAt: this.lastSeenAt,
       checks: this.checks,
+      appVersion: this.appVersion,
     };
   }
 }
@@ -44,6 +45,8 @@ UserDevice.init(
     lastSeenAt: { type: DataTypes.DATE, allowNull: false },
     /** How many times it has checked in. */
     checks: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    /** The app version it last checked in with, when it said. */
+    appVersion: { type: DataTypes.STRING(40), allowNull: true },
   },
   {
     sequelize,

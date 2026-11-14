@@ -46,4 +46,20 @@ function requireAnyPermission(...permissions) {
   };
 }
 
-module.exports = { requirePermission, requireAnyPermission };
+/**
+ * Only the super admin. For the feature switches: they apply to the super admin
+ * too, so a role holding them could hide the super admin's own tabs.
+ */
+function requireSuperAdmin(message = "Only the super admin can do this") {
+  return (req, _res, next) => {
+    try {
+      ensureAuthenticated(req);
+    } catch (err) {
+      return next(err);
+    }
+    if (!req.access?.isSuperAdmin) return next(ApiError.forbidden(message));
+    next();
+  };
+}
+
+module.exports = { requirePermission, requireAnyPermission, requireSuperAdmin };

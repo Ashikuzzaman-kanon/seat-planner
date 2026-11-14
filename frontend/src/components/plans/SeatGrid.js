@@ -9,15 +9,20 @@ import "./plan.css";
 import { TIP } from "@/components/ui/tip";
 const ORIENTATION_KEY = "sp_seatgrid_orientation";
 
+const EMPTY = new Set();
+
 const ORIENTATIONS = [
   { label: "Vertical", value: "vertical", icon: "pi pi-arrows-v" },
   { label: "Horizontal", value: "horizontal", icon: "pi pi-arrows-h" },
 ];
 
-function SeatBox({ seat, dir, horizontal, readOnly, selected, onClick }) {
+function SeatBox({ seat, dir, horizontal, readOnly, selected, cursor, inSwap, problem, onClick }) {
   const cls = ["seat"];
   if (readOnly) cls.push("readonly");
   if (selected) cls.push("selected");
+  if (cursor) cls.push("cursor");
+  if (inSwap) cls.push("in-swap");
+  if (problem) cls.push("problem");
   if (seat.isWindow) cls.push("window");
 
   // The direction marker follows the coach: down the page when the plan runs
@@ -25,7 +30,13 @@ function SeatBox({ seat, dir, horizontal, readOnly, selected, onClick }) {
   const arrow = horizontal ? (dir === "down" ? "▶" : "◀") : dir === "down" ? "▼" : "▲";
 
   return (
-    <div className={cls.join(" ")} onClick={readOnly ? undefined : onClick} title={seat.note || undefined}>
+    <div
+      className={cls.join(" ")}
+      onClick={readOnly ? undefined : onClick}
+      title={seat.note || undefined}
+      data-seat={seat.number || undefined}
+      aria-selected={readOnly ? undefined : Boolean(selected)}
+    >
       <div className="seat-badges">
         {seat.isWindow && (
           <span className="seat-badge" title={`${seat.windowType} window`}>
@@ -45,6 +56,12 @@ function SeatBox({ seat, dir, horizontal, readOnly, selected, onClick }) {
  * Renders a seat-plan layout. In editable mode it exposes seat selection,
  * blank/seat toggling, and per-row structural controls via callbacks.
  *
+ * Selection is by place, "row:cell" (lib/layout keyOf): `selectedKeys` are
+ * the seats chosen, `cursor` where the keyboard is (a blank too), `swapKeys`
+ * the seats waiting to be swapped, `problemKeys` seats the checks found
+ * wrong. A seat's click comes with its event, so Ctrl and Shift can be read;
+ * a row's number selects the row.
+ *
  * Orientation is a pure CSS transpose — the same markup, with rows laid out as
  * columns — rather than a rotation, so every number and label stays upright and
  * readable. A 105-seat coach is 22 rows tall, which no laptop shows at once;
@@ -53,7 +70,10 @@ function SeatBox({ seat, dir, horizontal, readOnly, selected, onClick }) {
 export default function SeatGrid({
   layout,
   readOnly = false,
-  selected = null,
+  selectedKeys = EMPTY,
+  cursor = null,
+  swapKeys = EMPTY,
+  problemKeys = EMPTY,
   defaultOrientation = "vertical",
   onSeatClick,
   onCellToggle,
@@ -62,6 +82,8 @@ export default function SeatGrid({
   onDeleteRow,
   onMoveRow,
   onMoveDivider,
+  onRowSelect,
+  onDuplicateRow,
 }) {
   const [orientation, setOrientation] = useState(defaultOrientation);
 
@@ -158,7 +180,20 @@ export default function SeatGrid({
                 <div className="seatgrid-row">
                   {!readOnly && (
                     <div className="row-gutter">
-                      <span className="row-index">{rowIdx + 1}</span>
+                      {onRowSelect ? (
+                        <button
+                          type="button"
+                          className="row-index row-index--pick"
+                          onClick={() => onRowSelect(rowIdx)}
+                          title="Select this row's seats"
+                          aria-label={`Select row ${rowIdx + 1}`}
+                        >
+                          {rowIdx + 1}
+                          {row.reversed && <span className="row-mirrored" title="Mirrored: numbered right to left">⇄</span>}
+                        </button>
+                      ) : (
+                        <span className="row-index">{rowIdx + 1}</span>
+                      )}
                       <Button aria-label="Add row above" tooltipOptions={TIP} icon="pi pi-plus" rounded text size="small" onClick={() => onAddRow(rowIdx, "above")} tooltip="Add row above" />
                     </div>
                   )}
@@ -172,12 +207,18 @@ export default function SeatGrid({
                             dir={dir}
                             horizontal={horizontal}
                             readOnly={readOnly}
-                            selected={selected && selected.rowIdx === rowIdx && selected.cellIdx === cellIdx}
-                            onClick={() => onSeatClick(rowIdx, cellIdx)}
+                            selected={selectedKeys.has(`${rowIdx}:${cellIdx}`)}
+                            cursor={cursor === `${rowIdx}:${cellIdx}`}
+                            inSwap={swapKeys.has(`${rowIdx}:${cellIdx}`)}
+                            problem={problemKeys.has(`${rowIdx}:${cellIdx}`)}
+                            onClick={(e) => onSeatClick(rowIdx, cellIdx, e)}
                           />
                         </div>
                       ) : (
-                        <div className={`seat-slot blank ${readOnly ? "readonly" : ""}`} key={`b-${cellIdx}`}>
+                        <div
+                          className={`seat-slot blank ${readOnly ? "readonly" : ""}${cursor === `${rowIdx}:${cellIdx}` ? " cursor" : ""}`}
+                          key={`b-${cellIdx}`}
+                        >
                           <div className="blank-box" onClick={readOnly ? undefined : () => onCellToggle(rowIdx, cellIdx)} title={readOnly ? undefined : "Click to make a seat"}>
                             {readOnly ? "" : "+"}
                           </div>
@@ -209,6 +250,9 @@ export default function SeatGrid({
                         onClick={() => onMoveRow(rowIdx, 1)}
                         tooltip={horizontal ? "Move right" : "Move down"}
                       />
+                      {onDuplicateRow && (
+                        <Button aria-label="Duplicate row" tooltipOptions={TIP} icon="pi pi-clone" rounded text size="small" onClick={() => onDuplicateRow(rowIdx)} tooltip="Duplicate row" />
+                      )}
                       <Button aria-label="Delete row" tooltipOptions={TIP} icon="pi pi-trash" rounded text severity="danger" size="small" onClick={() => onDeleteRow(rowIdx)} tooltip="Delete row" />
                       <Button aria-label="Add row below" tooltipOptions={TIP} icon="pi pi-plus" rounded text size="small" onClick={() => onAddRow(rowIdx, "below")} tooltip="Add row below" />
                     </div>
