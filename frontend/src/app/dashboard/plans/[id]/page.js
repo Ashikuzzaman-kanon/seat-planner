@@ -4,13 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "primereact/button";
 import { Tag } from "primereact/tag";
+import PersonLink from "@/components/people/PersonLink";
 import { Message } from "primereact/message";
 import { Toast } from "primereact/toast";
 import { ProgressSpinner } from "primereact/progressspinner";
 import { useAuth } from "@/contexts/AuthContext";
 import { PERMISSIONS } from "@/constants/permissions";
 import { PLAN_STATUS, PLAN_STATUS_LABELS, PLAN_STATUS_SEVERITY } from "@/constants/planStatus";
-import { getPlan } from "@/lib/plans";
+import { getPlan, idToEdit, REVISION_WORDS, moveToTemplates, restorePlan } from "@/lib/plans";
 import SeatGrid from "@/components/plans/SeatGrid";
 
 export default function ViewPlanPage() {
@@ -72,7 +73,32 @@ export default function ViewPlanPage() {
     return <div className="card"><p>Plan not found.</p></div>;
   }
 
-  const editable = [PLAN_STATUS.DRAFT, PLAN_STATUS.PENDING, PLAN_STATUS.REJECTED].includes(plan.status);
+  /** To templates, or back: what is refused says why. */
+  const toTemplates = async () => {
+    const [result] = await moveToTemplates([plan.id]);
+    if (result?.ok) {
+      toast.current?.show({ severity: "success", summary: "Moved to templates" });
+      load();
+    } else toast.current?.show({ severity: "warn", summary: "Not moved", detail: result?.reason, life: 8000 });
+  };
+  const toPlans = async () => {
+    try {
+      await restorePlan(plan.id);
+      toast.current?.show({ severity: "success", summary: "Back among the plans" });
+      load();
+    } catch (err) {
+      toast.current?.show({ severity: "warn", summary: "Not moved back", detail: err.message, life: 8000 });
+    }
+  };
+
+  // An approved plan is edited too — through a copy, so it keeps working meanwhile.
+  const edit = async () => {
+    try {
+      router.push(`/dashboard/plans/${await idToEdit(plan)}/edit`);
+    } catch (err) {
+      toast.current?.show({ severity: "error", summary: "Could not open it for editing", detail: err.message });
+    }
+  };
   const title = [plan.trainName?.name, plan.coachNo ? `Coach ${plan.coachNo}` : null].filter(Boolean).join(" · ") ||
     "Untitled draft";
   const meta = [
@@ -82,7 +108,7 @@ export default function ViewPlanPage() {
     ["Class", plan.coachClass?.name],
     ["From", plan.layout?.fromStation || "—"],
     ["To", plan.layout?.toStation || "—"],
-    ["Created by", plan.createdBy?.fullName],
+    ["Created by", plan.createdBy ? <PersonLink id={plan.createdBy.id} name={plan.createdBy.fullName} /> : null],
   ];
 
   return (
@@ -93,21 +119,67 @@ export default function ViewPlanPage() {
         <div>
           <h1 className="page-title" style={{ marginBottom: 4 }}>
             {title}{" "}
-            <Tag value={PLAN_STATUS_LABELS[plan.status]} severity={PLAN_STATUS_SEVERITY[plan.status]} />
+            {plan.isTemplate ? (
+              <Tag value="Template" severity="info" icon="pi pi-inbox" />
+            ) : (
+              <Tag value={PLAN_STATUS_LABELS[plan.status]} severity={PLAN_STATUS_SEVERITY[plan.status]} />
+            )}
           </h1>
           <p className="page-subtitle">
             {[plan.coachType?.name, plan.coachClass?.name].filter(Boolean).join(" · ") ||
               "No coach type or class yet"}
           </p>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        {/* Several of them: they wrap, on a phone, rather than run off the edge. */}
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", flexShrink: 1, maxWidth: "100%" }}>
           <Button label="Back" icon="pi pi-arrow-left" outlined severity="secondary" onClick={() => router.push("/dashboard/plans")} />
           <Button label="Export PDF" icon="pi pi-file-pdf" loading={exporting} onClick={exportPdf} />
-          {hasPermission(PERMISSIONS.PLAN_UPDATE) && editable && (
-            <Button label="Edit" icon="pi pi-pencil" onClick={() => router.push(`/dashboard/plans/${plan.id}/edit`)} />
+          {plan.isTemplate && hasPermission(PERMISSIONS.PLAN_CREATE) && (
+            <Button label="Make a plan from it" icon="pi pi-copy" outlined onClick={() => router.push(`/dashboard/plans/new?from=${plan.id}`)} />
+          )}
+          {hasPermission(PERMISSIONS.PLAN_UPDATE) && !plan.revisionOfId && (
+            plan.isTemplate ? (
+              <Button label="Move back to plans" icon="pi pi-replay" outlined onClick={toPlans} />
+            ) : (
+              <Button label="Move to templates" icon="pi pi-inbox" outlined severity="secondary" onClick={toTemplates} />
+            )
+          )}
+          {hasPermission(PERMISSIONS.PLAN_UPDATE) && (
+            <Button label="Edit" icon="pi pi-pencil" onClick={edit} />
           )}
         </div>
       </div>
+
+      {plan.isTemplate && (
+        <Message
+          severity="info"
+          style={{ width: "100%" }}
+          text="A template: kept to start plans from. It is never used by trains or departures, and never in the way of a plan with the same train and coach."
+        />
+      )}
+
+      {plan.revisionOfId && (
+        <div className="plan-revision-note" role="note">
+          <i className="pi pi-copy" aria-hidden="true" />
+          <span>
+            These are changes to an approved plan. The plan keeps being used as it is until they are approved; then it
+            takes them, and departures generated from then on carry them.
+          </span>
+          <Button label="The plan in service" size="small" text onClick={() => router.push(`/dashboard/plans/${plan.revisionOfId}`)} />
+        </div>
+      )}
+
+      {plan.revision && (
+        <div className="plan-revision-note" role="note">
+          <i className="pi pi-pencil" aria-hidden="true" />
+          <span>
+            {REVISION_WORDS[plan.revision.status] || "Changes are open"}
+            {plan.revision.status === PLAN_STATUS.REJECTED && plan.revision.rejectionReason ? `: “${plan.revision.rejectionReason}”` : "."}{" "}
+            This plan stays in use as it is until they are approved.
+          </span>
+          <Button label="Open the changes" size="small" text onClick={() => router.push(`/dashboard/plans/${plan.revision.id}`)} />
+        </div>
+      )}
 
       {plan.status === PLAN_STATUS.REJECTED && plan.rejectionReason && (
         <Message severity="error" text={`Rejected: ${plan.rejectionReason}`} style={{ width: "100%", justifyContent: "flex-start", marginBottom: "1rem" }} />

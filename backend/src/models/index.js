@@ -44,6 +44,20 @@ const UserSubscription = require("./UserSubscription");
 const SubscriptionPlatform = require("./SubscriptionPlatform");
 const UserDevice = require("./UserDevice");
 const UserDeviceRefusal = require("./UserDeviceRefusal");
+const AccountRestriction = require("./AccountRestriction");
+const SubscriptionVersionRule = require("./SubscriptionVersionRule");
+const SubscriptionVersionBlock = require("./SubscriptionVersionBlock");
+const SubscriptionAppNotice = require("./SubscriptionAppNotice");
+const AppToken = require("./AppToken");
+const RailwayTimetable = require("./RailwayTimetable");
+const FeatureSwitch = require("./FeatureSwitch");
+const FeatureSwitchTarget = require("./FeatureSwitchTarget");
+const AllocationTrain = require("./AllocationTrain");
+const AllocationPair = require("./AllocationPair");
+const AllocationClass = require("./AllocationClass");
+const AllocationUpload = require("./AllocationUpload");
+const PublicVisit = require("./PublicVisit");
+const PublicVisitDay = require("./PublicVisitDay");
 const demoCapture = require("../utils/demoCapture");
 
 const models = {
@@ -92,6 +106,20 @@ const models = {
   SubscriptionPlatform,
   UserDevice,
   UserDeviceRefusal,
+  AccountRestriction,
+  SubscriptionVersionRule,
+  SubscriptionVersionBlock,
+  SubscriptionAppNotice,
+  AppToken,
+  RailwayTimetable,
+  FeatureSwitch,
+  FeatureSwitchTarget,
+  AllocationTrain,
+  AllocationPair,
+  AllocationClass,
+  AllocationUpload,
+  PublicVisit,
+  PublicVisitDay,
 };
 
 // Wire up associations for any model that declares them.

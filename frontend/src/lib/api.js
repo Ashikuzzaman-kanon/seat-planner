@@ -46,6 +46,13 @@ export function setSessionExpiredHandler(handler) {
   onSessionExpired = handler;
 }
 
+// Told when the server refuses a call because a tab was switched off for this
+// person since the page loaded, so the menu can catch up straight away.
+let onFeatureUnavailable = null;
+export function setFeatureUnavailableHandler(handler) {
+  onFeatureUnavailable = handler;
+}
+
 /* ---------------------------------------------------------------- *
  * Waking a sleeping server
  * ---------------------------------------------------------------- */
@@ -142,6 +149,7 @@ function normalizeError(err) {
   const normalized = new Error(message);
   normalized.status = err.response?.status;
   normalized.details = err.response?.data?.error?.details || err.response?.data?.errors;
+  normalized.code = err.response?.data?.error?.code;
   return normalized;
 }
 
@@ -182,7 +190,9 @@ api.interceptors.response.use(
       }
     }
 
-    return Promise.reject(normalizeError(err));
+    const normalized = normalizeError(err);
+    if (normalized.code === "FEATURE_UNAVAILABLE") onFeatureUnavailable?.();
+    return Promise.reject(normalized);
   }
 );
 

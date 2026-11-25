@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Integration tests (concurrency)" type="js.build_tools.npm" folderName="Seat Planner">
+    <package-json value="$PROJECT_DIR$/backend/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="test:integration" />
+    </scripts>
+    <arguments value="-- concurrency" />
+    <node-interpreter value="project" />
+    <envs>
+      <env name="TEST_MONGO_URI" value="mongodb://127.0.0.1:27017/seat_planner_test" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

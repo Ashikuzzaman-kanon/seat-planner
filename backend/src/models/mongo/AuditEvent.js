@@ -52,5 +52,7 @@ const auditEventSchema = new mongoose.Schema(
 auditEventSchema.index({ at: -1 });
 auditEventSchema.index({ "actor.id": 1, at: -1 });
 auditEventSchema.index({ "entity.type": 1, "entity.id": 1, at: -1 });
+// The analysis: chosen operations over a span of time.
+auditEventSchema.index({ action: 1, at: -1 });
 
 module.exports = mongoose.models.AuditEvent || mongoose.model("AuditEvent", auditEventSchema);

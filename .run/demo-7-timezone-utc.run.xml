@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="7 Timezone (UTC server)" type="NodeJSConfigurationType" folderName="Debugging demo" path-to-js-file="demo/debugging/timezone.js" working-dir="$PROJECT_DIR$">
+    <envs>
+      <env name="TZ" value="UTC" />
+      <env name="DEMO_NOW" value="2026-11-15T20:00:00Z" />
+    </envs>
+    <method v="2" />
+  </configuration>
+</component>

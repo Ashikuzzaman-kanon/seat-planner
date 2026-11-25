@@ -16,8 +16,13 @@ export async function fetchMySubscriptions() {
   return data.subscriptions;
 }
 
-export async function createSubscription({ name, description, code }) {
-  const { data } = await api.post("/subscriptions", { name, description: description || null, code: code || undefined });
+export async function createSubscription({ name, description, code, includesSeatPlans = false }) {
+  const { data } = await api.post("/subscriptions", {
+    name,
+    description: description || null,
+    code: code || undefined,
+    includesSeatPlans,
+  });
   return data.subscription;
 }
 
@@ -74,6 +79,39 @@ export async function cancelSubscription(id, { reason } = {}) {
   return data.subscription;
 }
 
+/**
+ * Continue one that ended — run out, cancelled or declined — for a new
+ * period: `period` is `{ days }` or `{ lastDay }`; `devices` only when changed.
+ */
+export async function resumeSubscription(id, { period, devices }) {
+  const { data } = await api.post(`/subscriptions/members/${id}/resume`, { ...period, devices: devices || undefined });
+  return data.subscription;
+}
+
+/** Whether a subscription can be continued: it ended. */
+export const hasEnded = (m) => ["cancelled", "expired", "declined"].includes(m?.status);
+
+/** How the last period of a record ended, in a line: "Cancelled 12 Oct 2026 by them — “Too dear”". */
+export function endedLine(period, { userId } = {}) {
+  if (!period) return null;
+  const day = period.endedAt ? shortDay(period.endedAt) : period.lastDay ? longDate(period.lastDay) : null;
+  const why = period.reason ? ` — “${period.reason}”` : "";
+  switch (period.status) {
+    case "expired":
+      return `Ran until ${period.lastDay ? longDate(period.lastDay) : day}`;
+    case "declined":
+      return `Declined${day ? ` ${day}` : ""}${why}`;
+    case "cancelled":
+      return `${period.startsAt ? "Cancelled" : "Withdrawn"}${day ? ` ${day}` : ""}${period.endedById && period.endedById === userId ? " by them" : ""}${why}`;
+    default:
+      return period.status;
+  }
+}
+
+/** A moment as a day, "12 Oct 2026", in Dhaka. */
+const shortDay = (iso) =>
+  new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Dhaka" });
+
 /** Change a running subscription: `{ days }` or `{ lastDay }`, `{ devices }`, or both. */
 export async function amendSubscription(id, changes) {
   const { data } = await api.patch(`/subscriptions/members/${id}`, changes);
@@ -122,6 +160,69 @@ export async function updateDevice(id, changes) {
 
 export async function deleteDevice(id) {
   await api.delete(`/subscriptions/devices/${id}`);
+}
+
+/* ---------------- App versions ---------------- */
+
+/**
+ * One subscription's version rules: `{ subscription, platforms }`, each platform
+ * with its rules, blocked versions and the versions its subscribers use.
+ */
+export async function fetchVersionPolicies(subscriptionId) {
+  const { data } = await api.get(`/subscriptions/${subscriptionId}/versions`);
+  return data;
+}
+
+/** `{ versionRequired }`, `{ minVersion }` (empty or null clears it), or both. */
+export async function setVersionPolicy(subscriptionId, platformId, changes) {
+  const { data } = await api.patch(`/subscriptions/${subscriptionId}/versions/${platformId}`, changes);
+  return data.policy;
+}
+
+export async function blockVersion(subscriptionId, platformId, { version, note }) {
+  const { data } = await api.post(`/subscriptions/${subscriptionId}/versions/${platformId}/blocked`, { version, note });
+  return data.blocked;
+}
+
+/** Where the subscription's app is got from. Empty or null clears it. */
+export async function setAppLink(subscriptionId, appUrl) {
+  const { data } = await api.patch(`/subscriptions/${subscriptionId}/app-link`, { appUrl: appUrl || null });
+  return data.appUrl;
+}
+
+/** Tell the subscribers on a platform about a version: `{ kind, version, message, email }`. */
+export async function sendNotice(subscriptionId, platformId, notice) {
+  const { data } = await api.post(`/subscriptions/${subscriptionId}/versions/${platformId}/notices`, notice);
+  return data.notice;
+}
+
+export async function unblockVersion(subscriptionId, platformId, blockedId) {
+  await api.delete(`/subscriptions/${subscriptionId}/versions/${platformId}/blocked/${blockedId}`);
+}
+
+/*
+ * The server's version arithmetic (backend utils/appVersion), so the screen
+ * can say which versions in use a rule would turn away before it is saved:
+ * one to four numbers joined by dots, an optional leading "v", compared number
+ * by number with a missing one counting as 0.
+ */
+const VERSION = /^v?(\d{1,6}(?:\.\d{1,6}){0,3})$/i;
+
+/** "v1.4.02" → "1.4.2", or null if it is not a version. */
+export function cleanVersion(input) {
+  const match = String(input ?? "").trim().match(VERSION);
+  return match ? match[1].split(".").map((n) => String(Number(n))).join(".") : null;
+}
+
+/** -1, 0 or 1. */
+export function compareVersions(a, b) {
+  const x = a.split(".").map(Number);
+  const y = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d < 0 ? -1 : 1;
+  }
+  return 0;
 }
 
 /* ---------------- Dates ----------------
@@ -202,6 +303,7 @@ export const REFUSAL_WORDS = {
   blocked: "The device is blocked",
   limit_reached: "A new device, and every place was taken",
   beyond_limit: "It has a place, but beyond what the subscription allows",
+  app_version: "Every subscription it may use turns away its app's version",
 };
 
 /* ---------------- Words ---------------- */
@@ -221,7 +323,7 @@ export function standing(mine) {
   if (!mine) return "Not subscribed";
   switch (mine.status) {
     case "pending":
-      return "Requested — waiting for approval";
+      return mine.history?.length ? "Asked to continue — waiting for approval" : "Requested — waiting for approval";
     case "active":
       return `Active until ${longDate(mine.lastDay)}`;
     case "declined":

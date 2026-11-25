@@ -1,0 +1,6 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="API (debug)" type="NodeJSConfigurationType" folderName="Seat Planner" path-to-js-file="src/server.js" working-dir="$PROJECT_DIR$/backend">
+    <envs />
+    <method v="2" />
+  </configuration>
+</component>

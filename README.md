@@ -11,7 +11,8 @@ defined as data.
 > request after a quiet spell can take ~50 seconds.
 
 **Guides:** [Features](docs/FEATURES.md) — every feature with a link to its code ·
-[Learning goals](docs/LEARNING-GOALS.md) — each learning-goal topic and where the project exercises it
+[Learning goals](docs/LEARNING-GOALS.md) — each learning-goal topic and where the project exercises it ·
+[Goal study pages](docs/goals/README.md) — the open goals, to learn and present from (all the theory also [in one document](docs/goals/theory.md)), and the debugging demo's runbook
 
 ---
 
@@ -49,6 +50,10 @@ defined as data.
   the subscriber can cancel it at any time, and so can a reviewer. A caller
   outside the app can ask whether an account holds one on the device it is
   running on — see *Subscriptions and the check API*.
+- **Profiles**: a person's name, wherever the dashboard shows it, opens their
+  profile. Everyone sees the name and roles; the person themself, and staff
+  who can view users, also see the email, date of birth, the last four of the
+  national ID, when they joined and last signed in, and anything stopping them.
 
 **For staff on the train**
 - *Check Tickets*: scan a QR with the phone camera or type the number; eight
@@ -69,11 +74,22 @@ defined as data.
   showing who holds each seat and for which stretch; quota holds for specific
   pairs.
 - Seat plans: a grid designer for coach layouts, with an approval workflow.
+  A train has one plan per coach, numbered with the railway's coach letter
+  (KA, KHA, GA…), and classes carry the railway's codes (S_CHAIR, SNIGDHA,
+  AC_B…). An approved plan is changed through an editable copy: the plan
+  keeps being used until the copy is approved, then takes its changes under
+  its own id. Departures already generated keep their seats.
 
 **For administrators**
-- Roles and permissions are data: create roles, grant any of 52 permissions,
+- Roles and permissions are data: create roles, grant any of 54 permissions,
   assign several roles to a user. An escalation guard stops anyone granting
   what they do not hold.
+- **Restricting an account** (`user:restrict`): from its profile, or several at
+  once from *Users*, with a reason. It is signed out everywhere at once and
+  cannot sign in or pass the subscription check until someone lifts it; every
+  restriction and lift is kept with who did it and why. Nobody restricts their
+  own account or a super admin's, and an account holding a permission you lack
+  can only be restricted by someone who holds it too.
 - Sign-in pauses for an account after five wrong passwords in a row (both
   numbers are settings), so a password cannot be guessed at speed. Resetting
   the password ends the pause; anyone already signed in stays signed in.
@@ -222,9 +238,28 @@ npm run railway:load            # or Administration → Railway Data → Load
 npm run railway:fetch           # refresh the timetable snapshot from the railway (then review the diff)
 ```
 
+**Keeping it current.** *Railway Data → Check with the railway* asks the
+railway for every train's timetable as it is now and lists what differs here —
+new trains and stations, renamed trains, moved times, changed stations,
+changed running days, trains no longer published, trains it could not fetch.
+Nothing changes until **Apply changes**, which compares again and then takes
+new trains and stations, new names, and moved times (even on trains with
+departures, keeping the distances saved, so fares stay put); it replaces
+changed stations only on trains with no departures still to run, and updates
+running days unless they were set by hand, listing departures already made on
+a day the train no longer runs. Nothing is deleted, and coaches, seat plans
+and fares are untouched. The applied timetable is the one **Load** works from
+afterwards. The railway's API is not an official public one: if it stops
+answering, the check says so and nothing changes. (`RAILWAY_SOURCE_URL` points
+it elsewhere; the tests use a stand-in.)
+
 Loading adds what is missing and never changes what is there. Trains whose seat
 plans are known (50 of them) get coaches, running days and per-kilometre fares,
-ready for departures; diagrams that name no train become draft plans. It never
+ready for departures — and each of their 226 coaches a plan of its own,
+numbered with its letter, in the railway's class codes (AC_B, AC_S, SNIGDHA,
+F_BERTH, F_SEAT, F_CHAIR, S_CHAIR, SHOVAN, SHULOV, AC_CHAIR). Coaches built
+alike start from the same layout, and each can be changed on its own. Diagrams
+that name no train become draft plans. It never
 generates departures — do that on *Departures → Generate…*. It refuses while
 demo data exists, since the demo's stations share names with the real ones.
 Distances are estimated from running times (the timetable publishes none) and
@@ -283,29 +318,224 @@ Backend environment (`backend/.env`):
 | `CORS_ORIGINS` | production | Comma-separated allowed origins |
 | `APP_URL` | no | The web app's address, for buttons and the logo in emails. Defaults to the first `CORS_ORIGINS` entry |
 | `SUPER_ADMIN_NAME` `SUPER_ADMIN_EMAIL` `SUPER_ADMIN_PASSWORD` | for seeding | Used by `npm run seed:superadmin` |
+| `PUBLIC_EDGE_SECRET` | for the public page | Shared with the web app (same value on Vercel): the public Seat Allocation API then only answers through it, with the visitor's real address |
+| `TURNSTILE_SITE_KEY` `TURNSTILE_SECRET_KEY` | no | Cloudflare Turnstile, the public page's bot check. Without them, rate limits only |
 
 Frontend: `NEXT_PUBLIC_API_BASE_URL` (use `/api`) and, in production,
-`BACKEND_ORIGIN` — where the `/api` rewrite points.
+`BACKEND_ORIGIN` — where the `/api` rewrite points — and `PUBLIC_EDGE_SECRET`,
+the same value as the API's.
 
 Business rules (hold timeouts, refund slabs, waitlist windows, abuse weights,
 job retries…) live in the settings store and are edited on the *Settings*
 screen, not in environment variables.
 
+### Seat allocation
+
+*Operations → Seat Allocation* shows which station pairs Bangladesh Railway
+actually sets seats aside for, train by train and class by class. Four
+filters — from, to, train, class — each left empty to mean all: from and to
+together give the trains with seats on that journey, a train alone gives its
+pairs in route order (and a grid). Only allocated pairs show unless asked.
+
+It is the railway's own data, kept apart from the site's: its tables
+(`allocation_*`) name trains, stations and classes as the railway does, as
+text, and point at nothing the site books on; loading or syncing railway data,
+demo data and the clean-ups never touch them. Whoever holds
+`allocation:manage` fills it from three files, each shown before it is
+applied: the train routes (`train-stoppages.json`, for travel order), the
+census CSV from BR Ticket Helper (pairs in the file replace what is stored for
+them; failed scans, and "Allocated" without the trains named, are left out
+with the reason), and the counts sheet (download it, fill in seats, upload
+it). A count not known is stored as empty and shown as "count not available",
+never as 0. A pair can also be set by hand.
+
+The railway can change its allocation at any time, so the page says how
+current the data is: when the routes, the census and the counts last came in
+and from whom, the span of times the railway was checked for the pairs shown,
+when each count was last set, and every file applied (the upload history).
+
+### Seat allocation for everyone
+
+With **Settings → Public seat allocation → Show Seat Allocation to everyone**
+on, anyone can open `/seat-allocation` without signing in — the same filters,
+list and grid, read-only — and the sign-in page gets a *Check seat allocation
+· Free · no account needed* button. Every signed-in user can then see it in the
+app too.
+
+- **Free searches:** a number a day (default 5) per browser, and a higher one
+  per internet address, then *"Sign in or create a free account to keep
+  searching"*. The opening view and paging don't count; signed in, there is
+  no limit. Counted from the visit records, so a restart doesn't reset them.
+- **Rate limits:** per address a minute and a day, and a ceiling for the
+  whole page a second — all in Settings. Over them: `429` with Retry-After.
+- **Bot check:** Cloudflare Turnstile, once `TURNSTILE_SITE_KEY` and
+  `TURNSTILE_SECRET_KEY` are set on the API. It runs once a visit, out of
+  sight unless unsure, and its pass lasts an hour.
+- **Real addresses:** the web app's server (`frontend/src/middleware.js`)
+  passes each visitor's address and Vercel's rough location to the API, with
+  `PUBLIC_EDGE_SECRET` — set the **same value on Vercel and on Render**. With
+  it set, the public API refuses anything that didn't come through the web
+  app; without it, an address could be faked.
+- **Records:** every request goes into `public_visits` (time, address,
+  country and city, browser, OS, device, language, referring page, a random
+  browser id, what was searched, how many results, what happened) and into the
+  audit log. Kept for the days set in Settings (default 90), then folded into
+  daily totals. *Seat Allocation → Requests → Public page* shows them at a
+  glance.
+
+### Seat allocation requests
+
+Every search for the seat allocation is recorded: on the public page (above),
+and inside the app — the same table, `public_visits`, its `channel` saying
+which (`public` or `app`). The app's searches carry who made them, and the
+browser's address and rough location the same way the public page's do
+(`frontend/src/middleware.js` covers the app's search too). They never count
+against the public page's free searches, and are not in the audit log.
+
+*Seat Allocation → Requests*, for whoever holds `allocation:requests` (the
+super admin, and the admin role), analyses them: pick the days, group by one
+field and then another — who (person, role, browser, address, signed in or
+not), where (public page or app), the journey (from, to, from → to, a station
+either way, train, class, the whole search), the outcome (shown, asked to sign
+in, turned away; found something or nothing), place and device (country, city,
+device, browser, OS, language, the site they came from) or time (hour,
+weekday, day, week, month) — and each group is counted: requests, people,
+visitors, searches that found nothing, when last. A row breaks down further or
+lists its requests one by one; a bar of the chart narrows to its hour, day or
+week; the groups download as CSV. The tab carries today's count. Days whose
+requests have been folded into daily totals show as those totals only, the
+public page's and the app's apart.
+
+### Drawing a seat plan
+
+The seat plan editor (*Seat Plans → New*, or *Edit*):
+
+- **Choosing seats:** click one; Ctrl- or Shift-click for several (*Select
+  several* on a touch screen); a row's number chooses the row; Ctrl+A every
+  seat. What is chosen can be changed together (window, charging port, fan, a
+  note), numbered from a start, made blank or removed.
+- **Mirror left ↔ right:** a row's seats in reverse order, the corridor where
+  it was — every row, or the chosen rows. A seat takes its number and details
+  with it: the row numbers itself the other way from then on (`reversed`).
+- **Swap:** choose seats, *Swap with…*, choose as many others: they change
+  places, paired in reading order, numbers and all.
+- **Rows:** many at once from a pattern (*Add rows…*: 2 + 2, 2 + 3…), or
+  duplicated, repeated, copied (Ctrl+C) and pasted.
+- **Numbering…:** a start, a prefix, left to right, right to left or snaking.
+  Numbers typed in by hand keep theirs; *Renumber all* clears them.
+- **Undo and redo** every change (Ctrl+Z, Ctrl+Y); the arrows move between
+  seats, Space turns a place into a seat or a blank, Delete makes a blank,
+  typing a number sets the chosen seat's.
+- **Checks** as you go: a number on two seats (which cannot be submitted), seats
+  with no number, numbers skipped, what submitting still needs, and the seats,
+  windows and rows summed up. The page asks before you leave with changes
+  unsaved.
+- **Save to more coaches…:** the same layout as a plan of its own for other
+  coaches of the train, as drafts or submitted.
+
+The layout logic is plain functions in `frontend/src/lib/layout.js`, tested
+with `npm test` in `frontend/`.
+
+### Templates, and plans that clash
+
+A train has one plan per coach number (train + coach number is all that makes
+a plan unique; type and class are not). A **template** (`is_template`) is a
+layout kept to start plans from: it keeps its train, coach, type and class as
+labels, but never clashes with a plan, is never submitted or approved, and is
+never used by a train's coaches, a departure, the seat-plan API or the railway
+loader. *Seat Plans → Templates* lists them (*New template*, *Make a plan from
+it*, *Move back to plans*); plans move there one or several at once.
+
+Saving a plan into a train and coach another plan has opens a choice:
+
+- **Replace it with mine** (an approved one): mine becomes its editable copy,
+  so it goes through approval, then takes the plan's place under its own id —
+  every train and departure keeps it. The layout in use is kept as a template.
+- **Move it to templates** — not one a train's coaches use.
+- **Give it another coach number** — trains and departures keep it.
+- **Save mine as a template instead.**
+
+Taking an approved plan out of use, or changing its coach number, needs
+`plan:approve`. Each is in the audit log (`plan.template`, `plan.restore`,
+`plan.details`, `plan.replace`).
+
+### Audit log analysis
+
+*Audit Log → Analysis* (for whoever may read the log, `audit:view`) counts the
+log's events. Pick the events — operations or whole groups of them
+(`subscription.*`), people (or no one signed in), success or failure, the last
+hour or a span of days, hours of the day (`22:00–03:00` runs past midnight),
+days of the week, test accounts or not — and see:
+
+- the totals: events, people, internet addresses, failures;
+- the events over time (by 5 minutes, hour, day or week, as the span suits)
+  and a weekday × hour grid of when it is busiest, Saturday first — a bar or a
+  square narrows to itself;
+- the events grouped by one field and then another — operation, operation
+  group, outcome, target, person, role, internet address, browser, operating
+  system, device, hour, weekday, day, week, month — each group counted; a row
+  breaks down further or lists its events one by one; the groups download as
+  CSV;
+- with two to five people chosen, each side by side: their own totals, days and
+  grid.
+
+It can refresh itself every 30 seconds. Times are Dhaka's. Browser, system and
+device are read from each event's browser description inside the database, by
+the same rules as the public page's visits (`utils/userAgent.js`). It all runs
+as MongoDB aggregations (`services/auditAnalysisService.js`); every field and
+its expression are fixed there, and what a caller sends goes in only as values.
+
+### Switching tabs off
+
+*Settings → Features* (super admin only) turns any tab of the app off — for
+everyone, or for chosen people and roles — with an optional message. The tab
+leaves their menu and every shortcut to it (the Book button, the bell, the
+Home page cards, the account menu); its address shows that it is unavailable,
+with the message; and the API refuses the calls only that tab makes, with
+`403` and `code: "FEATURE_UNAVAILABLE"`. A call another tab still needs keeps
+working: switching off Network takes its stations away, but not the train list
+Departures shows. Which tab each endpoint serves is listed in
+`backend/src/constants/features.js`, and a test fails if a signed-in route is
+left out.
+
+A switch applies to the super admin too. Settings has no switch, so it is
+always there to switch things back on. With Home off, signing in lands on the
+first tab still there. The outside APIs (the subscription check and seat
+plans) are never switched. Every change is in the audit log.
+
 ## Subscriptions and the check API
 
-Two permissions run subscriptions, and a role can hold either or both (the
+Three permissions run subscriptions, and a role can hold any of them (the
 super admin holds every permission):
 
 | Permission | Allows |
 |---|---|
 | `subscription:manage` | Create a subscription, rename it, close it to new requests, reopen it, delete one nobody has asked for. Create the platforms subscriptions are used on, rename them, switch them off |
 | `subscription:approve` | See the requests, approve one for a period and a number of devices, or decline it. Change a running subscription's last day or device counts, cancel anyone's. See an account's devices and why any were turned away; note, block or remove a device |
+| `subscription:versions` (*Manage apps*) | Look after each subscription's app: which versions it accepts on each platform (require a version, set the oldest accepted, block single versions), the link subscribers get it from, and notices to subscribers about a new version or one going away |
 
 Everyone signed in sees the *Subscriptions* page and can ask for one. A
 subscription is valid from approval **through the end of its last day in
 Dhaka**; an hourly job then marks it ended and tells the subscriber, and warns
 them a few days before (*Settings → Subscriptions*). Every request is kept, so
 who decided what stays on record.
+
+**Continuing one that ended.** A person has one record per subscription. When
+it ended — run out, cancelled (by them or a reviewer), or declined — it
+carries on rather than starting over:
+
+- a reviewer (`subscription:approve`) presses **Continue** on it under
+  *Subscribers*: it runs again from today until the day chosen (suggested: as
+  long as last time), with the device counts it had unless changed; the dialog
+  warns when the person cancelled it themselves; they are told
+  (`subscription.resumed`), and it is audited as `subscription.resume`;
+- or the person presses **Ask to continue** on its card: the same record waits
+  for approval again, queued from when they asked, and the reviewer sees it is
+  a continuation and how it last ended.
+
+What each earlier period was — how it ended, when, by whom, why — is kept in
+the record's `history` (and the audit log); *Subscribers* shows how often it
+was continued.
 
 Each subscription has a **code** — made from its name when it is created, or
 chosen then — which never changes, even if the subscription is renamed.
@@ -330,6 +560,29 @@ same device may take one again, so block to keep one out); and every check
 that was turned away, with the reason. Subscribers see their own devices and
 how many places are used, to look at only.
 
+**App versions.** Each subscription has its own rules on the version of the
+app making the check, platform by platform — so one version can be fine for
+*basic* and too old for *premium*. From the *Versions* tab (pick the
+subscription, or use the tag button on its card): **require** a version, set
+the **oldest accepted**, and **block** single versions with a fault whatever
+the minimum. A version is one to four numbers joined by dots — `2`, `1.4.2`,
+`v1.4.2.17` — compared number by number, so `1.10` is newer than `1.9` and
+`1.4` is `1.4.0`. The tab lists the versions the subscription's current
+subscribers' devices last checked in with, so a minimum is raised knowing who
+it turns away. A new subscription has no rules: any version, or none, is
+accepted.
+
+**The app's link, and notices about its versions.** On the *Versions* tab a
+subscription gets an **app link** (an https address): subscribers whose
+subscription is running see an **Open the app** button on its card that goes
+there. Under each platform, **Send a notice** tells everyone currently
+subscribed with a device on that platform that a new version is out, or that
+an old one is going away — in the app at once, and by email too if the sender
+ticks *Email them too* (each email a queued job, retried if the mail server
+refuses). The message starts from ready-made words and can be changed. Raising
+the minimum or blocking a version offers a "going away" notice ready-filled.
+Every notice is listed under its platform, with who sent it and to how many.
+
 **Checking from outside the app.** One endpoint takes an email and password,
 and the device the call is made from, and says for every subscription there is
 whether that account's is valid on that device now:
@@ -337,36 +590,69 @@ whether that account's is valid on that device now:
 ```bash
 curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
   -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"...","deviceId":"458c70e0bd45dc3676dc6d83c5ccec4e","platform":"windows"}'
+  -d '{"email":"user@example.com","password":"...","deviceId":"458c70e0bd45dc3676dc6d83c5ccec4e","platform":"windows","version":"1.4.2"}'
 ```
 
 ```json
 {
   "user": { "name": "Rahim Uddin", "email": "user@example.com" },
   "subscriptions": [
-    { "code": "basic", "valid": false },
-    { "code": "premium", "valid": true }
+    { "code": "basic", "valid": true },
+    { "code": "premium", "valid": false, "message": "This version is no longer supported. Please update." },
+    { "code": "pro", "valid": false }
   ]
 }
 ```
 
-- It opens no session and returns no tokens or dates.
+- It returns no dates. With the right password from a named device, it also
+  returns a **sign-in token** for the app:
+
+  ```json
+  { "user": { … }, "subscriptions": [ … ], "token": "spa_…", "tokenExpiresAt": "2026-10-23T09:00:00.000Z" }
+  ```
+
+  The app sends it as `Authorization: Bearer <token>` in place of the email
+  and password — on the check and on seat plans — so it need not keep the
+  password. It lasts a week by default (*Settings → Subscriptions → App sign-in
+  lasts*), is tied to the account and that device, and still needs `version`
+  on each call. Signing in again from the device replaces it; a new password, a
+  restriction, or staff removing or blocking the device end it early. A token
+  that no longer works answers `401` "Sign in again".
 - `deviceId` is the caller's own stable id for the installation — 4 to 128
   letters, digits and `. _ : -` — and `platform` is a platform's value. Send
-  the same id every time: a new id is a new device.
+  the same id every time: a new id is a new device. `version` is the app's
+  version; the device remembers the last one it sent.
+- **A subscription that does not accept the app's version says so**, on its
+  own entry, so the app can show it: `"message": "A version is required"`
+  when none was sent, or `"This version is no longer supported. Please
+  update."` when it is older than that subscription's minimum or blocked by
+  it. The other subscriptions are answered as usual. It is said only when the
+  version is the one thing in the way — the account holds the subscription and
+  the device has a place — so it never hints at why a device was turned away.
+  The audit entry names each subscription that refused the version, and why.
+- A `version` that is not numbers and dots at all is a `400` for the whole
+  call, before the password is checked.
 - **A device that is not let in is told only `valid: false`.** The limit
   reached, the device blocked, an unknown or switched-off platform, a missing
   or malformed `deviceId` — each is the same `200` in the same shape, with no
   reason. The reason is kept for staff: on the account's devices (*Subscribers
   → Devices → Turned away*), one row per device and reason with a count, the
-  newest hundred per account for ninety days — and in the audit log as
-  `subscription.device_refuse`, when the audit log is configured.
+  newest hundred per account for ninety days — and in the audit log.
+- **Every call is in the audit log**, when the audit log is configured — a
+  device's hundredth check as much as its first. A call that is answered is a
+  `subscription.check` entry: the account, the `deviceId` and `platform` sent,
+  which subscriptions came back valid, and when none did, why. A call refused
+  at the password is `auth.login_failed`, with the same device details. A
+  device taking a place adds a `subscription.device_add` entry of its own.
+  That is one entry per call with nothing clearing them out, so a caller that
+  checks often is what will fill the audit store first.
 - **It answers from any origin** — a page on any other site may call it. The
   rest of the API stays limited to `CORS_ORIGINS`. That is safe here because
   nothing of the browser's own goes with the call: the caller sends the email
   and password itself.
 - A wrong password and an unknown email are the same `401`. An email not yet
-  verified is a `403`, as at sign-in.
+  verified, or a restricted account, is a `403`, as at sign-in — told only
+  after the password is right.
 - The password is checked exactly as sign-in checks it, **and shares its
   pause**: after five wrong passwords in a row the account answers `429` here
   and at sign-in for fifteen minutes, with `Retry-After` saying how long is
@@ -377,6 +663,42 @@ curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/check \
   also works while the API is awake, but while it sleeps that route answers a
   bare `429` (no JSON body) and does not wake it. A `429` that *does* carry a
   JSON `error` is the pause after wrong passwords.
+
+**Seat plans for subscribers' apps.** A subscription can include seat plans
+(*Includes seat plans* in its editor). An app signed in as one of its
+subscribers fetches a train's plans with the same sign-in as the check, plus
+the train — and, to narrow it, a class or a coach:
+
+```bash
+curl -X POST https://seat-planner-api.onrender.com/api/v1/subscriptions/seat-plans \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"...","deviceId":"458c70e0bd45dc3676dc6d83c5ccec4e","platform":"windows","version":"1.4.2","train":"EKOTA EXPRESS (705)","class":"S_CHAIR"}'
+```
+
+```json
+{
+  "train": { "name": "EKOTA EXPRESS (705)", "number": "705" },
+  "coaches": [
+    { "coach": "GA", "class": "S_CHAIR", "type": "PT Inka Red-Green (BG)", "planId": 41, "updatedAt": "2026-10-16T…", "layout": { "rows": [ … ] } },
+    { "coach": "GHA", "class": "S_CHAIR", "type": "PT Inka Red-Green (BG)", "planId": 42, "updatedAt": "2026-10-16T…", "layout": { "rows": [ … ] } }
+  ]
+}
+```
+
+- Signed in with the app's token instead, send `Authorization: Bearer <token>`,
+  `version` and `train` — no email or password.
+- `train` is its name or its number (`705`). Leave out `class` and `coach`
+  for every coach of the train, front to back. Only approved plans are sent;
+  `updatedAt` says when a plan last changed, for caching.
+- It answers only when the account holds a subscription that includes seat
+  plans and is valid on this device — that subscription's device limits and
+  version rules apply, and asking takes a new device's place as a check does.
+- Refused, it says nothing about the device: `403`. The exception is the app's
+  version, when that is the only thing in the way: `400` "A version is
+  required", or `426` "This version is no longer supported. Please update."
+  No such train, or no plan matching, is a `404`.
+- Answers come compressed (a whole train is a few kilobytes), from any origin,
+  and every call is in the audit log as `subscription.seat_plans`.
 
 ## Tests
 

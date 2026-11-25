@@ -7,6 +7,7 @@ import When from "@/components/ui/When";
 import Select from "@/components/ui/Select";
 import { Column } from "primereact/column";
 import { Tag } from "primereact/tag";
+import PersonLink from "@/components/people/PersonLink";
 import { Button } from "primereact/button";
 import { Toast } from "primereact/toast";
 import { ProgressBar } from "primereact/progressbar";
@@ -125,7 +126,12 @@ function JobsInner() {
       <strong>{job.label || JOB_TYPE_LABELS[job.type] || job.type}</strong>
       <small>
         <code>{job.type}</code>
-        {job.createdBy ? ` · started by ${job.createdBy.name || job.createdBy.email}` : ""}
+        {job.createdBy && (
+          <>
+            {" · started by "}
+            <PersonLink id={job.createdBy.id} name={job.createdBy.name || job.createdBy.email} />
+          </>
+        )}
       </small>
     </div>
   );

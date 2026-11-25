@@ -1,8 +1,8 @@
 // Drive Subscriptions the way three people would: a manager creates one, a
 // passenger asks for it on so many devices, a reviewer approves it for a week
 // with counts of their own, devices check in from outside and the reviewer
-// looks after them, and the passenger cancels. Then the platforms, and every
-// tab at phone width.
+// looks after them, and the passenger cancels. Then the platforms, the rules
+// on app versions, and every tab at phone width.
 //
 //   node subscriptions-ui.js
 //
@@ -27,6 +27,7 @@ const NAME = `Browser check ${STAMP}`;
 const DEVICE_A = `browser-check-${STAMP}-a`;
 const DEVICE_B = `browser-check-${STAMP}-b`;
 const PLATFORM = `e2e-${STAMP}`;
+const APP_URL = `https://apps.example.com/browser-check-${STAMP}`;
 
 let pass = 0, fail = 0;
 const check = (label, ok, detail = "") => {
@@ -167,8 +168,8 @@ const clickLabelled = (page, within, mention, label) =>
 
   /** Whether the subscription made here is valid for the passenger on a device. */
   let code = null;
-  const checkFrom = async (deviceId, platform = "windows") => {
-    const res = await api("POST", "/subscriptions/check", { body: { email: PASSENGER, password: PASSWORD, deviceId, platform } });
+  const checkFrom = async (deviceId, platform = "windows", version = "1.4.2") => {
+    const res = await api("POST", "/subscriptions/check", { body: { email: PASSENGER, password: PASSWORD, deviceId, platform, version } });
     return { status: res.status, entry: res.body?.subscriptions?.find((s) => s.code === code), body: res.body };
   };
 
@@ -180,9 +181,9 @@ const clickLabelled = (page, within, mention, label) =>
   const manager = await signedIn(browser, MANAGER, laptop);
   await manager.page.goto(PAGE, { waitUntil: "networkidle0" });
   check("the page is in the menu", (await manager.page.$('a[href="/dashboard/subscriptions"]')) !== null);
-  check("someone who reviews and manages sees the four tabs",
+  check("someone who reviews, manages and looks after versions sees the five tabs",
     (await manager.page.$$eval(".sub-tab", (tabs) => tabs.map((t) => t.textContent.trim().replace(/\d+$/, "")).join("|"))) ===
-      "Subscriptions|Requests|Subscribers|Platforms");
+      "Subscriptions|Requests|Subscribers|Platforms|Versions");
 
   await manager.page.evaluate(() => document.querySelector(".page-head .p-button").click());
   await manager.page.waitForSelector("#sub-name");
@@ -199,6 +200,22 @@ const clickLabelled = (page, within, mention, label) =>
     return el?.querySelector(".sub-code")?.textContent.trim() || null;
   }, NAME);
   check("with its code shown to staff", /^browser-check-/.test(code || ""), code);
+
+  const seatPlanTag = () =>
+    manager.page.evaluate((name) => {
+      const el = [...document.querySelectorAll(".sub-card")].find((c) => c.querySelector("h3")?.textContent === name);
+      return /Includes seat plans/.test(el?.querySelector(".sub-card__tags")?.textContent || "");
+    }, NAME);
+  check("it does not include seat plans to begin with", !(await seatPlanTag()));
+  await clickInCard(manager.page, NAME, "Rename or re-describe");
+  await manager.page.waitForSelector("#sub-seat-plans");
+  await manager.page.evaluate(() => document.querySelector("#sub-seat-plans").click());
+  await clickInDialog(manager.page, "^Save$");
+  await dialogGone(manager.page);
+  check("the editor can include them, and the card says so", Boolean(await waitFor(manager.page, (name) => {
+    const el = [...document.querySelectorAll(".sub-card")].find((c) => c.querySelector("h3")?.textContent === name);
+    return /Includes seat plans/.test(el?.querySelector(".sub-card__tags")?.textContent || "");
+  }, NAME)));
 
   /* ---------------- A passenger asks ---------------- */
   console.log("\n== a passenger asks for it, saying on how many devices ==");
@@ -284,8 +301,10 @@ const clickLabelled = (page, within, mention, label) =>
   check("the first Windows device is valid", first.status === 200 && first.entry?.valid === true, JSON.stringify(first.body));
   const second = await checkFrom(DEVICE_B);
   check("a second is not", second.status === 200 && second.entry?.valid === false, JSON.stringify(second.body));
+  // No reason anywhere: just who, yes or no for each, and the app's sign-in token.
   check("and is told nothing but that",
-    Object.keys(second.body).sort().join() === "subscriptions,user" && second.body.subscriptions.every((s) => Object.keys(s).sort().join() === "code,valid"),
+    Object.keys(second.body).sort().join() === "subscriptions,token,tokenExpiresAt,user" &&
+      second.body.subscriptions.every((s) => Object.keys(s).sort().join() === "code,valid"),
     JSON.stringify(second.body));
 
   await clickLabelled(manager.page, ".sub-table tbody tr", NAME, "Devices");
@@ -293,6 +312,7 @@ const clickLabelled = (page, within, mention, label) =>
   const dialog = () => manager.page.$eval(".p-dialog", (d) => d.innerText);
   let seen = await dialog();
   check("the reviewer sees the device and its place", seen.includes(DEVICE_A) && /Place 1/.test(seen), seen.slice(0, 400));
+  check("and the app version it checked in with", /version 1\.4\.2/.test(seen), seen.slice(0, 400));
   check("and why the other was turned away", /every place was taken/.test(seen) && seen.includes(DEVICE_B), seen.slice(-400));
 
   await clickLabelled(manager.page, ".p-dialog .sub-dev", DEVICE_A, "Add a note");
@@ -348,12 +368,173 @@ const clickLabelled = (page, within, mention, label) =>
   await dialogGone(manager.page);
   check("and the list shows the new counts", /2 Windows, 1 Android/.test((await waitFor(manager.page, subscriberRow, NAME)) || ""));
 
+  /* ---------------- Version rules, for this subscription ---------------- */
+  // While the passenger's subscription runs and DEVICE_A has a place, so a
+  // version this subscription turns away is the only thing in the way — the
+  // one case the check says why.
+  console.log("\n== this subscription's rules on app versions ==");
+  await manager.page.goto(PAGE, { waitUntil: "networkidle0" });
+  check("each card has a way to its version rules", await clickInCard(manager.page, NAME, "Version rules"));
+  await waitFor(manager.page, () => document.querySelector(".sub-versions-pick"));
+  check("which opens the Versions tab on that subscription",
+    (await manager.page.$eval(".sub-tab.is-active", (t) => t.textContent.trim())).startsWith("Versions") &&
+      (await manager.page.$eval(".sub-versions-pick .p-dropdown-label", (l) => l.textContent.trim())) === NAME &&
+      new URL(manager.page.url()).searchParams.get("subscription") !== null,
+    manager.page.url());
+
+  /** The Windows rules of the subscription shown: its text, or click, focus or read one thing in it. */
+  const inCard = (op, selector) =>
+    manager.page.evaluate(
+      (op, selector) => {
+        const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+        if (!el) return null;
+        if (op === "text") return el.innerText;
+        const target = el.querySelector(selector);
+        if (!target) return null;
+        if (op === "click") target.click();
+        if (op === "focus") target.focus();
+        return op === "disabled" ? target.disabled : op === "value" ? target.value : true;
+      },
+      op,
+      selector
+    );
+  const cardText = async () => (await inCard("text")) || "";
+  const savedToast = (words) => waitFor(manager.page, (words) => (document.querySelector(".p-toast")?.textContent || "").includes(words), words);
+  await waitFor(manager.page, () => document.querySelector(".sub-versions"));
+  check("it starts with no rules", /None[.]/.test(await cardText()) && !(await inCard("value", ".sub-versions__minimum input")), await cardText());
+  check("and shows the version its subscriber's device checked in with", /1\.4\.2\s+1 device/.test(await cardText()), await cardText());
+
+  const entryOf = (r) => r.entry || {};
+  let res = await checkFrom(DEVICE_A, "windows", "");
+  check("with no rules, a check without a version is valid", res.entry?.valid === true, JSON.stringify(res.body));
+
+  await inCard("click", ".p-inputswitch input");
+  await savedToast("A version is now required");
+  res = await checkFrom(DEVICE_A, "windows", "");
+  check("a version can be required — then that subscription says so",
+    entryOf(res).valid === false && entryOf(res).message === "A version is required", JSON.stringify(res.body));
+
+  await inCard("focus", ".sub-versions__minimum input");
+  await manager.page.keyboard.type("two");
+  check("a minimum that is not a version cannot be saved", await inCard("disabled", ".sub-versions__minimum button[type=submit]"));
+  await manager.page.keyboard.down("Control");
+  await manager.page.keyboard.press("a");
+  await manager.page.keyboard.up("Control");
+  await manager.page.keyboard.type("2.0");
+  await inCard("click", ".sub-versions__minimum button[type=submit]");
+  check("a minimum can be set", Boolean(await savedToast("Minimum is now 2.0")));
+  res = await checkFrom(DEVICE_A);
+  check("then an older version is told to update",
+    entryOf(res).valid === false && entryOf(res).message === "This version is no longer supported. Please update.", JSON.stringify(res.body));
+  check("and the screen marks who that turns away",
+    Boolean(await waitFor(manager.page, () => /Older than the minimum/.test(document.body.innerText) && /1 device last checked in with a version these rules refuse/.test(document.body.innerText))));
+  check("while the minimum itself is valid", (await checkFrom(DEVICE_A, "windows", "2")).entry?.valid === true);
+
+  await inCard("focus", ".sub-versions__block-form input");
+  await manager.page.keyboard.type("v2.1");
+  await manager.page.keyboard.press("Tab");
+  await manager.page.keyboard.type("Crashes on start");
+  await inCard("click", ".sub-versions__block-form button[type=submit]");
+  check("a single version can be blocked, with why",
+    Boolean(await waitFor(manager.page, () => {
+      const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+      const row = el?.querySelector(".sub-versions__blocked li");
+      return row && /2\.1/.test(row.textContent) && /Crashes on start/.test(row.textContent);
+    })));
+  res = await checkFrom(DEVICE_A, "windows", "2.1.0");
+  check("which is then refused, however it is written", entryOf(res).message === "This version is no longer supported. Please update.", JSON.stringify(res.body));
+  check("while the next one is valid", (await checkFrom(DEVICE_A, "windows", "2.2")).entry?.valid === true);
+
+  /** The notice form under the Windows rules, or null. */
+  const windowsNotice = () =>
+    manager.page.evaluate(() => {
+      const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+      const form = el?.querySelector(".sub-notice");
+      return form ? { version: form.querySelector("input[id^=notice-version]")?.value, message: form.querySelector("textarea")?.value } : null;
+    });
+  const inNotice = (label) =>
+    manager.page.evaluate((label) => {
+      const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+      const button = [...(el?.querySelectorAll(".sub-notice button, .sub-notice__head button") || [])].find((b) => b.textContent.trim().startsWith(label));
+      if (button) button.click();
+      return Boolean(button);
+    }, label);
+  const offered = await waitFor(manager.page, () => {
+    const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+    const form = el?.querySelector(".sub-notice");
+    return form?.querySelector("input[id^=notice-version]")?.value === "2.1";
+  });
+  const filled = await windowsNotice();
+  check("blocking it offers a going-away notice, ready-filled", Boolean(offered) && /going away/.test(filled?.message || ""), JSON.stringify(filled));
+  await manager.page.screenshot({ path: path.join(OUT, "subs-5b-versions.png") });
+  await inNotice("Cancel");
+
+  await inCard("click", '.sub-versions__blocked button[aria-label^="Unblock"]');
+  await savedToast("Version 2.1 unblocked");
+  check("it can be unblocked, after which it checks again", (await checkFrom(DEVICE_A, "windows", "2.1")).entry?.valid === true);
+
+  // Back to no rules, so the rest of the run is not about versions.
+  await inCard("focus", ".sub-versions__minimum input");
+  await manager.page.keyboard.down("Control");
+  await manager.page.keyboard.press("a");
+  await manager.page.keyboard.up("Control");
+  await manager.page.keyboard.press("Backspace");
+  await inCard("click", ".sub-versions__minimum button[type=submit]");
+  await savedToast("Minimum removed");
+  await inCard("click", ".p-inputswitch input");
+  await savedToast("A version is no longer required");
+  check("and the rules can be cleared", (await checkFrom(DEVICE_A, "windows", "")).entry?.valid === true);
+
+  /* ---------------- The app's link, and a notice ---------------- */
+  console.log("\n== the app's link, and a notice to subscribers ==");
+  await manager.page.click("#versions-app-link", { clickCount: 3 });
+  await manager.page.type("#versions-app-link", APP_URL);
+  await manager.page.evaluate(() => document.querySelector(".sub-versions-pick__link button[type=submit]").click());
+  check("an app link can be set", Boolean(await savedToast("App link saved")));
+
+  check("a notice says whom it reaches", /reaches 1 current subscriber with a Windows device/.test(await cardText()), await cardText());
+  await inNotice("Send a notice");
+  await waitFor(manager.page, () => document.querySelector(".sub-notice"));
+  await manager.page.evaluate(() => {
+    const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+    el.querySelector(".sub-notice input[id^=notice-version]").focus();
+  });
+  await manager.page.keyboard.type("3.0");
+  const words = await windowsNotice();
+  check("its words follow the version typed", /3\.0/.test(words?.message || "") && /is out/.test(words?.message || ""), JSON.stringify(words));
+  await inNotice("Send to 1 subscriber");
+  check("it can be sent", Boolean(await savedToast("Sent to 1 subscriber")));
+  check("and is listed under the platform", Boolean(await waitFor(manager.page, () => {
+    const el = [...document.querySelectorAll(".sub-versions")].find((c) => c.querySelector(".sub-request__who code")?.textContent === "windows");
+    const item = el?.querySelector(".sub-notice__history li");
+    return item && /New version/.test(item.textContent) && /3\.0/.test(item.textContent) && /in the app/.test(item.textContent);
+  })));
+  await manager.page.screenshot({ path: path.join(OUT, "subs-5c-notice.png") });
+  const told = (await api("GET", "/notifications?limit=20", { token: subscriber.accessToken })).body?.notifications || [];
+  check("the subscriber has it in the app", told.some((n) => /version 3\.0 is out/.test(n.title)), JSON.stringify(told.map((n) => n.title).slice(0, 5)));
+
   /* ---------------- The passenger sees it, and cancels ---------------- */
   console.log("\n== the passenger sees it running, and cancels ==");
   await passenger.page.goto(PAGE, { waitUntil: "networkidle0" });
   const active = await card(passenger.page, NAME);
-  check("the card says until when", /^Active until \d{1,2} \w{3} \d{4}$/.test(active?.standing || "") && active.buttons.join() === "Cancel subscription",
+  check("the card says until when", /^Active until \d{1,2} \w{3} \d{4}$/.test(active?.standing || "") && active.buttons.join() === "Open the app,Cancel subscription",
     JSON.stringify(active));
+  check("with a button to the app",
+    (await passenger.page.evaluate((name) => {
+      const el = [...document.querySelectorAll(".sub-card")].find((c) => c.querySelector("h3")?.textContent === name);
+      const link = el?.querySelector("a.sub-app-link");
+      return link ? [link.getAttribute("href"), link.getAttribute("target"), link.getAttribute("rel")].join(" ") : null;
+    }, NAME)) === `${APP_URL} _blank noopener noreferrer`);
+  const appButton = await passenger.page.evaluate((name) => {
+    const el = [...document.querySelectorAll(".sub-card")].find((c) => c.querySelector("h3")?.textContent === name);
+    const link = el?.querySelector("a.sub-app-link");
+    if (!link) return null;
+    const style = getComputedStyle(link);
+    return { color: style.color, background: style.backgroundColor, text: link.textContent.trim() };
+  }, NAME);
+  check("whose words can be read on it",
+    appButton?.text === "Open the app" && appButton.color === "rgb(255, 255, 255)" && appButton.color !== appButton.background,
+    JSON.stringify(appButton));
   check("and on how many devices", active?.devices === "On 2 Windows, 1 Android", active?.devices);
   const mine = await passenger.page.evaluate(() => {
     const section = document.querySelector("#sub-devices-title")?.closest("section");
@@ -371,7 +552,7 @@ const clickLabelled = (page, within, mention, label) =>
     const el = [...document.querySelectorAll(".sub-card")].find((c) => c.querySelector("h3")?.textContent === name);
     return el?.querySelector(".sub-standing")?.textContent.trim() === "Cancelled";
   }, NAME);
-  check("then it reads as cancelled, and can be asked for again", Boolean(ended) && (await card(passenger.page, NAME)).buttons.join() === "Subscribe again");
+  check("then it reads as cancelled, and can be asked for again", Boolean(ended) && (await card(passenger.page, NAME)).buttons.join() === "Ask to continue");
   check("and is in their earlier requests", /Your earlier requests/.test(await text(passenger.page)));
   check("and no device is valid for it any more", (await checkFrom(DEVICE_A)).entry?.valid === false);
 
@@ -426,7 +607,7 @@ const clickLabelled = (page, within, mention, label) =>
   check("after which nobody can ask for it", shut?.closed === true && shut.buttons.length === 0, JSON.stringify(shut));
 
   const phone = await signedIn(browser, MANAGER, { width: 390, height: 844, isMobile: true, hasTouch: true });
-  for (const tab of ["subscriptions", "requests", "subscribers", "platforms"]) {
+  for (const tab of ["subscriptions", "requests", "subscribers", "platforms", "versions"]) {
     await phone.page.goto(`${PAGE}?tab=${tab}`, { waitUntil: "networkidle0" });
     const overflow = await phone.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     check(`no sideways scrolling on a phone: ${tab}`, overflow <= 0, `${overflow}px`);

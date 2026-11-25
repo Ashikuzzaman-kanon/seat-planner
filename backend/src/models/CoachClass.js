@@ -2,7 +2,8 @@ const { Model, DataTypes } = require("sequelize");
 const sequelize = require("../config/database");
 
 /**
- * A service class — Shovan, Snigdha, AC Chair, and so on.
+ * A service class, named with the railway's own code — S_CHAIR, SNIGDHA,
+ * AC_B (an AC berth) and so on.
  *
  * Defined on its own rather than through the shared reference factory, because
  * it now carries more than a name: how many passengers may stand in a coach of

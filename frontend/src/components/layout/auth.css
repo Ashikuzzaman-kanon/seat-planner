@@ -636,6 +636,45 @@
   color: var(--brand-600, #2563eb);
 }
 
+/* Seat Allocation without signing in: plainly a way in, not competing with Sign in. */
+.auth-public {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 3.4rem;
+  padding: 0.55rem 1rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--brand-500, #3b82f6);
+  background: var(--brand-50, #eff5ff);
+  color: var(--ink, #0f172a) !important;
+  text-decoration: none !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.auth-public:hover {
+  background: var(--brand-100, #dbe7fe);
+}
+.auth-public:focus-visible {
+  outline: 3px solid var(--brand-500, #3b82f6);
+  outline-offset: 2px;
+}
+.auth-public .pi {
+  font-size: 1.15rem;
+  color: var(--brand-600, #2563eb);
+}
+.auth-public span {
+  display: grid;
+  text-align: left;
+  line-height: 1.25;
+}
+.auth-public strong {
+  font-size: 0.95rem;
+}
+.auth-public small {
+  color: var(--muted, #64748b);
+  font-size: 0.8rem;
+}
+
 .auth-back {
   display: inline-flex;
   align-items: center;

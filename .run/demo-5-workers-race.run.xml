@@ -1,0 +1,6 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="5 Worker threads (race)" type="NodeJSConfigurationType" folderName="Debugging demo" path-to-js-file="demo/debugging/workers.js" working-dir="$PROJECT_DIR$">
+    <envs />
+    <method v="2" />
+  </configuration>
+</component>
