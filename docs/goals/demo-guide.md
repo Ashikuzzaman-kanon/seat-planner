@@ -28,25 +28,30 @@ Run the commands in **PowerShell**. Every exercise uses its own throw-away conta
 - `docker compose down` keeps the data; `down -v` deletes the volumes with it.
 
 ```powershell
-docker pull nginx:alpine
-docker images
+docker pull nginx:alpine           # download a small web-server image from Docker Hub
+docker images                      # list the images on this machine, with their sizes
+
+# start a container named hello in the background (-d); port 8080 on this PC goes to port 80 inside it
 docker run -d --name hello -p 8080:80 nginx:alpine
-docker ps                          # PORTS: 0.0.0.0:8080->80/tcp
-curl.exe http://localhost:8080     # the nginx welcome page
-docker logs hello
-docker exec -it hello sh           # inside the container; type exit to leave
-docker stop hello ; docker ps -a   # Exited (0): stopped, not gone
-docker rm -f hello
+
+docker ps                          # list running containers; PORTS shows 0.0.0.0:8080->80/tcp
+curl.exe http://localhost:8080     # request the page through the published port: nginx's welcome page
+docker logs hello                  # what the container printed: one line per request
+docker exec -it hello sh           # open a shell inside the running container; type exit to leave
+docker stop hello                  # stop it politely (SIGTERM); the container still exists
+docker ps -a                       # list all containers, stopped ones too: hello shows Exited (0)
+docker rm -f hello                 # delete the container (-f stops it first if it is still running)
 ```
 
 The whole project stack:
 
 ```powershell
-cd D:\Projects\seat-planner
-docker compose up -d --build       # MySQL, MongoDB, API, web app, Caddy
-docker compose ps                  # db shows (healthy)
-docker compose logs backend --tail 20
-docker compose down                # no -v: the data is kept
+cd D:\Projects\seat-planner                 # the folder with docker-compose.yml
+docker compose up -d --build                # build the images, then start MySQL, MongoDB, API, web app and Caddy
+docker compose ps                           # this project's containers and their state; db shows (healthy)
+docker compose logs backend --tail 20       # the API's last 20 log lines: migrations, then "API listening"
+docker compose down                         # stop and delete the containers and network; data volumes are kept
+# docker compose down -v                    # the same, but also deletes the data volumes: the data is gone
 ```
 
 ### Docker vs Docker Compose
@@ -82,10 +87,11 @@ Compose file and `.env`, never in the image. Render uses only the Dockerfile.
   rebuilds only the last step, in seconds.
 
 ```powershell
-cd D:\Projects\seat-planner
-docker build -t sp-api:study backend    # first build: every step runs
-docker build -t sp-api:study backend    # again: every step CACHED
-docker history sp-api:study             # one row per layer, with its size
+cd D:\Projects\seat-planner                 # the project folder
+docker build -t sp-api:study backend        # build the API image from backend/Dockerfile, named sp-api:study
+docker build -t sp-api:study backend        # build it again, nothing changed: every step says CACHED
+# now change any file in backend/src and build again: only the last step (COPY . .) runs
+docker history sp-api:study                 # list the image's layers, one row per step, with their sizes
 ```
 
 Keep `sp-api:study`: the next exercises use it, and the registry one removes it at the end.
@@ -102,14 +108,20 @@ Keep `sp-api:study`: the next exercises use it, and the registry one removes it 
   `host.docker.internal` for your own PC.
 
 ```powershell
-docker network create demo-net
-docker run -d --name web --network demo-net nginx:alpine
-docker run --rm --network demo-net alpine wget -qO- http://web   # works: found by name
-docker run --rm alpine wget -qO- -T 3 http://web                 # fails: default bridge, no names
-docker rm -f web ; docker network rm demo-net
+docker network create demo-net                             # create a user-defined network (it has name lookup)
+docker run -d --name web --network demo-net nginx:alpine   # start a web server called web on that network
 
-docker network inspect seat-planner_default                      # the project's network
-docker port seat-planner-mongo-1                                 # 27017/tcp -> 127.0.0.1:27017
+# from a second container on the same network, fetch http://web: it works, "web" is found by name
+# (--rm deletes this helper container as soon as it finishes)
+docker run --rm --network demo-net alpine wget -qO- http://web
+
+# the same from the default network: it fails with "bad address 'web'", because there are no names there
+docker run --rm alpine wget -qO- -T 3 http://web
+
+docker rm -f web ; docker network rm demo-net              # delete the container, then the network
+
+docker network inspect seat-planner_default                # the project's network: its containers and their IPs
+docker port seat-planner-mongo-1                           # the ports it publishes: 27017/tcp -> 127.0.0.1:27017
 ```
 
 ### Debugging and logs
@@ -129,17 +141,20 @@ docker port seat-planner-mongo-1                                 # 27017/tcp -> 
 | 143 | Stopped politely (SIGTERM) |
 
 ```powershell
+# a container that prints one line to stdout and one to stderr, then exits with code 3
 docker run --name broken alpine sh -c "echo starting; echo 'cannot read config' >&2; exit 3"
-docker ps -a --filter name=broken                       # Exited (3)
-docker logs broken                                      # both lines
-docker rm broken
+docker ps -a --filter name=broken      # its state: Exited (3)
+docker logs broken                     # everything it printed, stdout and stderr: both lines
+docker rm broken                       # delete it
 
+# a container capped at 32 MB of memory that keeps taking more until Docker kills it
 docker run --name oom -m 32m alpine sh -c "tail /dev/zero"
-docker inspect oom --format "{{.State.ExitCode}} OOMKilled={{.State.OOMKilled}}"   # 137 OOMKilled=true
-docker rm oom
+# read how it ended: exit code 137, and OOMKilled=true (killed for running out of memory)
+docker inspect oom --format "{{.State.ExitCode}} OOMKilled={{.State.OOMKilled}}"
+docker rm oom                          # delete it
 
-docker stats --no-stream                                # CPU and memory per container
-docker logs -f -t --tail 5 <name>                       # follow, with times
+docker stats --no-stream               # CPU and memory use of every running container, once
+docker logs -f -t --tail 5 <name>      # a container's last 5 lines with times, then keep following (Ctrl+C stops)
 ```
 
 **A real incident:** the API on Render logged `getaddrinfo ENOTFOUND` for the database. The free
@@ -158,12 +173,13 @@ database had been switched off. Power it on, redeploy. Logs first, then the fix.
 - The web app builds in a `builder` stage and copies only the result into the `runner` stage.
 
 ```dockerfile
-RUN npm ci --omit=dev && npm cache clean --force    # one line: 328 MB -> 289 MB
+# install the production dependencies, then delete npm's download cache in the same layer: 328 MB -> 289 MB
+RUN npm ci --omit=dev && npm cache clean --force
 ```
 
 ```powershell
-docker images sp-api                 # SIZE
-docker history sp-api:study          # where the size is
+docker images sp-api                 # the sp-api images and their total sizes
+docker history sp-api:study          # the size of each layer: shows where the megabytes are
 ```
 
 ### Docker security
@@ -175,17 +191,21 @@ docker history sp-api:study          # where the size is
 - Next: read-only file system and dropped capabilities in Compose, and the scan in CI.
 
 ```powershell
-docker run --rm sp-api:study id                                   # uid=1000(node): not root
-docker run --rm --read-only sp-api:study sh -c "touch /app/x"     # Read-only file system
+docker run --rm sp-api:study id        # which user the app runs as: uid=1000(node), not root
+
+# start it with a read-only file system and try to write a file: refused, "Read-only file system"
+docker run --rm --read-only sp-api:study sh -c "touch /app/x"
+
+# scan the image for known HIGH and CRITICAL vulnerabilities, with Trivy running in its own container
 docker run --rm -v //var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.58.1 image --scanners vuln --severity HIGH,CRITICAL sp-api:study
 ```
 
 ```yaml
 # docker-compose.yml, per app service
-read_only: true
-tmpfs: [/tmp]
-cap_drop: [ALL]
-security_opt: ["no-new-privileges:true"]
+read_only: true                           # the container cannot change its own files
+tmpfs: [/tmp]                             # except /tmp, which lives in memory
+cap_drop: [ALL]                           # drop every Linux capability (special privileges)
+security_opt: ["no-new-privileges:true"]  # no process inside can gain more rights later
 ```
 
 ### Resource management
@@ -197,20 +217,21 @@ security_opt: ["no-new-privileges:true"]
 - The production MySQL pool is capped at 3 connections: the free plan allows only a few.
 
 ```powershell
+# a container limited to half a CPU, running an endless loop as fast as it can
 docker run -d --name busy --cpus 0.5 alpine sh -c "while :; do :; done"
-docker stats --no-stream             # busy stays at about 50% CPU
-docker rm -f busy
+docker stats --no-stream             # live use, once: busy stays at about 50% CPU, its limit
+docker rm -f busy                    # stop and delete it
 ```
 
 ```yaml
 backend:
   deploy:
     resources:
-      limits: { memory: 512M, cpus: "1.0" }
+      limits: { memory: 512M, cpus: "1.0" }      # at most 512 MB of memory and one CPU
   environment:
-    NODE_OPTIONS: --max-old-space-size=384
+    NODE_OPTIONS: --max-old-space-size=384      # keep Node's heap below the memory limit
   logging:
-    options: { max-size: "10m", max-file: "3" }
+    options: { max-size: "10m", max-file: "3" } # rotate logs: at most 3 files of 10 MB
 ```
 
 ### Custom registries
@@ -222,14 +243,18 @@ backend:
 - Today Render builds from Git; a registry is the next step.
 
 ```powershell
+# run a private registry on this PC, on port 5000
 docker run -d --name registry -p 127.0.0.1:5000:5000 registry:2
+
+# give the API image a second name that points at that registry (the same image, nothing is copied)
 docker tag sp-api:study localhost:5000/seat-planner-api:1.0.0
-docker push localhost:5000/seat-planner-api:1.0.0
-curl.exe http://localhost:5000/v2/_catalog
-docker rmi localhost:5000/seat-planner-api:1.0.0
-docker pull localhost:5000/seat-planner-api:1.0.0    # back from your own registry
-docker rm -f -v registry
-docker rmi localhost:5000/seat-planner-api:1.0.0 sp-api:study
+
+docker push localhost:5000/seat-planner-api:1.0.0     # upload the image to the registry
+curl.exe http://localhost:5000/v2/_catalog            # ask the registry what it holds: seat-planner-api
+docker rmi localhost:5000/seat-planner-api:1.0.0      # delete that name from this PC
+docker pull localhost:5000/seat-planner-api:1.0.0     # download it back from our own registry
+docker rm -f -v registry                              # delete the registry and its storage (-v)
+docker rmi localhost:5000/seat-planner-api:1.0.0 sp-api:study   # delete the images these exercises used
 ```
 
 ---
@@ -249,8 +274,13 @@ docker rmi localhost:5000/seat-planner-api:1.0.0 sp-api:study
 - **Next:** staging data for previews, a verified database certificate, security headers, scans in CI.
 
 ```powershell
-cd D:\Projects\seat-planner\backend ; npm audit --omit=dev
-curl.exe -sI https://seat-planner-sable.vercel.app/login                  # look for strict-transport-security
+cd D:\Projects\seat-planner\backend          # the API's folder
+npm audit --omit=dev                         # list known vulnerabilities in the production dependencies
+
+# the live site's response headers only (-I); look for strict-transport-security (HSTS)
+curl.exe -sI https://seat-planner-sable.vercel.app/login
+
+# scan the whole Git history for committed secrets, with any secret hidden in the output (--redact)
 docker run --rm -v "D:/Projects/seat-planner:/repo" zricethezav/gitleaks:v8.21.2 git /repo --redact --no-banner
 ```
 
@@ -264,12 +294,16 @@ docker run --rm -v "D:/Projects/seat-planner:/repo" zricethezav/gitleaks:v8.21.2
 - Next: an external uptime check, a health check that tests the databases, JSON logs, Sentry.
 
 ```powershell
-curl.exe -s http://localhost:4000/api/v1/health
+curl.exe -s http://localhost:4000/api/v1/health     # ask the local API whether it is up: {"status":"ok",...}
+
+# the same check, printing only the status code and how long the answer took
 curl.exe -s -o NUL -w "status %{http_code}, %{time_total}s`n" http://localhost:4000/api/v1/health
 
+# run Uptime Kuma, a self-hosted uptime monitor, on port 3001
 docker run -d --name kuma -p 127.0.0.1:3001:3001 louislam/uptime-kuma:1
-# http://localhost:3001 -> monitor http://host.docker.internal:4000/api/v1/health
-docker rm -f -v kuma
+# open http://localhost:3001, add an HTTP monitor for http://host.docker.internal:4000/api/v1/health,
+# then stop the API for a minute and watch the monitor turn red
+docker rm -f -v kuma                                # delete it and its data
 ```
 
 ### Rollback and disaster recovery
@@ -283,25 +317,40 @@ docker rm -f -v kuma
 - Next: nightly backups, one timed restore drill, a written runbook.
 
 ```powershell
-# backup and restore, on a throw-away MySQL
+# ----- backup and restore, on a throw-away MySQL -----
+
+# start MySQL 8 with an empty database called shop
 docker run -d --name dr-db -e MYSQL_ROOT_PASSWORD=secret -e MYSQL_DATABASE=shop mysql:8
-# wait about 20 seconds
+
+# wait about 20 seconds for MySQL to start, then create a table with two rows
 docker exec dr-db mysql -uroot -psecret shop -e "CREATE TABLE orders (id INT PRIMARY KEY, item VARCHAR(20)); INSERT INTO orders VALUES (1,'ticket'),(2,'refund');"
+
+# the backup: dump the whole database into a file
 docker exec dr-db sh -c "mysqldump -uroot -psecret --single-transaction shop > /tmp/shop.sql"
-docker exec dr-db mysql -uroot -psecret shop -e "DROP TABLE orders;"            # the disaster
-docker exec dr-db sh -c "mysql -uroot -psecret shop < /tmp/shop.sql"            # the recovery
-docker exec dr-db mysql -uroot -psecret shop -e "SELECT * FROM orders;"         # both rows back
-docker rm -f -v dr-db
 
-# rollback by image tag
-docker run -d --name app -p 8080:80 nginx:1.27-alpine          # "the new release"
-curl.exe -sI http://localhost:8080 | Select-String Server       # nginx/1.27.x
-docker rm -f app
-docker run -d --name app -p 8080:80 nginx:1.26-alpine          # roll back: same command, previous tag
-curl.exe -sI http://localhost:8080 | Select-String Server       # nginx/1.26.x
-docker rm -f app
+# the disaster: delete the table
+docker exec dr-db mysql -uroot -psecret shop -e "DROP TABLE orders;"
 
-# undo one migration, by name only (in backend/; shown for reference, not run here)
+# the recovery: load the dump back into the database
+docker exec dr-db sh -c "mysql -uroot -psecret shop < /tmp/shop.sql"
+
+# check: both rows are back
+docker exec dr-db mysql -uroot -psecret shop -e "SELECT * FROM orders;"
+
+docker rm -f -v dr-db                                          # delete the database container and its data
+
+# ----- rollback by image tag -----
+
+docker run -d --name app -p 8080:80 nginx:1.27-alpine          # deploy "the new release", version 1.27
+curl.exe -sI http://localhost:8080 | Select-String Server       # which version answers: nginx/1.27.x
+docker rm -f app                                               # take it down
+docker run -d --name app -p 8080:80 nginx:1.26-alpine          # roll back: the same command, the previous tag
+curl.exe -sI http://localhost:8080 | Select-String Server       # now nginx/1.26.x answers
+docker rm -f app                                               # clean up
+
+# ----- undo one migration, by name only (in backend/; shown for reference, not run here) -----
+
+# runs only that migration's "down" step; naming it means only the one you mean is undone
 npx sequelize-cli db:migrate:undo --name 20260205000000-subscription-continue.js
 ```
 
@@ -318,7 +367,8 @@ npx sequelize-cli db:migrate:undo --name 20260205000000-subscription-continue.js
 - Measure with DORA: deploy frequency, lead time, change failure rate, time to recover.
 
 ```powershell
-docker compose config --quiet        # checks the Compose file and the .env variables
+cd D:\Projects\seat-planner          # the folder with docker-compose.yml
+docker compose config --quiet        # check the Compose file is valid; warns about variables missing from .env
 ```
 
 ---
@@ -334,10 +384,15 @@ docker compose config --quiet        # checks the Compose file and the .env vari
 - Compared with GitHub Actions (this project): your own servers, a Groovy `Jenkinsfile`, and you maintain it.
 
 ```powershell
+# run Jenkins (the LTS version) on port 8081, keeping everything it stores in a volume called jenkins_home
 docker run -d --name jenkins -p 127.0.0.1:8081:8080 -v jenkins_home:/var/jenkins_home jenkins/jenkins:lts-jdk21
+
+# print the one-time password that unlocks the first sign-in
 docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
-# open http://localhost:8081, paste it, install suggested plugins
-docker rm -f jenkins ; docker volume rm jenkins_home
+
+# open http://localhost:8081, paste the password, choose "Install suggested plugins", create an admin user
+
+docker rm -f jenkins ; docker volume rm jenkins_home    # delete Jenkins, then everything it stored
 ```
 
 ### Freestyle project
@@ -360,19 +415,31 @@ docker rm -f jenkins ; docker volume rm jenkins_home
 
 ```groovy
 pipeline {
-  agent none
+  agent none                                  // no default machine: each stage picks its own
   stages {
     stage('CI') {
-      parallel {
+      parallel {                              // the two stages below run at the same time
         stage('Backend tests') {
-          agent { label 'linux && docker' }
-          tools { nodejs 'node-20' }
-          steps { checkout scm; dir('backend') { sh 'npm ci'; sh 'npm run coverage' } }
+          agent { label 'linux && docker' }   // run on an agent with these labels
+          tools { nodejs 'node-20' }          // put the Node 20 installation on the PATH
+          steps {
+            checkout scm                      // get the code of the branch being built
+            // (the full version starts MySQL and MongoDB here, with docker.image(...).withRun)
+            dir('backend') {                  // run the next steps in backend/
+              sh 'npm ci'                     // install the locked dependencies
+              sh 'npm run coverage'           // run the tests and measure coverage
+            }
+          }
         }
         stage('Frontend') {
           agent { label 'linux && docker' }
           tools { nodejs 'node-20' }
-          steps { checkout scm; dir('frontend') { sh 'npm ci && npm test && npm run build' } }
+          steps {
+            checkout scm
+            dir('frontend') {
+              sh 'npm ci && npm test && npm run build'   // install, unit tests, production build
+            }
+          }
         }
       }
     }
@@ -391,14 +458,14 @@ pipeline {
 
 ```yaml
 jenkins:
-  numExecutors: 0
+  numExecutors: 0             # the controller runs no builds itself; agents do
   securityRealm:
-    local:
-      allowsSignup: false
+    local:                    # accounts kept in Jenkins itself
+      allowsSignup: false     # nobody can create their own account
 tool:
   nodejs:
     installations:
-      - name: node-20
+      - name: node-20         # the name a Jenkinsfile uses: tools { nodejs 'node-20' }
 ```
 
 ---
@@ -430,9 +497,9 @@ tool:
 - Per folder: installed dependencies, `.env`, ports.
 
 ```powershell
-git worktree add ../seat-planner-demo demo
-git worktree list
-git worktree remove ../seat-planner-demo
+git worktree add ../seat-planner-demo demo   # a second folder next to this one, with the demo branch checked out
+git worktree list                            # every folder of this repository, and the branch in each
+git worktree remove ../seat-planner-demo     # delete that folder (refused if it has uncommitted changes)
 ```
 
 ### A proper AI setup
@@ -461,7 +528,8 @@ git worktree remove ../seat-planner-demo
 - Method: 3 to 5 tasks, an estimate without AI written down first, the actual time, and the quality.
 
 ```powershell
-gh pr list --state merged --search "merged:2026-10-02..2026-11-01" --limit 100 --json number --jq length   # 27
+# count the pull requests merged from 2 October to 1 November 2026, with GitHub's command-line tool: 27
+gh pr list --state merged --search "merged:2026-10-02..2026-11-01" --limit 100 --json number --jq length
 ```
 
 ---
@@ -490,8 +558,12 @@ In IntelliJ IDEA or PhpStorm, about 30 minutes. The run configurations load from
 | `Alt+F8` | Evaluate an expression |
 | `Ctrl+Alt+F5` | Attach to a process |
 
-To find the API's process id for part 2:
+Part 2, attaching to the running API:
 
 ```powershell
+# which process is listening on port 4000 (the API): prints its process id
 Get-NetTCPConnection -LocalPort 4000 -State Listen | Select-Object -ExpandProperty OwningProcess
+
+# ask that running process to open its debugger port (9229) without restarting it
+node demo/debugging/enable-inspector.js <pid>
 ```
