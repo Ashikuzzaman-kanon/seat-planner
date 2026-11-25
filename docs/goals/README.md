@@ -4,6 +4,10 @@ Study material for the goal sub-topics still open, written to learn from first a
 Every sub-goal at 100% is left out. The learning-goal topics in [`docs/LEARNING-GOALS.md`](../LEARNING-GOALS.md)
 are unchanged; its goal sheet now points here for each open sub-goal.
 
+**All the theory in one document:** [theory.md](theory.md) has pages 1 to 8 below in study order, with one
+contents table and a revision sheet (every sub-topic in one sentence) at the end. It is built from these
+pages by `node tools/build-theory-guide.js`, so edit a page and run that; never edit theory.md itself.
+
 ## How each sub-topic is laid out
 
 Every sub-topic follows the same nine parts, so you always know where to look:

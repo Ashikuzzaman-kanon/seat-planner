@@ -1158,3 +1158,6 @@ fs.writeFileSync(path.join(OUT, "LEARNING-GOALS.md"), g);
 console.log(`FEATURES.md: ${features.reduce((n, s) => n + s.items.length, 0)} features, ${links(f)} links`);
 console.log(`LEARNING-GOALS.md: ${topics.size} topics (1 to ${FROZEN} frozen), ${SHEET.flatMap((s) => s.items).length} sub-goals on the sheet, ${links(g)} links`);
 console.log(`counted: ${Object.entries(COUNT).map(([k, v]) => `${k} ${v}`).join(", ")}`);
+
+// And the theory study pages, in one document.
+require("./build-theory-guide").write();
