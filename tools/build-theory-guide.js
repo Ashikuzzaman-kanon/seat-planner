@@ -256,7 +256,8 @@ function write() {
 
 if (require.main === module) {
   if (process.argv.includes("--check")) {
-    const same = fs.existsSync(OUT) && fs.readFileSync(OUT, "utf8") === build().doc;
+    // Git on Windows may have checked it out with CRLF line endings; that is not a difference.
+    const same = fs.existsSync(OUT) && fs.readFileSync(OUT, "utf8").replace(/\r\n/g, "\n") === build().doc;
     console.log(same ? "theory.md is up to date" : "theory.md is out of date: run node tools/build-theory-guide.js");
     process.exit(same ? 0 : 1);
   }
