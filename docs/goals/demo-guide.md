@@ -1,8 +1,8 @@
-# Demo cheat sheet
+# Demo guide
 
-The short version, to keep open during the demo: each topic's purpose, the points to make, and the commands
-to show. The full explanations are in [theory.md](theory.md); the debugging steps are in
-[debugging-demo.md](debugging-demo.md).
+Each topic's purpose, its key points, and the commands that show it in practice, from Docker to AI, with the
+live debugging demo at the end. The examples come from Seat Planner, a railway ticketing app. Longer
+explanations of every topic are in [theory.md](theory.md).
 
 Run the commands in **PowerShell**. Every exercise uses its own throw-away containers (`hello`, `web`,
 `oom`...) and removes them at the end; the project's own containers are only looked at.
@@ -142,7 +142,7 @@ docker stats --no-stream                                # CPU and memory per con
 docker logs -f -t --tail 5 <name>                       # follow, with times
 ```
 
-**Real incident to mention:** the API on Render logged `getaddrinfo ENOTFOUND` for the database. The free
+**A real incident:** the API on Render logged `getaddrinfo ENOTFOUND` for the database. The free
 database had been switched off. Power it on, redeploy. Logs first, then the fix.
 
 ---
@@ -301,7 +301,7 @@ docker run -d --name app -p 8080:80 nginx:1.26-alpine          # roll back: same
 curl.exe -sI http://localhost:8080 | Select-String Server       # nginx/1.26.x
 docker rm -f app
 
-# undo one migration, by name only (in backend/; show it, do not run it in the demo)
+# undo one migration, by name only (in backend/; shown for reference, not run here)
 npx sequelize-cli db:migrate:undo --name 20260205000000-subscription-continue.js
 ```
 
@@ -469,9 +469,9 @@ gh pr list --state merged --search "merged:2026-10-02..2026-11-01" --limit 100 -
 ## Debugging demo (live)
 
 In IntelliJ IDEA or PhpStorm, about 30 minutes. The run configurations load from `.run/`; the scripts are in
-`demo/debugging/`. Full steps: [debugging-demo.md](debugging-demo.md).
+`demo/debugging/`. Step by step: [debugging-demo.md](debugging-demo.md).
 
-| # | Technique | Run configuration | What to show |
+| # | Technique | Run configuration | What it shows |
 |---|---|---|---|
 | 1 | Conditional breakpoints and actions | **1 Refunds (conditional breakpoints)** | Condition `refund < 0` stops at booking 1056; a logging breakpoint that does not stop |
 | 2 | Attach to process | **Attach to Node (9229)** | The API started with `npm start`, opened with `node demo/debugging/enable-inspector.js <pid>`; stop in the health route |
