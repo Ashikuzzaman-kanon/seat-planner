@@ -130,7 +130,7 @@ docker port seat-planner-mongo-1                           # the ports it publis
 
 1. `docker ps -a`: is it running, restarting or exited, and with which code?
 2. `docker inspect`: was it killed for memory (`OOMKilled`), is its health check failing?
-3. `docker logs --tail 100`: the last thing it printed.
+3. `docker compose logs --tail 100 <service>` (or `docker logs <container>`): the last thing it printed.
 4. `docker exec -it <name> sh` to look inside; if it dies at once, `docker run -it --entrypoint sh <image>`.
 
 | Exit code | Means |
@@ -140,22 +140,43 @@ docker port seat-planner-mongo-1                           # the ports it publis
 | 137 | Killed, often for memory |
 | 143 | Stopped politely (SIGTERM) |
 
-```powershell
-# a container that prints one line to stdout and one to stderr, then exits with code 3
-docker run --name broken alpine sh -c "echo starting; echo 'cannot read config' >&2; exit 3"
-docker ps -a --filter name=broken      # its state: Exited (3)
-docker logs broken                     # everything it printed, stdout and stderr: both lines
-docker rm broken                       # delete it
+**Logs of several containers with Docker Compose.** `docker compose logs` shows every service in the project
+together, each line starting with the service it came from:
 
-# a container capped at 32 MB of memory that keeps taking more until Docker kills it
-docker run --name oom -m 32m alpine sh -c "tail /dev/zero"
-# read how it ended: exit code 137, and OOMKilled=true (killed for running out of memory)
-docker inspect oom --format "{{.State.ExitCode}} OOMKilled={{.State.OOMKilled}}"
-docker rm oom                          # delete it
-
-docker stats --no-stream               # CPU and memory use of every running container, once
-docker logs -f -t --tail 5 <name>      # a container's last 5 lines with times, then keep following (Ctrl+C stops)
+```text
+db-1        | ... ready for connections. Version: '8.0' ...
+backend-1   | API listening on port 4000
+frontend-1  | ✓ Ready in 1.2s
+caddy-1     | {"level":"info","msg":"serving initial configuration"}
 ```
+
+```powershell
+cd D:\Projects\seat-planner                   # run them in the folder with docker-compose.yml
+docker compose ps                             # which services are running, and which have exited
+
+docker compose logs                           # all services, mixed together, each line labelled
+docker compose logs -f                        # the same, then keep following new lines (Ctrl+C stops)
+docker compose logs backend                   # one service only (use the service name)
+docker compose logs backend db                # two services together
+docker compose logs -f --tail 20 backend      # the last 20 lines, then follow
+docker compose logs -t --since 10m backend    # only the last 10 minutes, with a time on each line
+docker compose logs backend | Select-String error   # only the lines that contain "error"
+
+docker logs -f seat-planner-backend-1         # plain Docker works too, with the container's name
+```
+
+The service names in this project are `db`, `mongo`, `backend`, `frontend` and `caddy`.
+
+- **`up` without `-d`** starts everything and prints all the logs in the terminal; Ctrl+C then stops the
+  containers. With `up -d` they run in the background, and `docker compose logs -f` shows the logs.
+- **An exited service** still has its logs: `docker compose ps` shows which one stopped, its logs say why.
+- **`down` deletes the logs** along with the containers, so read them first.
+- **Logs only grow:** Docker keeps each container's output in a file and does not trim it by default. Set
+  `max-size` and `max-file` under `logging:` in the Compose file.
+- **In production** there is no Compose: Render and Vercel collect the same output (the app logs to stdout)
+  and show it in their dashboards.
+
+**One line:** `docker compose logs -f` shows every service at once; add a service name to see just one.
 
 **A real incident:** the API on Render logged `getaddrinfo ENOTFOUND` for the database. The free
 database had been switched off. Power it on, redeploy. Logs first, then the fix.
@@ -221,6 +242,12 @@ security_opt: ["no-new-privileges:true"]  # no process inside can gain more righ
 docker run -d --name busy --cpus 0.5 alpine sh -c "while :; do :; done"
 docker stats --no-stream             # live use, once: busy stays at about 50% CPU, its limit
 docker rm -f busy                    # stop and delete it
+
+# a container capped at 32 MB of memory that keeps taking more until Docker kills it
+docker run --name oom -m 32m alpine sh -c "tail /dev/zero"
+# read how it ended: exit code 137, and OOMKilled=true (killed for running out of memory)
+docker inspect oom --format "{{.State.ExitCode}} OOMKilled={{.State.OOMKilled}}"
+docker rm oom                        # delete it
 ```
 
 ```yaml
