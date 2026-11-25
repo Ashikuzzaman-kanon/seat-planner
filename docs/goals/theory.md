@@ -2709,7 +2709,7 @@ measurement must reward **finished, tested, working** features, otherwise it rew
 | Fastest stretch | 11 pull requests (#18 to #28) in **12 days**, about 20,000 lines added |
 | Size of the change | +77,108 / −3,168 lines across 783 file changes, in those 27 pull requests |
 | Features documented in the feature guide | **41** ([`docs/FEATURES.md`](../FEATURES.md)) |
-| Tests alongside them | **57** integration suites (about 2,150 checks), **337** backend unit tests, **10** frontend unit tests, **22** browser end-to-end scripts |
+| Tests alongside them | **57** integration suites (2,156 checks), **337** backend unit tests, **10** frontend unit tests, **20** browser end-to-end scripts (run locally before a pull request; CI runs the rest) |
 | CI | Every pull request runs all backend tests against real MySQL and MongoDB, and a full frontend build |
 | Scope | A ticketing system with seat plans, bookings, refunds, subscriptions with a public check API, seat allocation, audit analysis, an Android app with signed releases, and a production deployment |
 | These study notes | Nine pages, every exercise run before being written, in one working session |
@@ -2732,8 +2732,9 @@ If the estimates add up to three times the actual time, with equal or better qua
 
 > "I measure productivity by finished, tested work, not lines of code. In the month from early October to early
 > November I merged 27 pull requests, about six a week, including one stretch of eleven in twelve days. Each
-> came with tests: the project has 57 integration suites, over 300 unit tests and 22 browser tests, and CI runs
-> them on every pull request, so the speed did not cost quality.
+> came with tests: the project has 57 integration suites, over 300 unit tests and 20 browser test scripts. CI runs
+> the unit and integration tests on every pull request, and the browser scripts are run locally before one, so the
+> speed did not cost quality.
 >
 > For the 200% figure I compare tasks against how long they would have taken me before, using my own past work
 > as the baseline. Where AI helps most is the volume work (tests, migrations, documentation, verification) and
