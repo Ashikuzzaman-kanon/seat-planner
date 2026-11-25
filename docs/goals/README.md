@@ -8,8 +8,8 @@ are unchanged; its goal sheet now points here for each open sub-goal.
 contents table and a revision sheet (every sub-topic in one sentence) at the end. It is built from these
 pages by `node tools/build-theory-guide.js`, so edit a page and run that; never edit theory.md itself.
 
-**For the demo itself:** [demo-cheatsheet.md](demo-cheatsheet.md) keeps only each topic's purpose, the points
-to make and the commands to show, all on one page.
+**To present from:** [demo-guide.md](demo-guide.md) has each topic's purpose, key points and commands on one
+page.
 
 ## How each sub-topic is laid out
 
